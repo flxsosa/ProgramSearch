@@ -41,12 +41,12 @@ class CSG():
             if len(tokens) != 3: return None
             if not isinstance(tokens[2],CSG): return None
             if not isinstance(tokens[1],CSG): return None
-            return Union(tokens[0],tokens[1])
+            return Union(tokens[1],tokens[2])
         if tokens[0] == '-':
             if len(tokens) != 3: return None
             if not isinstance(tokens[2],CSG): return None
             if not isinstance(tokens[1],CSG): return None
-            return Difference(tokens[0],tokens[1])
+            return Difference(tokens[1],tokens[2])
         if tokens[0] == 't':
             if len(tokens) != 4: return None
             if not isinstance(tokens[3],CSG): return None
