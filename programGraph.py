@@ -112,6 +112,7 @@ class ProgramPointerNetwork(nn.Module):
                                           for o in objects])
         else:
             objectEncodings = torch.zeros((1, self.objectEncoder.outputDimensionality))
+            if self.use_cuda: objectEncodings = objectEncodings.cuda()
         
         h0 = self.initialHidden(objectEncodings, self.specEncoder(spec))
 
@@ -150,6 +151,7 @@ class ProgramPointerNetwork(nn.Module):
                                                 for o in objects])
             else:
                 objectEncodings = torch.zeros((1, self.objectEncoder.outputDimensionality))
+                if self.use_cuda: objectEncodings = objectEncodings.cuda()
 
             h0 = self.initialHidden(objectEncodings, self.specEncoder(spec))
 
@@ -190,6 +192,7 @@ class ProgramPointerNetwork(nn.Module):
                                    for o in objects ])
             else:
                 oe = torch.zeros((1, self.objectEncoder.outputDimensionality))
+                if self.use_cuda: oe = oe.cuda()
             h0 = self.initialHidden(oe, specEncoding)
 
             nextLineOfCode = self.decoder.sample(h0, oe if len(objectEncodings) > 0 else None)

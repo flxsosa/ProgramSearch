@@ -74,16 +74,24 @@ class LineDecoder(nn.Module):
         for p,b in enumerate(pointerBounds):
             if b is not None:
                 mask[p, b:] = NEGATIVEINFINITY
+                
+        mask = torch.tensor(mask).float()
+        if self.use_cuda: mask = mask.cuda()
         
-        return F.log_softmax(attention + torch.tensor(mask).float(), dim=1)        
+        return F.log_softmax(attention + mask, dim=1)        
 
     def logLikelihood_hidden(self, initialState, target, encodedInputs):
         symbolSequence = [self.wordToIndex[t if not isinstance(t,Pointer) else "POINTER"]
                           for t in ["STARTING"] + target + ["ENDING"] ]
         
         # inputSequence : L x H
-        inputSequence = self.embedding(torch.tensor(symbolSequence[:-1]))
+        inputSequence = torch.tensor(symbolSequence[:-1])
         outputSequence = torch.tensor(symbolSequence[1:])
+        if self.use_cuda:
+            inputSequence = inputSequence.cuda()
+            outputSequence = outputSequence.cuda()
+        inputSequence = self.embedding(inputSequence)
+        
 
         # Concatenate the object encodings w/ the inputs
         objectInputs = torch.zeros(len(symbolSequence) - 1, self.encoderDimensionality)
