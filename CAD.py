@@ -225,7 +225,7 @@ def trainCSG(m, getProgram, maxSteps=100000):
                 print(f"loss is small! Trying a sample. For reference, here is the goal graph:\n{g.prettyPrint()}")
                 sample = m.sample(s.execute(), maxMoves=5)
                 if sample is None: print("Failed to get a correct sample")
-                else: print(sample.prettyPrint())
+                else: print(f"Got the following sample:\n{sample.prettyPrint()}")
                 print()
 
         print(f"\n\nEPOCH {iteration}\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}")
