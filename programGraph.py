@@ -1,5 +1,8 @@
-import math
+from pointerNetwork import *
+from utilities import *
 
+import math
+import numpy as np
 
 import torch.nn as nn
 import torch
@@ -8,10 +11,6 @@ import torch.optim as optimization
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-import numpy as np
-
-
-from pointerNetwork import *
 
 class ProgramGraph:
     """A program graph is a state in the search space"""
@@ -65,9 +64,9 @@ class ProgramGraph:
 
 
         
-class ProgramPointerNetwork(nn.Module):
+class ProgramPointerNetwork(Module):
     """A network that looks at the objects in a ProgramGraph and then predicts what to add to the graph"""
-    def __init__(self, objectEncoder, specEncoder, DSL, H=256, use_cuda=None):
+    def __init__(self, objectEncoder, specEncoder, DSL, H=256):
         """
         specEncoder: Module that encodes spec to initial hidden state of RNN
         objectEncoder: Module that encodes (spec, object) to features we attend over
@@ -84,10 +83,7 @@ class ProgramPointerNetwork(nn.Module):
             nn.Linear(objectEncoder.outputDimensionality + specEncoder.outputDimensionality, H),
             nn.ReLU())
 
-        if use_cuda is None: use_cuda = torch.cuda.is_available()
-        self.use_cuda = use_cuda
-        if self.use_cuda: self.cuda()
-
+        self.finalize()
 
     def initialHidden(self, objectEncodings, specEncoding):
         x = torch.cat([specEncoding, objectEncodings.max(0)[0]])
@@ -111,8 +107,7 @@ class ProgramPointerNetwork(nn.Module):
             objectEncodings = torch.stack([ self.objectEncoder(spec, o.execute())
                                           for o in objects])
         else:
-            objectEncodings = torch.zeros((1, self.objectEncoder.outputDimensionality))
-            if self.use_cuda: objectEncodings = objectEncodings.cuda()
+            objectEncodings = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
         
         h0 = self.initialHidden(objectEncodings, self.specEncoder(spec))
 
@@ -150,8 +145,7 @@ class ProgramPointerNetwork(nn.Module):
                 objectEncodings = torch.stack([ self.objectEncoder(spec, o.execute())
                                                 for o in objects])
             else:
-                objectEncodings = torch.zeros((1, self.objectEncoder.outputDimensionality))
-                if self.use_cuda: objectEncodings = objectEncodings.cuda()
+                objectEncodings = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
 
             h0 = self.initialHidden(objectEncodings, self.specEncoder(spec))
 
@@ -191,8 +185,7 @@ class ProgramPointerNetwork(nn.Module):
                 oe = torch.stack([ objectEncodings[o]
                                    for o in objects ])
             else:
-                oe = torch.zeros((1, self.objectEncoder.outputDimensionality))
-                if self.use_cuda: oe = oe.cuda()
+                oe = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
             h0 = self.initialHidden(oe, specEncoding)
 
             nextLineOfCode = self.decoder.sample(h0, oe if len(objectEncodings) > 0 else None)

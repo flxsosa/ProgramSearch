@@ -1,3 +1,5 @@
+from utilities import *
+
 import torch
 import torch.nn as nn
 
@@ -9,10 +11,9 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
-class CNN(nn.Module):
+class CNN(Module):
     def __init__(self, _=None, channels=1, layers=4,
-                 inputImageDimension=None, hiddenChannels=64, outputChannels=64,
-                 use_cuda=None):
+                 inputImageDimension=None, hiddenChannels=64, outputChannels=64):
         super(CNN, self).__init__()
         assert inputImageDimension is not None
         assert layers > 1
@@ -38,10 +39,8 @@ class CNN(nn.Module):
         self.outputDimensionality = int(outputChannels*inputImageDimension*inputImageDimension/(4**layers))
         self.channels = channels
 
-        if use_cuda is None: use_cuda = torch.cuda.is_available()
-        self.use_cuda = use_cuda
-        if self.use_cuda: self.cuda()
-
+        self.finalize()
+        
     def forward(self, v):
         if isinstance(v, list): v = np.array(v)
         if self.channels == 1: # input is either BxWxH or WxH
@@ -52,8 +51,7 @@ class CNN(nn.Module):
             if len(v.shape) == 3: squeeze = 1
             elif len(v.shape) == 4: squeeze = 0
 
-        v = torch.tensor(v)
-        if self.use_cuda: v = v.cuda()
+        v = self.tensor(v)
         for _ in range(squeeze): v = v.unsqueeze(0)
         v = self.encoder(v.float())
         for _ in range(squeeze): v = v.squeeze(0)

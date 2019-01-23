@@ -197,7 +197,7 @@ def randomScene(resolution=64):
         return Translation((x,y),
                            Circle(r))
     s = None
-    for _ in range(random.choice([2])):
+    for _ in range(random.choice([1])):
         o = quadrilateral() if random.choice([True,False]) else circular()
         if s is None: s = o
         else: s = Union(s,o)

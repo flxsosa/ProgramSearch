@@ -1,3 +1,5 @@
+from utilities import *
+
 import random
 
 import torch.nn as nn
@@ -16,24 +18,22 @@ class Pointer():
     def __str__(self): return f"P({self.i}, max={self.m})"
     def __repr__(self): return str(self)
     
-class SymbolEncoder(nn.Module):
-    def __init__(self, lexicon, H=256, use_cuda=None):
+class SymbolEncoder(Module):
+    def __init__(self, lexicon, H=256):
         super(SymbolEncoder, self).__init__()
 
         self.encoder = nn.Embedding(len(lexicon), H)
         self.lexicon = lexicon
         self.wordToIndex = {w: j for j,w in enumerate(self.lexicon) }
         
-        if use_cuda is None: use_cuda = torch.cuda.is_available()
-        self.use_cuda = use_cuda
-        if self.use_cuda: self.cuda()
-
+        self.finalize()
+        
     def forward(self, objects):
-        return self.encoder(torch.tensor([self.wordToIndex[o] for o in objects]))
+        return self.encoder(self.device(torch.tensor([self.wordToIndex[o] for o in objects])))
         
 
-class LineDecoder(nn.Module):
-    def __init__(self, lexicon, H=256, encoderDimensionality=256, layers=1, use_cuda=None):
+class LineDecoder(Module):
+    def __init__(self, lexicon, H=256, encoderDimensionality=256, layers=1):
         super(LineDecoder, self).__init__()
 
         self.encoderDimensionality = encoderDimensionality
@@ -57,9 +57,7 @@ class LineDecoder(nn.Module):
 
         self.pointerIndex = self.wordToIndex["POINTER"]
 
-        if use_cuda is None: use_cuda = torch.cuda.is_available()
-        self.use_cuda = use_cuda
-        if self.use_cuda: self.cuda()
+        self.finalize()
         
     def pointerAttention(self, hiddenStates, objectEncodings, pointerBounds):
         hiddenStates = self.decoderToPointer(hiddenStates)
@@ -75,24 +73,17 @@ class LineDecoder(nn.Module):
             if b is not None:
                 mask[p, b:] = NEGATIVEINFINITY
                 
-        mask = torch.tensor(mask).float()
-        if self.use_cuda: mask = mask.cuda()
-        
-        return F.log_softmax(attention + mask, dim=1)        
+        return F.log_softmax(attention + self.device(torch.tensor(mask).float()), dim=1)        
 
     def logLikelihood_hidden(self, initialState, target, encodedInputs):
         symbolSequence = [self.wordToIndex[t if not isinstance(t,Pointer) else "POINTER"]
                           for t in ["STARTING"] + target + ["ENDING"] ]
         
         # inputSequence : L x H
-        inputSequence = torch.tensor(symbolSequence[:-1])
-        outputSequence = torch.tensor(symbolSequence[1:])
-        if self.use_cuda:
-            inputSequence = inputSequence.cuda()
-            outputSequence = outputSequence.cuda()
+        inputSequence = self.tensor(symbolSequence[:-1])
+        outputSequence = self.tensor(symbolSequence[1:])
         inputSequence = self.embedding(inputSequence)
         
-
         # Concatenate the object encodings w/ the inputs
         objectInputs = torch.zeros(len(symbolSequence) - 1, self.encoderDimensionality)
         for t, p in enumerate(target):
@@ -118,11 +109,11 @@ class LineDecoder(nn.Module):
             assert encodedInputs is not None
             pointerValues = [v.i for v in target if isinstance(v, Pointer) ]
             pointerBounds = [v.m for v in target if isinstance(v, Pointer) ]
-            pointerHiddens = o[torch.tensor(pointerTimes),:,:].squeeze(1)
+            pointerHiddens = o[self.tensor(pointerTimes),:,:].squeeze(1)
 
             attention = self.pointerAttention(pointerHiddens, encodedInputs,
                                               pointerBounds)
-            pll = -F.nll_loss(attention, torch.tensor(pointerValues),
+            pll = -F.nll_loss(attention, self.tensor(pointerValues),
                               reduce=True, size_average=False)
         return sll + pll, h
 
@@ -138,8 +129,8 @@ class LineDecoder(nn.Module):
                 latestPointer = encodedInputs[lastWord.i]
                 lastWord = "POINTER"
             else:
-                latestPointer = torch.zeros(self.encoderDimensionality)
-            i = self.embedding(torch.tensor(self.wordToIndex[lastWord]))
+                latestPointer = self.device(torch.zeros(self.encoderDimensionality))
+            i = self.embedding(self.tensor(self.wordToIndex[lastWord]))
             i = torch.cat([i, latestPointer])
             if h is not None: h = h.unsqueeze(0).unsqueeze(0)
             o,h = self.model(i.unsqueeze(0).unsqueeze(0), h)
@@ -164,16 +155,13 @@ class LineDecoder(nn.Module):
 
             
             
-class PointerNetwork(nn.Module):
-    def __init__(self, encoder, lexicon, H=256, use_cuda=None):
+class PointerNetwork(Module):
+    def __init__(self, encoder, lexicon, H=256):
         super(PointerNetwork, self).__init__()
         self.encoder = encoder
         self.decoder = LineDecoder(lexicon, H=H)
 
-        if use_cuda is None: use_cuda = torch.cuda.is_available()
-        self.use_cuda = use_cuda
-        if self.use_cuda: self.cuda()
-
+        self.finalize()
 
     def gradientStep(self, optimizer, inputObjects, outputSequence,
                      verbose=False):
