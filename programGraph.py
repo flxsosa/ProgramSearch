@@ -62,6 +62,9 @@ class ProgramGraph:
             if all( child in self.nodes for child in n.children() ):
                 yield n
 
+    def distanceOracle(self, targetGraph):
+        return len(self.nodes^targetGraph.nodes)
+
 
         
 class ProgramPointerNetwork(Module):
@@ -83,13 +86,32 @@ class ProgramPointerNetwork(Module):
             nn.Linear(objectEncoder.outputDimensionality + specEncoder.outputDimensionality, H),
             nn.ReLU())
 
+        self._distance = nn.Sequential(
+            nn.Linear(objectEncoder.outputDimensionality + specEncoder.outputDimensionality, H),
+            nn.ReLU(),
+            nn.Linear(H, 1),
+            nn.ReLU())
+
         self.finalize()
 
     def initialHidden(self, objectEncodings, specEncoding):
-        x = torch.cat([specEncoding, objectEncodings.max(0)[0]])
-        return self._initialHidden(x)
+        if objectEncodings is None:
+            objectEncodings = self.device(torch.zeros(self.objectEncoder.outputDimensionality))
+        else:
+            objectEncodings = objectEncodings.max(0)[0]
+        return self._initialHidden(torch.cat([specEncoding, objectEncodings]))
+
+    def distance(self, objectEncodings, specEncoding):
+        """Returns a 1-dimensional tensor which should be the sum of (# objects to create) + (# spurious objects created)"""
+        if objectEncodings is None:
+            objectEncodings = self.device(torch.zeros(self.objectEncoder.outputDimensionality))
+        else:
+            objectEncodings = objectEncodings.max(0)[0]
+
+        return self._distance(torch.cat([specEncoding, objectEncodings]))
 
     def gradientStep(self, optimizer, spec, currentGraph, goalGraph):
+        """Returns (policy loss, distance loss)"""
         self.zero_grad()
         
         optimalMoves = list(currentGraph.policyOracle(goalGraph))
@@ -108,8 +130,9 @@ class ProgramPointerNetwork(Module):
                                           for o in objects])
         else:
             objectEncodings = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
-        
-        h0 = self.initialHidden(objectEncodings, self.specEncoder(spec))
+
+        se = self.specEncoder(spec)
+        h0 = self.initialHidden(objectEncodings, se)
 
         def substitutePointers(serialization):
             return [token if isinstance(token,str) else object2pointer[token]
@@ -119,14 +142,108 @@ class ProgramPointerNetwork(Module):
                        for m in optimalMoves]
         targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, objectEncodings if len(objects) > 0 else None)
                              for targetLine in targetLines]
-        l = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
-        l.backward()
+        policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
+
+
+        actualDistance = currentGraph.distanceOracle(goalGraph)
+        predictedDistance = self.distance(objectEncodings, se)
+        distanceLoss = (predictedDistance - float(actualDistance))**2
+        
+        (policyLoss + distanceLoss).backward()
         optimizer.step()
-        return l.data.item()
+        return policyLoss.data.item(), distanceLoss.data.item()
 
     def gradientStepTrace(self, optimizer, spec, goalGraph):
+        """Returns ([policy losses], [distance losses])"""
+        self.zero_grad()
+        
         currentGraph = ProgramGraph([])
-        losses = []
+        policyLosses, distanceLosses = [], []
+
+        objects = list(goalGraph.objects())
+        objectEncodings = self.objectEncoder(spec, [o.execute() for o in objects])
+        object2encodingIndex = {o: i for i,o in enumerate(objects) }
+        
+        specEncoding = self.specEncoder(spec)
+
+        while True:
+            optimalMoves = list(currentGraph.policyOracle(goalGraph))
+            if len(optimalMoves) == 0:
+                finalMove = True
+                optimalMoves = [['RETURN']]
+            else:
+                finalMove = False
+
+            # Gather together objects in scope
+            objectsInScope = list(currentGraph.objects())
+            if len(currentGraph) == 0:
+                scopeEncoding = None
+            else:
+                scopeEncoding = objectEncodings[self.tensor([object2encodingIndex[o]
+                                                             for o in objectsInScope ])]
+
+            object2pointer = {o: Pointer(i)
+                              for i, o  in enumerate(objectsInScope)}
+
+            h0 = self.initialHidden(scopeEncoding, specEncoding)
+            def substitutePointers(serialization):
+                return [token if isinstance(token,str) else object2pointer[token]
+                        for token in serialization]
+
+            targetLines = [substitutePointers(m.serialize()) if not finalMove else m
+                           for m in optimalMoves]
+            targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, scopeEncoding)
+                                 for targetLine in targetLines]
+            policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
+            policyLosses.append(policyLoss)
+
+            actualDistance = currentGraph.distanceOracle(goalGraph)
+            predictedDistance = self.distance(scopeEncoding, specEncoding)
+            distanceLoss = (predictedDistance - float(actualDistance))**2
+
+            # On-policy sample
+            onPolicy = self.decoder.sample(h0, scopeEncoding)
+            if onPolicy is not None:
+                onPolicy = [objectsInScope[token.i] if isinstance(token, Pointer) else token
+                            for token in onPolicy]
+                onPolicy = self.DSL.parseLine(onPolicy)
+                if onPolicy is not None:
+                    onPolicyGraph = currentGraph.extend(onPolicy)
+                    actualDistance = onPolicyGraph.distanceOracle(goalGraph)
+                    if onPolicy in goalGraph.nodes:
+                        # Use precomputed on policy embeddings
+                        newObjectEncoding = objectEncodings[object2encodingIndex[onPolicy]]
+                    else:
+                        # Annoyingly have to compute new embedding
+                        newObjectEncoding = self.objectEncoder(spec, onPolicy.execute())
+                    if len(objectsInScope) > 0: # stuck it on to the objects we already have
+                        onPolicyObjects = torch.cat([scopeEncoding, newObjectEncoding.view(1,-1)])
+                    else: # it is its own thing
+                        onPolicyObjects = torch.stack([newObjectEncoding])                        
+                        
+                    predictedDistance = self.distance(onPolicyObjects, specEncoding)
+                    distanceLoss += (predictedDistance - float(actualDistance))**2                
+
+            
+            policyLosses.append(policyLoss.data.item())
+            distanceLosses.append(distanceLoss.data.item())
+
+            if finalMove:
+                (sum(policyLosses) + sum(distanceLosses)).backward()
+                optimizer.step()
+                return policyLosses, distanceLosses
+
+            # Sample the next (optimal) line of code predicted by the model
+            targetLikelihoods = [math.exp(tl.data.item() + policyLoss) for tl in targetLikelihoods]
+            # This shouldn't be necessary - normalize :/
+            targetLikelihoods = [tl/sum(targetLikelihoods) for tl in targetLikelihoods ]
+            move = np.random.choice(optimalMoves, p=targetLikelihoods)
+            currentGraph = currentGraph.extend(move)
+            
+
+
+        
+        
         while True:
             self.zero_grad()
         
@@ -137,7 +254,7 @@ class ProgramPointerNetwork(Module):
             else:
                 finalMove = False
 
-            objects = currentGraph.objects()
+            objects = list(currentGraph.objects())
             object2pointer = {o: Pointer(i)
                               for i,o in enumerate(objects) }
 
@@ -147,7 +264,8 @@ class ProgramPointerNetwork(Module):
             else:
                 objectEncodings = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
 
-            h0 = self.initialHidden(objectEncodings, self.specEncoder(spec))
+            se = self.specEncoder(spec)
+            h0 = self.initialHidden(objectEncodings, se)
 
             def substitutePointers(serialization):
                 return [token if isinstance(token,str) else object2pointer[token]
@@ -157,15 +275,40 @@ class ProgramPointerNetwork(Module):
                            for m in optimalMoves]
             targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, objectEncodings if len(objects) > 0 else None)
                                  for targetLine in targetLines]
-            l = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
-            l.backward()
-            optimizer.step()
-            losses.append(l.data.item())
+            policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
 
-            if finalMove: return losses
+            actualDistance = currentGraph.distanceOracle(goalGraph)
+            predictedDistance = self.distance(objectEncodings, se)
+            distanceLoss = (predictedDistance - float(actualDistance))**2
+
+            # On-policy sample
+            onPolicy = self.decoder.sample(h0, objectEncodings if len(objects) > 0 else None)
+            if onPolicy is not None:
+                onPolicy = [objects[token.i] if isinstance(token, Pointer) else token
+                            for token in onPolicy]
+                onPolicy = self.DSL.parseLine(onPolicy)
+                if onPolicy is not None:
+                    onPolicyGraph = currentGraph.extend(onPolicy)
+                    actualDistance = onPolicyGraph.distanceOracle(goalGraph)
+                    newObjectEncoding = self.objectEncoder(spec, onPolicy.execute())
+                    if len(objects) > 0: # stuck it on to the objects we already have
+                        onPolicyObjects = torch.cat([objectEncodings, newObjectEncoding.view(1,-1)])
+                    else: # it is its own thing
+                        onPolicyObjects = torch.stack([newObjectEncoding])                        
+                        
+                    predictedDistance = self.distance(onPolicyObjects, se)
+                    distanceLoss += (predictedDistance - float(actualDistance))**2                
+
+            
+            (policyLoss + distanceLoss).backward()
+            optimizer.step()
+            policyLosses.append(policyLoss.data.item())
+            distanceLosses.append(distanceLoss.data.item())
+
+            if finalMove: return policyLosses, distanceLosses
 
             # Sample the next (optimal) line of code predicted by the model
-            targetLikelihoods = [math.exp(tl.data.item() + l) for tl in targetLikelihoods]
+            targetLikelihoods = [math.exp(tl.data.item() + policyLoss) for tl in targetLikelihoods]
             # This shouldn't be necessary - normalize :/
             targetLikelihoods = [tl/sum(targetLikelihoods) for tl in targetLikelihoods ]
             move = np.random.choice(optimalMoves, p=targetLikelihoods)

@@ -147,6 +147,8 @@ class LineDecoder(Module):
                     # Sample the next pointer
                     a = self.pointerAttention(h.unsqueeze(0), encodedInputs, []).squeeze(0)
                     next_symbol = Pointer(torch.multinomial(a.exp(),1)[0].data.item())
+                else:
+                    return None
 
             sequence.append(next_symbol)
                 

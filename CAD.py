@@ -3,6 +3,7 @@ from pointerNetwork import *
 from programGraph import *
 from CNN import *
 
+import time
 import random
 
 
@@ -172,7 +173,12 @@ class ObjectEncoder(CNN):
                                             inputImageDimension=RESOLUTION)
 
     def forward(self, spec, obj):
-        return super(ObjectEncoder, self).forward(np.stack([spec, obj]))
+        if isinstance(obj, list): # batched - expect a single spec and multiple objects
+            spec = np.repeat(spec[np.newaxis,:,:],len(obj),axis=0)
+            obj = np.stack(obj)
+            return super(ObjectEncoder, self).forward(np.stack([spec, obj],1))
+        else: # not batched
+            return super(ObjectEncoder, self).forward(np.stack([spec, obj]))
         
 
 class SpecEncoder(CNN):
@@ -212,15 +218,20 @@ def trainCSG(m, getProgram, maxSteps=100000):
              for _ in range(16)
              for s in [getProgram()]
              for g in [ProgramGraph.fromRoot(s)] ]
+    startTime = time.time()
+    totalSteps = 0
     for iteration in range(maxSteps):
         totalLosses = []
         movedLosses = []
+        distanceLosses = []
         random.shuffle(batch)
         for s,g in batch:
-            l = m.gradientStepTrace(optimizer, s.execute(), g)
+            l,dl = m.gradientStepTrace(optimizer, s.execute(), g)
+            totalSteps += 1
             totalLosses.append(sum(l))
             movedLosses.append(sum(l)/len(l))
-            print(f"Trace loss {sum(l)}\tAverage per-move loss {sum(l)/len(l)}")
+            distanceLosses.append(sum(dl)/len(dl))
+            print(f"Trace loss {sum(l)}\tAverage per-move loss {sum(l)/len(l)}\tAverage distance loss {sum(dl)/len(dl)}")
             if sum(l) < 2. and iteration%5 == 0:
                 print(f"loss is small! Trying a sample. For reference, here is the goal graph:\n{g.prettyPrint()}")
                 sample = m.sample(s.execute(), maxMoves=5)
@@ -228,7 +239,7 @@ def trainCSG(m, getProgram, maxSteps=100000):
                 else: print(f"Got the following sample:\n{sample.prettyPrint()}")
                 print()
 
-        print(f"\n\nEPOCH {iteration}\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}")
+        print(f"\n\nEPOCH {iteration}\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n\t{totalSteps} grad steps\t{totalSteps/(time.time() - startTime)} grad steps/sec")
         
     
 
