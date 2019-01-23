@@ -31,7 +31,9 @@ class LineDecoder(nn.Module):
     def __init__(self, lexicon, H=256, encoderDimensionality=256, layers=1):
         super(LineDecoder, self).__init__()
 
-        self.model = nn.GRU(H, H, layers)
+        self.encoderDimensionality = encoderDimensionality
+
+        self.model = nn.GRU(H + encoderDimensionality, H, layers)
 
         self.specialSymbols = [
             "STARTING", "ENDING", "POINTER"
@@ -49,15 +51,7 @@ class LineDecoder(nn.Module):
         self.attentionSelector = nn.Linear(H, 1, bias=False)
 
         self.pointerIndex = self.wordToIndex["POINTER"]
-
-    def forward(self, input, hidden):
-        input = input.unsqueeze(0)
-        hidden = hidden.unsqueeze(0)        
-        output, hidden = self.model(input, hidden)
-        input = input.squeeze(0)
-        output = output.squeeze(0)
-        return self.output(output), hidden
-
+        
     def pointerAttention(self, hiddenStates, objectEncodings, pointerBounds):
         hiddenStates = self.decoderToPointer(hiddenStates)
         objectEncodings = self.encoderToPointer(objectEncodings)
@@ -78,9 +72,18 @@ class LineDecoder(nn.Module):
         symbolSequence = [self.wordToIndex[t if not isinstance(t,Pointer) else "POINTER"]
                           for t in ["STARTING"] + target + ["ENDING"] ]
         
-        # inputSequence : L x B x H
-        inputSequence = self.embedding(torch.tensor(symbolSequence[:-1])).unsqueeze(1)
+        # inputSequence : L x H
+        inputSequence = self.embedding(torch.tensor(symbolSequence[:-1]))
         outputSequence = torch.tensor(symbolSequence[1:])
+
+        # Concatenate the object encodings w/ the inputs
+        objectInputs = torch.zeros(len(symbolSequence) - 1, self.encoderDimensionality)
+        for t, p in enumerate(target):
+            if isinstance(p, Pointer):
+                objectInputs[t + 1] = encodedInputs[p.i]
+        objectInputs = objectInputs
+
+        inputSequence = torch.cat([inputSequence, objectInputs], 1).unsqueeze(1)
 
         if initialState is not None: initialState = initialState.unsqueeze(0).unsqueeze(0)
 
@@ -95,6 +98,7 @@ class LineDecoder(nn.Module):
         if len(pointerTimes) == 0:
             pll = 0.
         else:
+            assert encodedInputs is not None
             pointerValues = [v.i for v in target if isinstance(v, Pointer) ]
             pointerBounds = [v.m for v in target if isinstance(v, Pointer) ]
             pointerHiddens = o[torch.tensor(pointerTimes),:,:].squeeze(1)
@@ -113,8 +117,13 @@ class LineDecoder(nn.Module):
         h = initialState
         while len(sequence) < 100:
             lastWord = sequence[-1]
-            if isinstance(lastWord, Pointer): lastWord = "POINTER"
+            if isinstance(lastWord, Pointer):
+                latestPointer = encodedInputs[lastWord.i]
+                lastWord = "POINTER"
+            else:
+                latestPointer = torch.zeros(self.encoderDimensionality)
             i = self.embedding(torch.tensor(self.wordToIndex[lastWord]))
+            i = torch.cat([i, latestPointer])
             if h is not None: h = h.unsqueeze(0).unsqueeze(0)
             o,h = self.model(i.unsqueeze(0).unsqueeze(0), h)
             o = o.squeeze(0).squeeze(0)
@@ -126,9 +135,10 @@ class LineDecoder(nn.Module):
             if next_symbol == "ENDING":
                 break
             if next_symbol == "POINTER":
-                # Sample the next pointer
-                a = self.pointerAttention(h.unsqueeze(0), encodedInputs, []).squeeze(0)
-                next_symbol = Pointer(torch.multinomial(a.exp(),1)[0].data.item())
+                if encodedInputs is not None:
+                    # Sample the next pointer
+                    a = self.pointerAttention(h.unsqueeze(0), encodedInputs, []).squeeze(0)
+                    next_symbol = Pointer(torch.multinomial(a.exp(),1)[0].data.item())
 
             sequence.append(next_symbol)
                 
@@ -147,7 +157,7 @@ class PointerNetwork(nn.Module):
                      verbose=False):
         self.zero_grad()
         l = -self.decoder.logLikelihood(None, outputSequence,
-                                        self.encoder(inputObjects))
+                                        self.encoder(inputObjects) if inputObjects else None)
         l.backward()
         optimizer.step()
         if verbose:
@@ -157,37 +167,7 @@ class PointerNetwork(nn.Module):
         return [ inputObjects[s.i] if isinstance(s,Pointer) else s
                  for s in self.decoder.sample(None,
                                               self.encoder(inputObjects))         ]
-        
-
-class SLCNetwork(nn.Module):
-    def __init__(self, encoder, lexicon, H=256):
-        super(SLCNetwork, self).__init__()
-        lexicon = lexicon + ["RETURN"]
-        self.decoder = LineDecoder(lexicon, encoderDimensionality=encoder.outputDimensionality, H=H)
-        self.encoder = encoder
-        self.spec2hidden = nn.Linear(encoder.outputDimensionality,
-                                     H)
-
-    def gradientStep(self, optimizer, program, spec):
-        lines = program.toSLC()
-        trace = [l.execute()
-                 for l in program.calculateTrace()]
-
-        self.zero_grad()
-        spec = self.encoder(spec)
-        objects = self.encoder(trace)
-
-        loss = 0
-        h = self.spec2hidden(spec).unsqueeze(0).unsqueeze(0)
-        for n,line in enumerate(lines):
-            objectsInScope = objects[:n,:]
-            ll, h = self.decoder.logLikelihood_hidden(h, line, objectsInScope)
-            loss = loss - ll
-        loss = loss - self.decoder.logLikelihood(None, ["RETURN"], objects)
-
-        loss.backward()
-        optimizer.step()
-        return l.data.item()
+    
             
 
         
@@ -211,6 +191,9 @@ if __name__ == "__main__":
             sequence = ["small", Pointer(int(small == y)),
                         "large", Pointer(int(large == y))]
         verbose = n%50 == 0
-        m.gradientStep(optimizer, [x,y], sequence, verbose=verbose)
+        if random.choice([False,True]):
+            m.gradientStep(optimizer, [x,y], sequence, verbose=verbose)
+        else:
+            m.gradientStep(optimizer, [], ["small","small"], verbose=verbose)
         if verbose:
             print([x,y],"goes to",m.sample([x,y]))
