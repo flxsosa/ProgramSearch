@@ -204,6 +204,7 @@ def randomScene(resolution=64):
     return s
 
 def trainCSG(m, getProgram, maxSteps=100000):
+    print("cuda?",m.use_cuda)
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
 
     s = getProgram()

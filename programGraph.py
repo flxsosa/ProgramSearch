@@ -193,12 +193,15 @@ class ProgramPointerNetwork(nn.Module):
             h0 = self.initialHidden(oe, specEncoding)
 
             nextLineOfCode = self.decoder.sample(h0, oe if len(objectEncodings) > 0 else None)
+            print("Raw decoder output", nextLineOfCode)
             nextLineOfCode = [objects[t.i] if isinstance(t, Pointer) else t
                               for t in nextLineOfCode ]
+            print("Dereferenced output", nextLineOfCode)
 
             if 'RETURN' in nextLineOfCode or len(graph) >= maxMoves: return graph
 
             nextObject = self.DSL.parseLine(nextLineOfCode)
+            print("Parsed output", nextLineOfCode)
             if nextObject is None: return None
 
             graph = graph.extend(nextObject)
