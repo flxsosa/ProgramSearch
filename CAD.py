@@ -41,6 +41,7 @@ class CSG():
             if len(tokens) != 3: return None
             if not isinstance(tokens[2],CSG): return None
             if not isinstance(tokens[1],CSG): return None
+            if tokens[1] == tokens[2]: return None
             return Union(tokens[1],tokens[2])
         if tokens[0] == '-':
             if len(tokens) != 3: return None
