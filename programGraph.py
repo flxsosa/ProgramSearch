@@ -67,7 +67,7 @@ class ProgramGraph:
         
 class ProgramPointerNetwork(nn.Module):
     """A network that looks at the objects in a ProgramGraph and then predicts what to add to the graph"""
-    def __init__(self, objectEncoder, specEncoder, DSL, H=256):
+    def __init__(self, objectEncoder, specEncoder, DSL, H=256, use_cuda=None):
         """
         specEncoder: Module that encodes spec to initial hidden state of RNN
         objectEncoder: Module that encodes (spec, object) to features we attend over
@@ -83,6 +83,11 @@ class ProgramPointerNetwork(nn.Module):
         self._initialHidden = nn.Sequential(
             nn.Linear(objectEncoder.outputDimensionality + specEncoder.outputDimensionality, H),
             nn.ReLU())
+
+        if use_cuda is None: use_cuda = torch.cuda.is_available()
+        self.use_cuda = use_cuda
+        if self.use_cuda: self.cuda()
+
 
     def initialHidden(self, objectEncodings, specEncoding):
         x = torch.cat([specEncoding, objectEncodings.max(0)[0]])

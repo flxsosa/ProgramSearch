@@ -17,18 +17,23 @@ class Pointer():
     def __repr__(self): return str(self)
     
 class SymbolEncoder(nn.Module):
-    def __init__(self, lexicon, H=256):
+    def __init__(self, lexicon, H=256, use_cuda=None):
         super(SymbolEncoder, self).__init__()
 
         self.encoder = nn.Embedding(len(lexicon), H)
         self.lexicon = lexicon
         self.wordToIndex = {w: j for j,w in enumerate(self.lexicon) }
+        
+        if use_cuda is None: use_cuda = torch.cuda.is_available()
+        self.use_cuda = use_cuda
+        if self.use_cuda: self.cuda()
+
     def forward(self, objects):
         return self.encoder(torch.tensor([self.wordToIndex[o] for o in objects]))
         
 
 class LineDecoder(nn.Module):
-    def __init__(self, lexicon, H=256, encoderDimensionality=256, layers=1):
+    def __init__(self, lexicon, H=256, encoderDimensionality=256, layers=1, use_cuda=None):
         super(LineDecoder, self).__init__()
 
         self.encoderDimensionality = encoderDimensionality
@@ -51,6 +56,10 @@ class LineDecoder(nn.Module):
         self.attentionSelector = nn.Linear(H, 1, bias=False)
 
         self.pointerIndex = self.wordToIndex["POINTER"]
+
+        if use_cuda is None: use_cuda = torch.cuda.is_available()
+        self.use_cuda = use_cuda
+        if self.use_cuda: self.cuda()
         
     def pointerAttention(self, hiddenStates, objectEncodings, pointerBounds):
         hiddenStates = self.decoderToPointer(hiddenStates)
@@ -148,10 +157,15 @@ class LineDecoder(nn.Module):
             
             
 class PointerNetwork(nn.Module):
-    def __init__(self, encoder, lexicon, H=256):
+    def __init__(self, encoder, lexicon, H=256, use_cuda=None):
         super(PointerNetwork, self).__init__()
         self.encoder = encoder
         self.decoder = LineDecoder(lexicon, H=H)
+
+        if use_cuda is None: use_cuda = torch.cuda.is_available()
+        self.use_cuda = use_cuda
+        if self.use_cuda: self.cuda()
+
 
     def gradientStep(self, optimizer, inputObjects, outputSequence,
                      verbose=False):
