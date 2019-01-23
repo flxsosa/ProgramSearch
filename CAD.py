@@ -215,6 +215,7 @@ def trainCSG(m, getProgram, maxSteps=100000):
     for iteration in range(maxSteps):
         totalLosses = []
         movedLosses = []
+        random.shuffle(batch)
         for s,g in batch:
             l = m.gradientStepTrace(optimizer, s.execute(), g)
             totalLosses.append(sum(l))
