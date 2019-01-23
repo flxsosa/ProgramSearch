@@ -198,7 +198,7 @@ def randomScene(resolution=64):
         return Translation((x,y),
                            Circle(r))
     s = None
-    for _ in range(random.choice([2])):
+    for _ in range(random.choice([1,2])):
         o = quadrilateral() if random.choice([True,False]) else circular()
         if s is None: s = o
         else: s = Union(s,o)
@@ -208,18 +208,26 @@ def trainCSG(m, getProgram, maxSteps=100000):
     print("cuda?",m.use_cuda)
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
 
-    s = getProgram()
-    g = ProgramGraph.fromRoot(s)
-    print(f"Training on graph:\n{g.prettyPrint()}")
-
+    batch = [(s,g)
+             for _ in range(16)
+             for s in [getProgram()]
+             for g in [ProgramGraph.fromRoot(s)] ]
     for iteration in range(maxSteps):
-        l = m.gradientStepTrace(optimizer, s.execute(), g)
-        print(f"Trace loss {sum(l)}\tAverage per-move loss {sum(l)/len(l)}")
-        if sum(l)/len(l) < 1.:
-            print(f"1-move loss is small! Trying a sample...")
-            sample = m.sample(s.execute(), maxMoves=5)
-            if sample is None: print("Failed to get a correct sample")
-            else: print(sample.prettyPrint())
+        totalLosses = []
+        movedLosses = []
+        for s,g in batch:
+            l = m.gradientStepTrace(optimizer, s.execute(), g)
+            totalLosses.append(sum(l))
+            movedLosses.append(sum(l)/len(l))
+            print(f"Trace loss {sum(l)}\tAverage per-move loss {sum(l)/len(l)}")
+            if sum(l) < 2. and iteration%5 == 0:
+                print(f"loss is small! Trying a sample. For reference, here is the goal graph:\n{g.prettyPrint()}")
+                sample = m.sample(s.execute(), maxMoves=5)
+                if sample is None: print("Failed to get a correct sample")
+                else: print(sample.prettyPrint())
+                print()
+
+        print(f"\n\nEPOCH {iteration}\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}")
         
     
 
