@@ -197,7 +197,7 @@ class ProgramPointerNetwork(Module):
             if 'RETURN' in nextLineOfCode or len(graph) >= maxMoves: return graph
 
             nextObject = self.DSL.parseLine(nextLineOfCode)
-            print("Parsed output", nextLineOfCode)
+            print("Parsed output", nextObject)
             if nextObject is None: return None
 
             graph = graph.extend(nextObject)
