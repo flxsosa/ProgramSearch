@@ -85,7 +85,7 @@ class LineDecoder(Module):
         inputSequence = self.embedding(inputSequence)
         
         # Concatenate the object encodings w/ the inputs
-        objectInputs = torch.zeros(len(symbolSequence) - 1, self.encoderDimensionality)
+        objectInputs = self.device(torch.zeros(len(symbolSequence) - 1, self.encoderDimensionality))
         for t, p in enumerate(target):
             if isinstance(p, Pointer):
                 objectInputs[t + 1] = encodedInputs[p.i]
