@@ -1,6 +1,8 @@
+import pickle
 import numpy as np
 from pointerNetwork import *
 from programGraph import *
+from SMC import *
 from CNN import *
 
 import time
@@ -23,6 +25,9 @@ class CSG():
     def execute(self):
         if self._rendering is None: self._rendering = self.render()
         return self._rendering
+
+    def IoU(self, other):
+        return (self.execute()*other.execute()).sum()/(self.execute() + other.execute() - self.execute()*other.execute()).sum()
     
     def render(self, w=None, h=None):
         w = w or RESOLUTION
@@ -188,7 +193,7 @@ class SpecEncoder(CNN):
 
 
 """Training"""
-def randomScene(resolution=64):
+def randomScene(resolution=32, maxShapes=3, verbose=False):
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
@@ -204,45 +209,94 @@ def randomScene(resolution=64):
         return Translation((x,y),
                            Circle(r))
     s = None
-    for _ in range(random.choice([1,2])):
+    numberOfShapes = 0
+    desiredShapes = random.choice(range(1, 1 + maxShapes))
+    while numberOfShapes < desiredShapes:
         o = quadrilateral() if random.choice([True,False]) else circular()
         if s is None: s = o
-        else: s = Union(s,o)
+        else:
+            if (s.execute()*o.execute()).sum() > 0.5: continue
+            s = Union(s,o)
+        numberOfShapes += 1
+    if verbose:
+        import matplotlib.pyplot as plot
+        print(ProgramGraph.fromRoot(s).prettyPrint())
+        plot.imshow(s.execute())
+        plot.show()
+    
     return s
 
-def trainCSG(m, getProgram, maxSteps=100000):
+def trainCSG(m, getProgram, maxSteps=100000, checkpoint=None):
     print("cuda?",m.use_cuda)
+    assert checkpoint is not None, "must provide a checkpoint path to export to"
+    
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
-
-    batch = [(s,g)
-             for _ in range(16)
-             for s in [getProgram()]
-             for g in [ProgramGraph.fromRoot(s)] ]
+    
     startTime = time.time()
-    totalSteps = 0
-    for iteration in range(maxSteps):
-        totalLosses = []
-        movedLosses = []
-        distanceLosses = []
-        random.shuffle(batch)
-        for s,g in batch:
-            l,dl = m.gradientStepTrace(optimizer, s.execute(), g)
-            totalSteps += 1
-            totalLosses.append(sum(l))
-            movedLosses.append(sum(l)/len(l))
-            distanceLosses.append(sum(dl)/len(dl))
-            print(f"Trace loss {sum(l)}\tAverage per-move loss {sum(l)/len(l)}\tAverage distance loss {sum(dl)/len(dl)}")
-            if sum(l) < 2. and iteration%5 == 0:
-                print(f"loss is small! Trying a sample. For reference, here is the goal graph:\n{g.prettyPrint()}")
-                sample = m.sample(s.execute(), maxMoves=5)
-                if sample is None: print("Failed to get a correct sample")
-                else: print(f"Got the following sample:\n{sample.prettyPrint()}")
-                print()
+    reportingFrequency = 500
+    totalLosses = []
+    movedLosses = []
+    distanceLosses = []
 
-        print(f"\n\nEPOCH {iteration}\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n\t{totalSteps} grad steps\t{totalSteps/(time.time() - startTime)} grad steps/sec")
+    for iteration in range(maxSteps):
+        s = getProgram()
+        g = ProgramGraph.fromRoot(s)
+        l,dl = m.gradientStepTrace(optimizer, s.execute(), g)
+        totalLosses.append(sum(l))
+        movedLosses.append(sum(l)/len(l))
+        distanceLosses.append(sum(dl)/len(dl))
+        if sum(l) < 2. and iteration%5 == 0:
+            print(f"loss is small! Trying a sample. For reference, here is the goal graph:\n{g.prettyPrint()}")
+            sample = m.sample(s.execute(), maxMoves=5)
+            if sample is None: print("Failed to get a correct sample")
+            else: print(f"Got the following sample:\n{sample.prettyPrint()}")
+            print()
+
+        if iteration > 0 and iteration%reportingFrequency == 0:
+            print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\t\tdistance loss {sum(distanceLosses)/len(distanceLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
+            totalLosses = []
+            movedLosses = []
+            distanceLosses = []
+            with open(checkpoint,"wb") as handle:
+                pickle.dump(m, handle)
+
+def testCSG(m, getProgram):
+    i = SMC(m, particles=50)
+    for _ in range(100):
+        spec = getProgram()
+        print("Trying to explain the program:")
+        print(ProgramGraph.fromRoot(spec).prettyPrint())
+        samples = i.infer(spec.execute())
+        for s in samples:
+            print(s.prettyPrint())
+            print("IoU:",min( o.IoU(spec) for o in s.objects() ))
+            print()
+        print(f"Solved task? {any( spec in s.objects() for s in samples )}")
+
+        print("Trying forward samples...")
+        samples = [m.sample(spec.execute(), maxMoves=6) for _ in range(100)]
+        samples = [sample for sample in samples if sample is not None]
+        print("Sampled IOU:",[max(o.IoU(spec) for o in s.objects() ) for s in samples ])
+        print("Best IOU:",max([max(o.IoU(spec) for o in s.objects() ) for s in samples ]))
+        print(f"{sum( spec in s.objects() for s in samples if s is not None)}/100 samples solved task")
+        
         
     
 
 if __name__ == "__main__":
-    m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), CSG)
-    trainCSG(m, lambda: randomScene())
+    import argparse
+    parser = argparse.ArgumentParser(description = "")
+    parser.add_argument("mode", choices=["train","test"])
+    parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
+    parser.add_argument("--maxShapes", default=2,
+                            type=int)
+    arguments = parser.parse_args()
+
+    if arguments.mode == "train":
+        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), CSG)
+        trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes),
+                 checkpoint=arguments.checkpoint)
+    elif arguments.mode == "test":
+        with open(arguments.checkpoint,"rb") as handle:
+            m = pickle.load(handle)
+        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes))

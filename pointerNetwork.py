@@ -59,15 +59,23 @@ class LineDecoder(Module):
 
         self.finalize()
         
-    def pointerAttention(self, hiddenStates, objectEncodings, pointerBounds):
+    def pointerAttention(self, hiddenStates, objectEncodings, _=None,
+                         pointerBounds=[], objectKeys=None):
+        """
+        hiddenStates: BxH
+        objectEncodings: (# objects)x(encoder dimensionality); if this is set to none, expects:
+        objectKeys: (# objects)x(key dimensionality)
+        OUTPUT: Bx(# objects) attention matrix
+        """
         hiddenStates = self.decoderToPointer(hiddenStates)
-        objectEncodings = self.encoderToPointer(objectEncodings)
+        if objectKeys is None:
+            objectKeys = self.encoderToPointer(objectEncodings)
 
-        _h = hiddenStates.unsqueeze(1).repeat(1, objectEncodings.size(0), 1)
-        _o = objectEncodings.unsqueeze(0).repeat(hiddenStates.size(0), 1, 1)
+        _h = hiddenStates.unsqueeze(1).repeat(1, objectKeys.size(0), 1)
+        _o = objectKeys.unsqueeze(0).repeat(hiddenStates.size(0), 1, 1)
         attention = self.attentionSelector(torch.tanh(_h + _o)).squeeze(2)
 
-        mask = np.zeros((hiddenStates.size(0), objectEncodings.size(0)))
+        mask = np.zeros((hiddenStates.size(0), objectKeys.size(0)))
 
         for p,b in enumerate(pointerBounds):
             if b is not None:
@@ -112,7 +120,7 @@ class LineDecoder(Module):
             pointerHiddens = o[self.tensor(pointerTimes),:,:].squeeze(1)
 
             attention = self.pointerAttention(pointerHiddens, encodedInputs,
-                                              pointerBounds)
+                                              pointerBounds=pointerBounds)
             pll = -F.nll_loss(attention, self.tensor(pointerValues),
                               reduce=True, size_average=False)
         return sll + pll, h
@@ -153,6 +161,82 @@ class LineDecoder(Module):
             sequence.append(next_symbol)
                 
         return sequence[1:]
+
+    def beam(self, initialState, encodedObjects, B,
+             maximumLength=50):
+        """Given an initial hidden state, of size H, and the encodings of the
+        objects in scope, of size Ox(self.encoderDimensionality), do a beam
+        search with beam width B. Returns a list of (log likelihood, sequence of tokens)"""
+        master = self
+        class Particle():
+            def __init__(self, h, ll, sequence):
+                self.h = h
+                self.ll = ll
+                self.sequence = sequence
+            def input(self):
+                lastWord = self.sequence[-1]
+                if isinstance(lastWord, Pointer):
+                    latestPointer = encodedObjects[lastWord.i]
+                    lastWord = "POINTER"
+                else:
+                    latestPointer = master.device(torch.zeros(master.encoderDimensionality))
+                return torch.cat([master.embedding(master.tensor(master.wordToIndex[lastWord])), latestPointer])
+            @property
+            def finished(self): return self.sequence[-1] == "ENDING"
+            def children(self, outputDistribution, pointerDistribution, newHidden):
+                if self.finished: return [self]
+                def tokenLikelihood(token):
+                    if isinstance(token, Pointer):
+                        return outputDistribution[master.pointerIndex] + pointerDistribution[token.i]
+                    return outputDistribution[master.wordToIndex[token]]
+                bestTokens = list(sorted([ t for t in master.lexicon if t not in ["STARTING","POINTER"] ] + \
+                                         [Pointer(i) for i in range(numberOfObjects) ],
+                                         key=tokenLikelihood, reverse=True))[:B]
+                return [Particle(newHidden, self.ll + tokenLikelihood(t),
+                                 self.sequence + [t])
+                        for t in bestTokens ]
+            def trimmed(self):
+                if self.sequence[-1] == "ENDING": return self.sequence[1:-1]
+                return self.sequence[1:]                
+
+        particles = [Particle(initialState, 0., ["STARTING"])]
+        if encodedObjects is not None:
+            objectKeys = self.encoderToPointer(encodedObjects)
+            numberOfObjects = objectKeys.size(0)
+        else:
+            numberOfObjects = 0
+            
+        for _ in range(maximumLength):
+            unfinishedParticles = [p for p in particles if not p.finished ]
+            inputs = torch.stack([p.input() for p in unfinishedParticles]).unsqueeze(0)
+            if any( p.h is not None for p in unfinishedParticles ):
+                hs = torch.stack([p.h for p in unfinishedParticles]).unsqueeze(0)
+            else:
+                hs = None
+            o, h = self.model(inputs, hs)
+            o = o.squeeze(0)
+            h = h.squeeze(0)
+
+            outputDistributions = self.output(o).detach().numpy()
+            if encodedObjects is not None:
+                attention = self.pointerAttention(h, None, objectKeys=objectKeys).detach().numpy()
+            else:
+                attention = None
+
+            particles = [child
+                         for j,p in enumerate(unfinishedParticles)
+                         for child in p.children(outputDistributions[j], attention[j], h[j]) ] + \
+                             [p for p in particles if p.finished ]
+            particles.sort(key=lambda p: p.ll, reverse=True)
+            particles = particles[:B]
+
+            if all( p.finished for p in particles ): break
+        return [(p.ll, p.trimmed()) for p in particles if p.finished]
+            
+            
+            
+         
+                     
             
 
             
@@ -179,6 +263,13 @@ class PointerNetwork(Module):
         return [ inputObjects[s.i] if isinstance(s,Pointer) else s
                  for s in self.decoder.sample(None,
                                               self.encoder(inputObjects))         ]
+
+    def beam(self, inputObjects, B, maximumLength=10):
+        return [ (ll, [ inputObjects[s.i] if isinstance(s,Pointer) else s
+                        for s in sequence ])
+                 for ll, sequence in self.decoder.beam(None, self.encoder(inputObjects), B,
+                                                       maximumLength=maximumLength)]
+
     
             
 
@@ -209,3 +300,8 @@ if __name__ == "__main__":
             m.gradientStep(optimizer, [], ["small","small"], verbose=verbose)
         if verbose:
             print([x,y],"goes to",m.sample([x,y]))
+            print([x,y],"beams into:")
+            for ll, s in m.beam([x,y],10):
+                print(f"{s}\t(w/ ll={ll})")
+            print()
+            

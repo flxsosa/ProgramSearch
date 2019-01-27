@@ -343,3 +343,40 @@ class ProgramPointerNetwork(Module):
             graph = graph.extend(nextObject)
             objectEncodings[nextObject] = self.objectEncoder(spec, nextObject.execute())
 
+    def repeatedlySample(self, specEncoding, graph, objectEncodings, n_samples):
+        """Repeatedly samples a single line of code.
+        specEncoding: Encoding of the spec
+        objectEncodings: dictionary mapping object to it's encoding
+        graph: the current graph
+        n_samples: how many samples to draw
+        returns: list of sampled DSL objects. If the sample is `RETURN` then that entry in the list is None.
+        """
+
+        objectsInScope = list(graph.objects())
+        if len(graph) > 0:
+            oe = torch.stack([ objectEncodings[o]
+                               for o in objectsInScope ])
+        else:
+            oe = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
+        
+        h0 = self.initialHidden(oe, specEncoding)
+
+        samples = []
+        for _ in range(n_samples):
+            nextLineOfCode = self.decoder.sample(h0, oe if len(objectsInScope) > 0 else None)
+            if nextLineOfCode is None: continue
+            nextLineOfCode = [objectsInScope[t.i] if isinstance(t, Pointer) else t
+                              for t in nextLineOfCode ]
+            if 'RETURN' in nextLineOfCode:
+                samples.append(None)
+            else:
+                nextObject = self.DSL.parseLine(nextLineOfCode)
+                if nextObject is not None:
+                    samples.append(nextObject)
+
+        return samples
+
+
+
+
+
