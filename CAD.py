@@ -310,7 +310,7 @@ if __name__ == "__main__":
                                   heads=arguments.heads,
                                   H=arguments.hidden)
         trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes),
-                 trainTime=arguments.trainTime, checkpoint=arguments.checkpoint)
+                 trainTime=arguments.trainTime*60*60, checkpoint=arguments.checkpoint)
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
