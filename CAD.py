@@ -233,7 +233,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     
     startTime = time.time()
-    reportingFrequency = 2
+    reportingFrequency = 100
     totalLosses = []
     movedLosses = []
     distanceLosses = []
@@ -253,7 +253,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
             else: print(f"Got the following sample:\n{sample.prettyPrint()}")
             print()
 
-        if iteration > 0 and iteration%reportingFrequency == 0:
+        if iteration%reportingFrequency == 0:
             print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\t\tdistance loss {sum(distanceLosses)/len(distanceLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
             totalLosses = []
             movedLosses = []
