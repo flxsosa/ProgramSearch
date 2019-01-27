@@ -1,3 +1,4 @@
+from MHDPA import *
 from pointerNetwork import *
 from utilities import *
 
@@ -66,10 +67,50 @@ class ProgramGraph:
         return len(self.nodes^targetGraph.nodes)
 
 
+class ScopeEncoding():
+    """A cache of the encodings of objects in scope"""
+    def __init__(self, owner, spec):
+        """owner: a ProgramPointerNetwork that "owns" this scope encoding"""
+        self.spec = spec
+        self.owner = owner
+        self.object2index = {}
+        self.objectEncoding = None
+
+    def registerObject(self, o):
+        if o in self.object2index: return self
+        oe = self.owner.objectEncoder(self.spec, o.execute())
+        if self.objectEncoding is None:
+            self.objectEncoding = oe.view(1,-1)
+        else:
+            self.objectEncoding = torch.cat([self.objectEncoding, oe.view(1,-1)])
+        self.object2index[o] = len(self.object2index)
+        return self
+
+    def registerObjects(self, os):
+        os = [o for o in os if o not in self.object2index ]
+        if len(os) == 0: return self
+        encodings = self.owner.objectEncoder(self.spec, [o.execute() for o in os])
+        if self.objectEncoding is None:
+            self.objectEncoding = encodings
+        else:
+            self.objectEncoding = torch.cat([self.objectEncoding, encodings])
+        for o in os:
+            self.object2index[o] = len(self.object2index)
+        return self
+
+    def encoding(self, objects):
+        """Takes as input O objects (as a list) and returns a OxE tensor of their encodings.
+        If objects is the empty list then return None"""
+        if len(objects) == 0: return None
+        self.registerObjects(objects)
+        return self.objectEncoding[self.owner.device(torch.tensor([self.object2index[o]
+                                                                   for o in objects ]))]
         
+            
 class ProgramPointerNetwork(Module):
     """A network that looks at the objects in a ProgramGraph and then predicts what to add to the graph"""
-    def __init__(self, objectEncoder, specEncoder, DSL, H=256):
+    def __init__(self, objectEncoder, specEncoder, DSL, H=256,
+                 attentionRounds=1, heads=4):
         """
         specEncoder: Module that encodes spec to initial hidden state of RNN
         objectEncoder: Module that encodes (spec, object) to features we attend over
@@ -83,29 +124,37 @@ class ProgramPointerNetwork(Module):
                                    encoderDimensionality=objectEncoder.outputDimensionality,
                                    H=H)
         self._initialHidden = nn.Sequential(
-            nn.Linear(objectEncoder.outputDimensionality + specEncoder.outputDimensionality, H),
+            nn.Linear(H + specEncoder.outputDimensionality, H),
             nn.ReLU())
 
         self._distance = nn.Sequential(
-            nn.Linear(objectEncoder.outputDimensionality + specEncoder.outputDimensionality, H),
+            nn.Linear(H + specEncoder.outputDimensionality, H),
             nn.ReLU(),
             nn.Linear(H, 1),
             nn.ReLU())
 
+        self.selfAttention = nn.Sequential(
+            nn.Linear(objectEncoder.outputDimensionality, H),
+            MultiHeadAttention(heads, H, rounds=attentionRounds, residual=True))
+
+        self.H = H
+        
         self.finalize()
 
     def initialHidden(self, objectEncodings, specEncoding):
         if objectEncodings is None:
-            objectEncodings = self.device(torch.zeros(self.objectEncoder.outputDimensionality))
+            objectEncodings = self.device(torch.zeros(self.H))
         else:
+            objectEncodings = self.selfAttention(objectEncodings)
             objectEncodings = objectEncodings.max(0)[0]
         return self._initialHidden(torch.cat([specEncoding, objectEncodings]))
 
     def distance(self, objectEncodings, specEncoding):
         """Returns a 1-dimensional tensor which should be the sum of (# objects to create) + (# spurious objects created)"""
         if objectEncodings is None:
-            objectEncodings = self.device(torch.zeros(self.objectEncoder.outputDimensionality))
+            objectEncodings = self.device(torch.zeros(self.H))
         else:
+            objectEncodings = self.selfAttention(objectEncodings)
             objectEncodings = objectEncodings.max(0)[0]
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))
@@ -120,18 +169,13 @@ class ProgramPointerNetwork(Module):
             finalMove = True
         else:
             finalMove = False
-            
+
+        se = self.specEncoder(spec)
         objects = currentGraph.objects()
+        objectEncodings = ScopeEncoding(self, spec).encoding(objects)
         object2pointer = {o: Pointer(i)
                           for i,o in enumerate(objects) }
 
-        if len(objects) > 0:
-            objectEncodings = torch.stack([ self.objectEncoder(spec, o.execute())
-                                          for o in objects])
-        else:
-            objectEncodings = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
-
-        se = self.specEncoder(spec)
         h0 = self.initialHidden(objectEncodings, se)
 
         def substitutePointers(serialization):
@@ -140,7 +184,7 @@ class ProgramPointerNetwork(Module):
 
         targetLines = [substitutePointers(m.serialize()) if not finalMove else m
                        for m in optimalMoves]
-        targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, objectEncodings if len(objects) > 0 else None)
+        targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, objectEncodings)
                              for targetLine in targetLines]
         policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
 
@@ -161,9 +205,7 @@ class ProgramPointerNetwork(Module):
         policyLosses, distanceLosses = [], []
 
         objects = list(goalGraph.objects())
-        objectEncodings = self.objectEncoder(spec, [o.execute() for o in objects])
-        object2encodingIndex = {o: i for i,o in enumerate(objects) }
-        
+        objectEncodings = ScopeEncoding(self, spec).registerObjects(objects)
         specEncoding = self.specEncoder(spec)
 
         while True:
@@ -176,12 +218,7 @@ class ProgramPointerNetwork(Module):
 
             # Gather together objects in scope
             objectsInScope = list(currentGraph.objects())
-            if len(currentGraph) == 0:
-                scopeEncoding = None
-            else:
-                scopeEncoding = objectEncodings[self.tensor([object2encodingIndex[o]
-                                                             for o in objectsInScope ])]
-
+            scopeEncoding = objectEncodings.encoding(objectsInScope)
             object2pointer = {o: Pointer(i)
                               for i, o  in enumerate(objectsInScope)}
 
@@ -209,17 +246,8 @@ class ProgramPointerNetwork(Module):
                 onPolicy = self.DSL.parseLine(onPolicy)
                 if onPolicy is not None:
                     onPolicyGraph = currentGraph.extend(onPolicy)
+                    onPolicyObjects = objectEncodings.encoding(onPolicyGraph.objects())
                     actualDistance = onPolicyGraph.distanceOracle(goalGraph)
-                    if onPolicy in goalGraph.nodes:
-                        # Use precomputed on policy embeddings
-                        newObjectEncoding = objectEncodings[object2encodingIndex[onPolicy]]
-                    else:
-                        # Annoyingly have to compute new embedding
-                        newObjectEncoding = self.objectEncoder(spec, onPolicy.execute())
-                    if len(objectsInScope) > 0: # stuck it on to the objects we already have
-                        onPolicyObjects = torch.cat([scopeEncoding, newObjectEncoding.view(1,-1)])
-                    else: # it is its own thing
-                        onPolicyObjects = torch.stack([newObjectEncoding])                        
                         
                     predictedDistance = self.distance(onPolicyObjects, specEncoding)
                     distanceLoss += (predictedDistance - float(actualDistance))**2                
@@ -241,98 +269,21 @@ class ProgramPointerNetwork(Module):
             currentGraph = currentGraph.extend(move)
             
 
-
-        
-        
-        while True:
-            self.zero_grad()
-        
-            optimalMoves = list(currentGraph.policyOracle(goalGraph))
-            if len(optimalMoves) == 0:
-                finalMove = True
-                optimalMoves = [['RETURN']]
-            else:
-                finalMove = False
-
-            objects = list(currentGraph.objects())
-            object2pointer = {o: Pointer(i)
-                              for i,o in enumerate(objects) }
-
-            if len(objects) > 0:
-                objectEncodings = torch.stack([ self.objectEncoder(spec, o.execute())
-                                                for o in objects])
-            else:
-                objectEncodings = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
-
-            se = self.specEncoder(spec)
-            h0 = self.initialHidden(objectEncodings, se)
-
-            def substitutePointers(serialization):
-                return [token if isinstance(token,str) else object2pointer[token]
-                        for token in serialization]
-
-            targetLines = [substitutePointers(m.serialize()) if not finalMove else m
-                           for m in optimalMoves]
-            targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, objectEncodings if len(objects) > 0 else None)
-                                 for targetLine in targetLines]
-            policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
-
-            actualDistance = currentGraph.distanceOracle(goalGraph)
-            predictedDistance = self.distance(objectEncodings, se)
-            distanceLoss = (predictedDistance - float(actualDistance))**2
-
-            # On-policy sample
-            onPolicy = self.decoder.sample(h0, objectEncodings if len(objects) > 0 else None)
-            if onPolicy is not None:
-                onPolicy = [objects[token.i] if isinstance(token, Pointer) else token
-                            for token in onPolicy]
-                onPolicy = self.DSL.parseLine(onPolicy)
-                if onPolicy is not None:
-                    onPolicyGraph = currentGraph.extend(onPolicy)
-                    actualDistance = onPolicyGraph.distanceOracle(goalGraph)
-                    newObjectEncoding = self.objectEncoder(spec, onPolicy.execute())
-                    if len(objects) > 0: # stuck it on to the objects we already have
-                        onPolicyObjects = torch.cat([objectEncodings, newObjectEncoding.view(1,-1)])
-                    else: # it is its own thing
-                        onPolicyObjects = torch.stack([newObjectEncoding])                        
-                        
-                    predictedDistance = self.distance(onPolicyObjects, se)
-                    distanceLoss += (predictedDistance - float(actualDistance))**2                
-
-            
-            (policyLoss + distanceLoss).backward()
-            optimizer.step()
-            policyLosses.append(policyLoss.data.item())
-            distanceLosses.append(distanceLoss.data.item())
-
-            if finalMove: return policyLosses, distanceLosses
-
-            # Sample the next (optimal) line of code predicted by the model
-            targetLikelihoods = [math.exp(tl.data.item() + policyLoss) for tl in targetLikelihoods]
-            # This shouldn't be necessary - normalize :/
-            targetLikelihoods = [tl/sum(targetLikelihoods) for tl in targetLikelihoods ]
-            move = np.random.choice(optimalMoves, p=targetLikelihoods)
-            currentGraph = currentGraph.extend(move)
-            
-
     def sample(self, spec, maxMoves=None):
         specEncoding = self.specEncoder(spec)
-        objectEncodings = {}
+        objectEncodings = ScopeEncoding(self, spec)
 
         graph = ProgramGraph([])
 
         while True:
             # Make the encoding matrix
-            if len(objectEncodings) > 0:
-                objects = list(objectEncodings.keys())
-                oe = torch.stack([ objectEncodings[o]
-                                   for o in objects ])
-            else:
-                oe = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
+            objectsInScope = list(graph.objects())
+            oe = objectEncodings.encoding(objectsInScope)
             h0 = self.initialHidden(oe, specEncoding)
 
-            nextLineOfCode = self.decoder.sample(h0, oe if len(objectEncodings) > 0 else None)
-            nextLineOfCode = [objects[t.i] if isinstance(t, Pointer) else t
+            nextLineOfCode = self.decoder.sample(h0, oe)
+            if nextLineOfCode is None: return None
+            nextLineOfCode = [objectsInScope[t.i] if isinstance(t, Pointer) else t
                               for t in nextLineOfCode ]
 
             if 'RETURN' in nextLineOfCode or len(graph) >= maxMoves: return graph
@@ -341,29 +292,22 @@ class ProgramPointerNetwork(Module):
             if nextObject is None: return None
 
             graph = graph.extend(nextObject)
-            objectEncodings[nextObject] = self.objectEncoder(spec, nextObject.execute())
 
     def repeatedlySample(self, specEncoding, graph, objectEncodings, n_samples):
         """Repeatedly samples a single line of code.
         specEncoding: Encoding of the spec
-        objectEncodings: dictionary mapping object to it's encoding
+        objectEncodings: a ScopeEncoding
         graph: the current graph
         n_samples: how many samples to draw
         returns: list of sampled DSL objects. If the sample is `RETURN` then that entry in the list is None.
         """
-
         objectsInScope = list(graph.objects())
-        if len(graph) > 0:
-            oe = torch.stack([ objectEncodings[o]
-                               for o in objectsInScope ])
-        else:
-            oe = self.device(torch.zeros((1, self.objectEncoder.outputDimensionality)))
-        
+        oe = objectEncodings.encoding(objectsInScope)
         h0 = self.initialHidden(oe, specEncoding)
 
         samples = []
         for _ in range(n_samples):
-            nextLineOfCode = self.decoder.sample(h0, oe if len(objectsInScope) > 0 else None)
+            nextLineOfCode = self.decoder.sample(h0, oe)
             if nextLineOfCode is None: continue
             nextLineOfCode = [objectsInScope[t.i] if isinstance(t, Pointer) else t
                               for t in nextLineOfCode ]

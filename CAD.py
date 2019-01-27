@@ -226,19 +226,20 @@ def randomScene(resolution=32, maxShapes=3, verbose=False):
     
     return s
 
-def trainCSG(m, getProgram, maxSteps=100000, checkpoint=None):
+def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     print("cuda?",m.use_cuda)
     assert checkpoint is not None, "must provide a checkpoint path to export to"
     
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     
     startTime = time.time()
-    reportingFrequency = 500
+    reportingFrequency = 2
     totalLosses = []
     movedLosses = []
     distanceLosses = []
+    iteration = 0
 
-    for iteration in range(maxSteps):
+    while trainTime is None or time.time() - startTime < trainTime:
         s = getProgram()
         g = ProgramGraph.fromRoot(s)
         l,dl = m.gradientStepTrace(optimizer, s.execute(), g)
@@ -260,16 +261,19 @@ def trainCSG(m, getProgram, maxSteps=100000, checkpoint=None):
             with open(checkpoint,"wb") as handle:
                 pickle.dump(m, handle)
 
+        iteration += 1
+
 def testCSG(m, getProgram):
     i = SMC(m, particles=50)
     for _ in range(100):
         spec = getProgram()
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec).prettyPrint())
+        print()
         samples = i.infer(spec.execute())
         for s in samples:
             print(s.prettyPrint())
-            print("IoU:",min( o.IoU(spec) for o in s.objects() ))
+            print("IoU:",max( o.IoU(spec) for o in s.objects() ))
             print()
         print(f"Solved task? {any( spec in s.objects() for s in samples )}")
 
@@ -290,12 +294,23 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
+    parser.add_argument("--trainTime", default=None, type=float,
+                        help="Time in hours to train the network")
+    parser.add_argument("--attention", default=1, type=int,
+                        help="Number of rounds of self attention to perform upon objects in scope")
+    parser.add_argument("--heads", default=2, type=int,
+                        help="Number of attention heads")
+    parser.add_argument("--hidden", "-H", type=int, default=256,
+                        help="Size of hidden layers")
     arguments = parser.parse_args()
 
     if arguments.mode == "train":
-        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), CSG)
+        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), CSG,
+                                  attentionRounds=arguments.attention,
+                                  heads=arguments.heads,
+                                  H=arguments.hidden)
         trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes),
-                 checkpoint=arguments.checkpoint)
+                 trainTime=arguments.trainTime, checkpoint=arguments.checkpoint)
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)

@@ -12,25 +12,13 @@ class SMC():
         specEncoding = self.model.specEncoder(spec)
         
         # Maps from an object to its embedding
-        _objectEncodings = {}
-        def objectEncoding(o):
-            if o in _objectEncodings: return _objectEncodings[o]
-            oe = self.model.objectEncoder(spec, o.execute())
-            _objectEncodings[o] = oe
-            return oe
-
-        def scopeEncoding(g):
-            if len(g) > 0:
-                return torch.stack([objectEncoding(o)
-                                    for o in g.objects() ])
-            else:
-                return self.model.device(torch.zeros((1, self.model.objectEncoder.outputDimensionality)))
-            
+        objectEncodings = ScopeEncoding(self.model, spec)
+        
         # Maps from a graph to its distance
         _distance = {}
         def distance(g):
             if g in _distance: return _distance[g]
-            se = scopeEncoding(g)
+            se = objectEncodings.encoding(list(g.objects()))
             d = self.model.distance(se, specEncoding)
             _distance[g] = d
             return d            
@@ -48,8 +36,7 @@ class SMC():
             sampleFrequency = {}
             for p in population:
                 for newObject in self.model.repeatedlySample(specEncoding, p.graph,
-                                                             _objectEncodings, p.frequency):
-                    if newObject is not None: objectEncoding(newObject)
+                                                             objectEncodings, p.frequency):
                     if newObject is None: newGraph = p.graph
                     else: newGraph = p.graph.extend(newObject)                        
                     sampleFrequency[newGraph] = sampleFrequency.get(newGraph, 0) + 1
