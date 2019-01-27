@@ -2,7 +2,8 @@ from utilities import *
 import torch.nn.functional as F
 
 class MultiHeadAttention(Module):
-    def __init__(self, heads, entity_dimensionality, rounds=1, residual=True):
+    def __init__(self, heads, entity_dimensionality, rounds=1, residual=True,
+                 layers=2):
         super().__init__()
         self.entity_dimensionality = entity_dimensionality
         self.heads = heads
@@ -16,7 +17,10 @@ class MultiHeadAttention(Module):
         self.Q = nn.Linear(entity_dimensionality, entity_dimensionality)
         self.V = nn.Linear(entity_dimensionality, entity_dimensionality)
         self.K = nn.Linear(entity_dimensionality, entity_dimensionality)
-        self.output = nn.Linear(entity_dimensionality, entity_dimensionality)
+        self.output = nn.Sequential(*[ layer
+                                       for _ in range(layers)
+                                       for layer in [nn.Linear(entity_dimensionality, entity_dimensionality),
+                                                     nn.ReLU()]])
 
         self.rounds = rounds
         self.residual = residual
@@ -39,7 +43,7 @@ class MultiHeadAttention(Module):
             attention = F.softmax(q@(k.permute(0,2,1))/(self.d**0.5), dim=-1)
 
             # Mix together values
-            o = (attention@k).transpose(0,1).contiguous().view(entities.size(0), self.entity_dimensionality)
+            o = (attention@v).transpose(0,1).contiguous().view(entities.size(0), self.entity_dimensionality)
             
             # Apply output transformation
             o = self.output(o)
