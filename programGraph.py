@@ -253,13 +253,12 @@ class ProgramPointerNetwork(Module):
                     distanceLoss += (predictedDistance - float(actualDistance))**2                
 
             
-            policyLosses.append(policyLoss.data.item())
-            distanceLosses.append(distanceLoss.data.item())
+            distanceLosses.append(distanceLoss)
 
             if finalMove:
                 (sum(policyLosses) + sum(distanceLosses)).backward()
                 optimizer.step()
-                return policyLosses, distanceLosses
+                return [l.data.item() for l in policyLosses], [l.data.item() for l in distanceLosses]
 
             # Sample the next (optimal) line of code predicted by the model
             targetLikelihoods = [math.exp(tl.data.item() + policyLoss) for tl in targetLikelihoods]
