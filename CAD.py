@@ -267,6 +267,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 def testCSG(m, getProgram):
     def reward(s, g):
+        if len(g) == 0: return 0
         return max((s*o).sum()/(s + o - s*o).sum() for o_ in g.objects() for o in [o_.execute()] )
     searchers = [ForwardSample(m),
                  SMC(m, particles=50),
@@ -284,6 +285,8 @@ def testCSG(m, getProgram):
             samples = s.infer(spec.execute())
             if not isinstance(samples, list): samples = [samples]
             rewards[i].append(max(reward(spec.execute(), sample) for sample in samples ))
+            print(f"{s}\t{rewards[i][-1]}")
+        print()
     for searcher, rs in zip(searchers, rewards):
         print(f"Search algorithm {searcher}")
         print(f"Rewards {rs}")

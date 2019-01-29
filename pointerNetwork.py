@@ -221,7 +221,7 @@ class LineDecoder(Module):
             if encodedObjects is not None:
                 attention = self.pointerAttention(h, None, objectKeys=objectKeys).detach().numpy()
             else:
-                attention = None
+                attention = [None]*len(unfinishedParticles)
 
             particles = [child
                          for j,p in enumerate(unfinishedParticles)
