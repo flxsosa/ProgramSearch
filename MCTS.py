@@ -1,7 +1,7 @@
 from programGraph import *
 
 class MCTS():
-    def __init__(self, model, _=None, simulations=1000,
+    def __init__(self, model, _=None, simulations=100,
                  beamSize=10, discountFactor=0.9, cb=1, ca=100, rolloutDepth=None, reward=None):
         assert reward is not None, "must specify reward: spec X graph -> real"
         self.simulations = simulations
