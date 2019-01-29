@@ -82,23 +82,19 @@ class MCTS():
         rootNode = Node(ProgramGraph([]), distance(ProgramGraph([])))
 
         for _ in range(simulations):
-            print("Starting simulation...")
             n = rootNode
             trajectory = [] # list of traversed edges
             while n.visits > 0:
                 if len(n.edges) == 0: break
                 e = max(n.edges, key=uct)
                 trajectory.append(e)
-                print(f"Traversing {list(e.child.graph.nodes - e.parent.graph.nodes)[0].serialize()}")
                 n = e.child
             expand(n)
             if len(n.edges) == 0: # expanded but failed to produce any children
-                print("Failed to produce any children")
                 continue
 
             d = distance(n.graph)
             r = self.reward(spec, rollout(n.graph))
-            print(f"Rollout reward {r}\tDistance {d}")
             # back up the reward
             for e in trajectory:
                 e.totalReward += r
