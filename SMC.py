@@ -9,6 +9,9 @@ class SMC():
         self.model = model
 
     def infer(self, spec, maximumLength=8):
+        with torch.no_grad(): return self._infer(spec, maximumLength)
+            
+    def _infer(self, spec, maximumLength=8):
         specEncoding = self.model.specEncoder(spec)
         
         # Maps from an object to its embedding
