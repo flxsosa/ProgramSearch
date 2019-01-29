@@ -267,7 +267,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 def testCSG(m, getProgram):
     def reward(s, g):
-        return max((s*o).sum()/(s + o - s*o).sum() for o_ in g.objects() for o in [o.execute()] )
+        return max((s*o).sum()/(s + o - s*o).sum() for o_ in g.objects() for o in [o_.execute()] )
     searchers = [ForwardSample(m),
                  SMC(m, particles=50),
                  MCTS(m, rolloutDepth=15, reward=reward)]
