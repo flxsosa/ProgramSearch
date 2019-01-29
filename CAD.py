@@ -264,26 +264,28 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         iteration += 1
 
 def testCSG(m, getProgram):
-    i = SMC(m, particles=50)
+    def reward(s, g):
+        return max((s*o).sum()/(s + o - s*o).sum() for o_ in g.objects() for o in [o.execute()] )
+    searchers = [ForwardSample(m),
+                 SMC(m, particles=50),
+                 MCTS(m, rolloutDepth=15, reward=reward)]
+    # Map from index of searcher to list of rewards
+    rewards = [[] for _ in searchers]
+                 
+    
     for _ in range(100):
         spec = getProgram()
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec).prettyPrint())
         print()
-        samples = i.infer(spec.execute())
-        for s in samples:
-            print(s.prettyPrint())
-            print("IoU:",max( o.IoU(spec) for o in s.objects() ))
-            print()
-        print(f"Solved task? {any( spec in s.objects() for s in samples )}")
-
-        print("Trying forward samples...")
-        samples = [m.sample(spec.execute(), maxMoves=6) for _ in range(100)]
-        samples = [sample for sample in samples if sample is not None]
-        print("Sampled IOU:",[max(o.IoU(spec) for o in s.objects() ) for s in samples ])
-        print("Best IOU:",max([max(o.IoU(spec) for o in s.objects() ) for s in samples ]))
-        print(f"{sum( spec in s.objects() for s in samples if s is not None)}/100 samples solved task")
-        
+        for i, s in enumerate(searchers):
+            samples = i.infer(spec.execute())
+            if not isinstance(samples, list): samples = [samples]
+            rewards[i].append(max(reward(spec.execute(), sample) for sample in samples ))
+    for searcher, rs in zip(searchers, rewards):
+        print(f"Search algorithm {searcher}")
+        print(f"Rewards {rs}")
+        print(f"Average {sum(rs)/len(rs)}\tMedian {list(sorted(rs))[len(rs)//2]}\tHits {sum(r > 0.99 for r in rs )}")
         
     
 

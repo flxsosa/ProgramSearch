@@ -1,9 +1,10 @@
 from programGraph import *
 
 class MCTS():
-    def __init__(self, model, _=None,
+    def __init__(self, model, _=None, simulations=100,
                  beamSize=10, discountFactor=0.9, cb=1, ca=100, rolloutDepth=None, reward=None):
         assert reward is not None, "must specify reward: spec X graph -> real"
+        self.simulations = simulations
         self.discountFactor = discountFactor
         self.reward = reward        
         self.ca = ca
@@ -30,8 +31,8 @@ class MCTS():
             
             
 
-    def infer(self, spec, simulations):
-        with torch.no_grad(): return self._infer(spec, simulations)
+    def infer(self, spec):
+        with torch.no_grad(): return self._infer(spec, self.simulations)
     
     def _infer(self, spec, simulations):
         specEncoding = self.model.specEncoder(spec)
