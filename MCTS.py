@@ -88,7 +88,7 @@ class MCTS():
                 if len(n.edges) == 0: break
                 e = max(n.edges, key=uct)
                 trajectory.append(e)
-                print(f"Traversing {next(e.child.nodes - e.parent.nodes)}")
+                print(f"Traversing {next(e.child.nodes - e.parent.nodes).serialize()}")
                 n = e.child
             expand(n)
             if len(n.edges) == 0: # expanded but failed to produce any children
