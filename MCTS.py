@@ -53,7 +53,7 @@ class MCTS():
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None: continue
                 newGraph = n.graph.extend(o)
-                print(f"Expanding: {o}")
+                print(f"Expanding: {o.serialize()}")
                 child = Node(newGraph, distance(newGraph))
                 e = Edge(n, child, ll)
                 n.edges.append(e)
@@ -89,7 +89,7 @@ class MCTS():
                 if len(n.edges) == 0: break
                 e = max(n.edges, key=uct)
                 trajectory.append(e)
-                print(f"Traversing {next(e.child.nodes - e.parent.nodes).serialize()}")
+                print(f"Traversing {next(e.child.graph.nodes - e.parent.graph.nodes).serialize()}")
                 n = e.child
             expand(n)
             if len(n.edges) == 0: # expanded but failed to produce any children
