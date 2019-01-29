@@ -217,7 +217,7 @@ class LineDecoder(Module):
             o = o.squeeze(0)
             h = h.squeeze(0)
 
-            outputDistributions = self.output(o).detach().numpy()
+            outputDistributions = self.output(o).cpu().detach().numpy()
             if encodedObjects is not None:
                 attention = self.pointerAttention(h, None, objectKeys=objectKeys).detach().numpy()
             else:
