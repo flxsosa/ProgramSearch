@@ -3,6 +3,8 @@ import numpy as np
 from pointerNetwork import *
 from programGraph import *
 from SMC import *
+from MCTS import *
+from ForwardSample import *
 from CNN import *
 
 import time
