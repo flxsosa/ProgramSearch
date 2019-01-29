@@ -13,10 +13,9 @@ class MCTS():
         self.rolloutDepth = rolloutDepth
 
     class Node:
-        def __init__(self, owner, graph, predictedDistance):
+        def __init__(self, graph, predictedDistance):
             self.graph = graph
             self.predictedDistance = predictedDistance
-            self.owner = owner
             self.visits = 0
             self.edges = []
 
@@ -52,7 +51,7 @@ class MCTS():
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None: continue
                 newGraph = n.graph.extend(o)
-                child = Node(self, newGraph, distance(newGraph))
+                child = Node(newGraph, distance(newGraph))
                 e = Edge(n, child, ll)
                 n.edges.append(e)
 
@@ -101,7 +100,7 @@ class MCTS():
 
         def findBest(n):
             return max([(n.graph, self.reward(spec, n.graph))] + \
-                       [ findBest(e.child) for e in n.edges ]c,
+                       [ findBest(e.child) for e in n.edges ],
                        key=lambda gr: gr[1])
         return findBest(rootNode)[0]
                          
