@@ -13,28 +13,28 @@ class MCTS():
         self.model = model
         self.rolloutDepth = rolloutDepth
 
-    class Node:
-        def __init__(self, graph, predictedDistance):
-            self.graph = graph
-            self.predictedDistance = predictedDistance
-            self.visits = 0
-            self.edges = []
-
-    class Edge:
-        def __init__(self, parent, child, logLikelihood):
-            self.logLikelihood = logLikelihood
-            self.parent = parent
-            self.child = child
-            self.traversals = 0
-            self.totalReward = 0
-            self.totalValue = 0
-            
             
 
     def infer(self, spec):
         with torch.no_grad(): return self._infer(spec, self.simulations)
     
     def _infer(self, spec, simulations):
+        class Node:
+            def __init__(self, graph, predictedDistance):
+                self.graph = graph
+                self.predictedDistance = predictedDistance
+                self.visits = 0
+                self.edges = []
+
+        class Edge:
+            def __init__(self, parent, child, logLikelihood):
+                self.logLikelihood = logLikelihood
+                self.parent = parent
+                self.child = child
+                self.traversals = 0
+                self.totalReward = 0
+                self.totalValue = 0
+
         specEncoding = self.model.specEncoder(spec)
         objectEncodings = ScopeEncoding(self.model, spec)
 
