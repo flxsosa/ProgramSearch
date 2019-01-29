@@ -100,8 +100,8 @@ class MCTS():
                 e.traversals += 1
 
         def findBest(n):
-            return max([ [(n.graph, self.reward(spec, n.graph))] + \
-                         [ findBest(e.child) for e in n.edges ] ],
+            return max([(n.graph, self.reward(spec, n.graph))] + \
+                       [ findBest(e.child) for e in n.edges ]c,
                        key=lambda gr: gr[1])
         return findBest(rootNode)[0]
                          
