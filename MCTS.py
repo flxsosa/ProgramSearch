@@ -48,7 +48,7 @@ class MCTS():
             return d
 
         def expand(n):
-            assert visits == 0
+            assert n.visits == 0
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None: continue
                 newGraph = n.graph.extend(o)
