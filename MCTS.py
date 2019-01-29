@@ -77,7 +77,7 @@ class MCTS():
             confidence += self.ca*math.exp(e.logLikelihood)/(e.traversals + 1)
             return confidence
 
-        rootNode = Node(self, ProgramGraph([]), distance(ProgramGraph([])))
+        rootNode = Node(ProgramGraph([]), distance(ProgramGraph([])))
 
         for _ in range(simulations):
             n = rootNode
