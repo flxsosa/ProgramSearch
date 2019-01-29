@@ -219,7 +219,7 @@ class LineDecoder(Module):
 
             outputDistributions = self.output(o).cpu().detach().numpy()
             if encodedObjects is not None:
-                attention = self.pointerAttention(h, None, objectKeys=objectKeys).detach().numpy()
+                attention = self.pointerAttention(h, None, objectKeys=objectKeys).cpu().detach().numpy()
             else:
                 attention = [None]*len(unfinishedParticles)
 
