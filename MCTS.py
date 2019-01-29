@@ -48,8 +48,6 @@ class MCTS():
             return d
 
         def expand(n):
-            assert n.visits == 0
-            n.visits = 1
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None or o in n.graph.nodes: continue
                 newGraph = n.graph.extend(o)
@@ -83,14 +81,10 @@ class MCTS():
         for _ in range(simulations):
             n = rootNode
             trajectory = [] # list of traversed edges
-            while n.visits > 0:
-                if len(n.edges) == 0: break
+            while n.visits > 0 and len(n.edges) > 0:
                 e = max(n.edges, key=uct)
                 trajectory.append(e)
                 n = e.child
-            expand(n)
-            if len(n.edges) == 0: # expanded but failed to produce any children
-                continue
 
             d = distance(n.graph)
             r = self.reward(spec, rollout(n.graph))
@@ -100,6 +94,12 @@ class MCTS():
                 e.totalValue += self.discountFactor**d
                 e.traversals += 1
                 e.parent.visits += 1
+
+            if n.visits == 0:
+                expand(n)
+                n.visits = 1
+            else:
+                n.visits += 1                
 
         def findBest(n):
             return max([(n.graph, self.reward(spec, n.graph))] + \
