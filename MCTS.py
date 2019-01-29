@@ -49,6 +49,7 @@ class MCTS():
 
         def expand(n):
             assert n.visits == 0
+            n.visits = 1
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None: continue
                 newGraph = n.graph.extend(o)
@@ -103,6 +104,7 @@ class MCTS():
                 e.totalReward += r
                 e.totalValue += self.discountFactor**d
                 e.traversals += 1
+                e.parent.visits += 1
 
         def findBest(n):
             return max([(n.graph, self.reward(spec, n.graph))] + \
