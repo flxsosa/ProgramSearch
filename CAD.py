@@ -281,7 +281,7 @@ def testCSG(m, getProgram):
         print(ProgramGraph.fromRoot(spec).prettyPrint())
         print()
         for i, s in enumerate(searchers):
-            samples = i.infer(spec.execute())
+            samples = s.infer(spec.execute())
             if not isinstance(samples, list): samples = [samples]
             rewards[i].append(max(reward(spec.execute(), sample) for sample in samples ))
     for searcher, rs in zip(searchers, rewards):
