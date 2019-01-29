@@ -1,7 +1,7 @@
 from programGraph import *
 
 class MCTS():
-    def __init__(self, model, _=None, simulations=100,
+    def __init__(self, model, _=None, simulations=1000,
                  beamSize=10, discountFactor=0.9, cb=1, ca=100, rolloutDepth=None, reward=None):
         assert reward is not None, "must specify reward: spec X graph -> real"
         self.simulations = simulations
@@ -52,6 +52,7 @@ class MCTS():
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None: continue
                 newGraph = n.graph.extend(o)
+                print(f"Expanding: {o}")
                 child = Node(newGraph, distance(newGraph))
                 e = Edge(n, child, ll)
                 n.edges.append(e)
@@ -80,19 +81,23 @@ class MCTS():
         rootNode = Node(ProgramGraph([]), distance(ProgramGraph([])))
 
         for _ in range(simulations):
+            print("Starting simulation...")
             n = rootNode
             trajectory = [] # list of traversed edges
             while n.visits > 0:
                 if len(n.edges) == 0: break
                 e = max(n.edges, key=uct)
                 trajectory.append(e)
+                print(f"Traversing {next(e.child.nodes - e.parent.nodes)}")
                 n = e.child
             expand(n)
             if len(n.edges) == 0: # expanded but failed to produce any children
+                print("Failed to produce any children")
                 continue
 
             d = distance(n.graph)
             r = self.reward(spec, rollout(n.graph))
+            print(f"Rollout reward {r}\tDistance {d}")
             # back up the reward
             for e in trajectory:
                 e.totalReward += r
