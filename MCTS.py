@@ -35,6 +35,14 @@ class MCTS():
                 self.totalReward = 0
                 self.totalValue = 0
 
+        bestReward = None
+        bestProgram = None
+        def recordProgram(g):
+            r = self.reward(spec, g)
+            if bestReward is None or r > bestReward:
+                bestReward = r
+                bestProgram = g
+
         specEncoding = self.model.specEncoder(spec)
         objectEncodings = ScopeEncoding(self.model, spec)
 
@@ -51,6 +59,7 @@ class MCTS():
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None or o in n.graph.nodes: continue
                 newGraph = n.graph.extend(o)
+                recordProgram(newGraph)
                 child = Node(newGraph, distance(newGraph))
                 e = Edge(n, child, ll)
                 n.edges.append(e)
@@ -61,9 +70,12 @@ class MCTS():
                 samples = self.model.repeatedlySample(specEncoding, g, objectEncodings, 1)
                 assert len(samples) <= 1
                 depth += 1
-                if len(samples) == 0 or samples[0] is None: return g
+                if len(samples) == 0 or samples[0] is None: break
                 g = g.extend(samples[0])
-                if self.rolloutDepth is not None and depth >= self.rolloutDepth: return g
+                if self.rolloutDepth is not None and depth >= self.rolloutDepth: break
+                
+            recordProgram(g)
+            return g
 
         def uct(e):
             if e.traversals == 0: return float('inf')
@@ -101,11 +113,7 @@ class MCTS():
             else:
                 n.visits += 1                
 
-        def findBest(n):
-            return max([(n.graph, self.reward(spec, n.graph))] + \
-                       [ findBest(e.child) for e in n.edges ],
-                       key=lambda gr: gr[1])
-        return findBest(rootNode)[0]
+        return bestProgram
                          
         
 
