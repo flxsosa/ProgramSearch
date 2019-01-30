@@ -38,6 +38,8 @@ class MCTS():
         bestReward = None
         bestProgram = None
         def recordProgram(g):
+            nonlocal bestReward
+            nonlocal bestProgram
             r = self.reward(spec, g)
             if bestReward is None or r > bestReward:
                 bestReward = r
