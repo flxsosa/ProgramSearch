@@ -195,7 +195,7 @@ class SpecEncoder(CNN):
 
 
 """Training"""
-def randomScene(resolution=32, maxShapes=3, verbose=False):
+def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False):
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
@@ -212,7 +212,7 @@ def randomScene(resolution=32, maxShapes=3, verbose=False):
                            Circle(r))
     s = None
     numberOfShapes = 0
-    desiredShapes = random.choice(range(1, 1 + maxShapes))
+    desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
     while numberOfShapes < desiredShapes:
         o = quadrilateral() if random.choice([True,False]) else circular()
         if s is None: s = o
@@ -326,4 +326,4 @@ if __name__ == "__main__":
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
-        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes))
+        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes))
