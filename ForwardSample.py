@@ -27,7 +27,7 @@ class ForwardSample():
                 newObjects = self.model.repeatedlySample(specEncoding, g, objectEncodings, 1)
                 if len(newObjects) == 0 or newObjects[0] is None: break
                 g = g.extend(newObjects[0])
-            r = self.reward(g)
+            r = self.reward(spec, g)
             if best is None or best[0] < r:
                 best = (r, g)
         return best[1] if best is not None else None
