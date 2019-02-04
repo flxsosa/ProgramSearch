@@ -39,7 +39,7 @@ class MCTS():
                 self.visits = 0
                 self.edges = []
                 if owner.beamSize <= 0:
-                    self.generator = self.model.bestFirstEnumeration(specEncoding, graph, objectEncodings)
+                    self.generator = owner.model.bestFirstEnumeration(specEncoding, graph, objectEncodings)
 
             def needsExpansion(self):
                 # If we are doing a beam search: abort once we find something without any edges
