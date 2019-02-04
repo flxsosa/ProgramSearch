@@ -1,10 +1,11 @@
 from programGraph import *
+import time
+
 
 class MCTS():
-    def __init__(self, model, _=None, simulations=100,
+    def __init__(self, model, _=None, 
                  beamSize=10, discountFactor=0.9, cb=1, ca=100, rolloutDepth=None, reward=None):
         assert reward is not None, "must specify reward: spec X graph -> real"
-        self.simulations = simulations
         self.discountFactor = discountFactor
         self.reward = reward        
         self.ca = ca
@@ -15,10 +16,12 @@ class MCTS():
 
             
 
-    def infer(self, spec):
-        with torch.no_grad(): return self._infer(spec, self.simulations)
+    def infer(self, spec, timeout):
+        with torch.no_grad(): return self._infer(spec, timeout)
     
-    def _infer(self, spec, simulations):
+    def _infer(self, spec, timeout):
+        startTime = time.time()
+        
         class Node:
             def __init__(self, graph, predictedDistance):
                 self.graph = graph
@@ -61,8 +64,11 @@ class MCTS():
             for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
                 if o is None or o in n.graph.nodes: continue
                 newGraph = n.graph.extend(o)
-                recordProgram(newGraph)
-                child = Node(newGraph, distance(newGraph))
+                if newGraph in graph2node:
+                    child = graph2node[newGraph]
+                else:
+                    recordProgram(newGraph)
+                    child = Node(newGraph, distance(newGraph))
                 e = Edge(n, child, ll)
                 n.edges.append(e)
 
@@ -83,7 +89,8 @@ class MCTS():
             if e.traversals == 0: return float('inf')
 
             # Exploit: Weighted average of rewards and distance
-            confidence = 0.5*e.totalReward/e.traversals + 0.5*e.totalValue/e.traversals
+            wv = 0.
+            confidence = (1. - wv)*e.totalReward/e.traversals + wv*e.totalValue/e.traversals
             # Explore: Prefer paths that are less visited
             confidence += self.cb*(math.log(e.parent.visits)/e.traversals)**0.5
             # Policy: Prefer paths the neural net likes
@@ -91,8 +98,9 @@ class MCTS():
             return confidence
 
         rootNode = Node(ProgramGraph([]), distance(ProgramGraph([])))
+        graph2node = {ProgramGraph([]): rootNode}
 
-        for _ in range(simulations):
+        while time.time() - startTime < timeout:
             n = rootNode
             trajectory = [] # list of traversed edges
             while n.visits > 0 and len(n.edges) > 0:
