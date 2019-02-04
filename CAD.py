@@ -270,8 +270,10 @@ def testCSG(m, getProgram):
         if len(g) == 0: return 0
         return max((s*o).sum()/(s + o - s*o).sum() for o_ in g.objects() for o in [o_.execute()] )
     searchers = [ForwardSample(m, defaultTimeout=5., reward=reward),
-                 SMC(m, particles=50),
-                 MCTS(m, rolloutDepth=15, reward=reward, defaultTimeout=5.)]
+                 SMC(m, particles=100),
+                 MCTS(m, beamSize=50, rolloutDepth=10, reward=reward, defaultTimeout=5.),
+                 MCTS(m, beamSize=10, rolloutDepth=10, reward=reward, defaultTimeout=5.),
+                 MCTS(m, beamSize= 0, rolloutDepth=10, reward=reward, defaultTimeout=5.)]
     # Map from index of searcher to list of rewards
     rewards = [[] for _ in searchers]
                  

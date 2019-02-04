@@ -4,12 +4,12 @@ import time
 
 class MCTS():
     def __init__(self, model, _=None, 
-                 beamSize=10, discountFactor=0.9, cb=1, ca=100, rolloutDepth=None, reward=None, defaultTimeout=None):
+                 beamSize=10, discountFactor=0.9, cb=1, c_puct=100, rolloutDepth=None, reward=None, defaultTimeout=None):
         assert reward is not None, "must specify reward: spec X graph -> real"
         self.defaultTimeout = defaultTimeout
         self.discountFactor = discountFactor
         self.reward = reward        
-        self.ca = ca
+        self.c_puct = c_puct
         self.cb = cb
         self.beamSize = beamSize
         self.model = model
@@ -19,6 +19,9 @@ class MCTS():
         self.distanceTime = 0.
         self.rollingTime = 0.
 
+    def __str__(self):
+        return f"MCTS(bs={self.beamSize})"
+
             
 
     def infer(self, spec, timeout=None):
@@ -27,6 +30,7 @@ class MCTS():
     
     def _infer(self, spec, timeout):
         startTime = time.time()
+        owner = self
 
         class Node:
             def __init__(self, graph, predictedDistance):
@@ -34,6 +38,17 @@ class MCTS():
                 self.predictedDistance = predictedDistance
                 self.visits = 0
                 self.edges = []
+                if owner.beamSize <= 0:
+                    self.generator = self.model.bestFirstEnumeration(specEncoding, graph, objectEncodings)
+
+            def needsExpansion(self):
+                # If we are doing a beam search: abort once we find something without any edges
+                # If we are doing a best search: abort once we find something without enough edges
+                if self.visits == 0: return True
+                if owner.beamSize > 0: return len(self.edges) == 0
+                if owner.beamSize <= 0:
+                    return self.generator is not None and len(self.edges) < int(self.visits**0.5)
+                assert False
 
         class Edge:
             def __init__(self, parent, child, logLikelihood):
@@ -70,7 +85,16 @@ class MCTS():
 
         def expand(n):
             t0 = time.time()
-            bm = self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize)
+            if self.beamSize > 0:
+                bm = self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize)
+            else:
+                desiredSize = int(1 + n.visits**0.5)
+                bm = []
+                while n.generator is not None and len(bm) + len(n.edges) < desiredSize:
+                    try: bm.append(next(n.generator))
+                    except StopIteration:
+                        n.generator = None
+                        break                
             self.beamTime += time.time() - t0
             
             for o, ll in bm:
@@ -109,7 +133,7 @@ class MCTS():
             # Explore: Prefer paths that are less visited
             confidence += self.cb*(math.log(e.parent.visits)/e.traversals)**0.5
             # Policy: Prefer paths the neural net likes
-            confidence += self.ca*math.exp(e.logLikelihood)/(e.traversals + 1)
+            confidence += self.c_puct*math.exp(e.logLikelihood)/(e.traversals + 1)
             return confidence
 
         rootNode = Node(ProgramGraph([]), distance(ProgramGraph([])))
@@ -118,7 +142,8 @@ class MCTS():
         while time.time() - startTime < timeout:
             n = rootNode
             trajectory = [] # list of traversed edges
-            while n.visits > 0 and len(n.edges) > 0:
+
+            while not n.needsExpansion():
                 e = max(n.edges, key=uct)
                 trajectory.append(e)
                 n = e.child
@@ -132,11 +157,8 @@ class MCTS():
                 e.traversals += 1
                 e.parent.visits += 1
 
-            if n.visits == 0:
-                expand(n)
-                n.visits = 1
-            else:
-                n.visits += 1                
+            expand(n)
+            n.visits += 1                
 
         return bestProgram
                          
