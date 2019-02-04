@@ -284,7 +284,8 @@ class LineDecoder(Module):
             # incorporate successors into heap
             o = self.output(o.squeeze(0).squeeze(0)).cpu().detach().numpy()
             h = h.squeeze(0)
-            a = self.pointerAttention(h, None, objectKeys=objectKeys).squeeze(0).cpu().detach().numpy()
+            if numberOfObjects > 0:
+                a = self.pointerAttention(h, None, objectKeys=objectKeys).squeeze(0).cpu().detach().numpy()
             h = h.squeeze(0)
             for j,w in enumerate(self.lexicon):
                 ll = o[j]
