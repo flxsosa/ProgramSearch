@@ -4,8 +4,9 @@ import time
 
 class MCTS():
     def __init__(self, model, _=None, 
-                 beamSize=10, discountFactor=0.9, cb=1, ca=100, rolloutDepth=None, reward=None):
+                 beamSize=10, discountFactor=0.9, cb=1, ca=100, rolloutDepth=None, reward=None, defaultTimeout=None):
         assert reward is not None, "must specify reward: spec X graph -> real"
+        self.defaultTimeout = defaultTimeout
         self.discountFactor = discountFactor
         self.reward = reward        
         self.ca = ca
@@ -14,14 +15,19 @@ class MCTS():
         self.model = model
         self.rolloutDepth = rolloutDepth
 
+        self.beamTime = 0.
+        self.distanceTime = 0.
+        self.rollingTime = 0.
+
             
 
-    def infer(self, spec, timeout):
+    def infer(self, spec, timeout=None):
+        if timeout is None: timeout = self.defaultTimeout
         with torch.no_grad(): return self._infer(spec, timeout)
     
     def _infer(self, spec, timeout):
         startTime = time.time()
-        
+
         class Node:
             def __init__(self, graph, predictedDistance):
                 self.graph = graph
@@ -56,12 +62,18 @@ class MCTS():
         def distance(g):
             if g in _distance: return _distance[g]
             se = objectEncodings.encoding(list(g.objects()))
+            t0 = time.time()
             d = self.model.distance(se, specEncoding).data.item()
+            self.distanceTime += time.time() - t0
             _distance[g] = d
             return d
 
         def expand(n):
-            for o, ll in self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize):
+            t0 = time.time()
+            bm = self.model.beamNextLine(specEncoding, n.graph, objectEncodings, self.beamSize)
+            self.beamTime += time.time() - t0
+            
+            for o, ll in bm:
                 if o is None or o in n.graph.nodes: continue
                 newGraph = n.graph.extend(o)
                 if newGraph in graph2node:
@@ -73,6 +85,7 @@ class MCTS():
                 n.edges.append(e)
 
         def rollout(g):
+            t0 = time.time()
             depth = 0
             while True:
                 samples = self.model.repeatedlySample(specEncoding, g, objectEncodings, 1)
@@ -81,8 +94,10 @@ class MCTS():
                 if len(samples) == 0 or samples[0] is None: break
                 g = g.extend(samples[0])
                 if self.rolloutDepth is not None and depth >= self.rolloutDepth: break
-                
+
+            self.rollingTime += time.time() - t0
             recordProgram(g)
+            
             return g
 
         def uct(e):
