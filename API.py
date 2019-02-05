@@ -1,13 +1,34 @@
+import torch
+import time
+
 class Solver:
     def __init__(self):
         pass
 
+    def _report(self, program, spec):
+        l = self.loss(program)
+        if len(self.reportedSolutions) == 0 or self.reportedSolutions[-1][1] > l:
+            self.reportedSolutions.append((program, l, time.time() - self.startTime))            
+        
     def infer(self, spec, loss, timeout):
         """
         spec: specification of goal
+        loss: function from (spec, program) to real
         timeout: maximum time to run solver, measured in seconds
         returns: list of (program, loss, time)
         Should take no longer than timeout seconds."""
+        self.reportedSolutions = []
+        self.startTime = time.time()
+        self.loss = lambda p: loss(spec, p)
+
+        with torch.no_grad():
+            self._infer(spec, loss, timeout)
+
+        self.loss = None # in case we need to serialize this object and loss is a lambda
+        
+        return self.reportedSolutions
+
+    def _infer(self, spec, loss, timeout):
         assert False, "not implemented"
 
 class DSL:
@@ -27,7 +48,7 @@ class DSL:
         Parses a serialized line of code into a Program object.
         Returns None if the DSL cannot parse the serialized code.
         """
-        if len(tokens) == 0: return None
+        if len(tokens) == 0 or tokens[0] not in self.tokenToOperator: return None
 
         f = self.tokenToOperator[tokens[0]]
         if len(tokens) != len(f.argument_types) + 1: return None

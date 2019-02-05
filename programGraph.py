@@ -1,3 +1,4 @@
+from API import *
 from MHDPA import *
 from pointerNetwork import *
 from utilities import *
@@ -224,7 +225,7 @@ class ProgramPointerNetwork(Module):
 
             h0 = self.initialHidden(scopeEncoding, specEncoding)
             def substitutePointers(serialization):
-                return [token if not isinstance(token, Pointer) else object2pointer[token]
+                return [token if not isinstance(token, Program) else object2pointer[token]
                         for token in serialization]
 
             targetLines = [substitutePointers(m.serialize()) if not finalMove else m
