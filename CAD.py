@@ -267,10 +267,11 @@ def testCSG(m, getProgram, timeout):
             testResults[n].append(solver.infer(spec.execute(), loss, timeout))
 
     plotTestResults(testResults, timeout,
-                    ["SMC", "FS"])
+                    defaultLoss=-1.,
+                    names=["SMC", "FS"])
 
-def plotTestResults(testResults, timeout,
-                    names):
+def plotTestResults(testResults, timeout, defaultLoss=None,
+                    names=None):
     import matplotlib.pyplot as plot
 
     def averageLoss(n, T):
@@ -278,7 +279,7 @@ def plotTestResults(testResults, timeout,
         # Filter out results that occurred after time T
         results = [ [r for r in rs if r.time <= T]
                     for rs in results ]
-        losses = [ min(r.loss for r in rs) for rs in results ]
+        losses = [ min([defaultLoss] + [r.loss for r in rs]) for rs in results ]
         return sum(losses)/len(losses)
 
     plot.figure()
