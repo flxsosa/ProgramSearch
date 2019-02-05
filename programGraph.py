@@ -42,7 +42,7 @@ class ProgramGraph:
                               for t in n.serialize() ]
             myIndex = len(index2node)
             index2node.append(n)
-            index2code[myIndex] = "(" + " ".join(serialization) + ")"
+            index2code[myIndex] = "(" + " ".join(map(str, serialization)) + ")"
             node2index[n] = myIndex            
             return myIndex
         for n in self.nodes: getIndex(n)

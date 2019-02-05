@@ -5,17 +5,17 @@ class Solver:
     def __init__(self):
         pass
 
-    def _report(self, program, spec):
+    def _report(self, program):
         l = self.loss(program)
-        if len(self.reportedSolutions) == 0 or self.reportedSolutions[-1][1] > l:
-            self.reportedSolutions.append((program, l, time.time() - self.startTime))            
+        if len(self.reportedSolutions) == 0 or self.reportedSolutions[-1].loss > l:
+            self.reportedSolutions.append(SearchResult(program, l, time.time() - self.startTime))            
         
     def infer(self, spec, loss, timeout):
         """
         spec: specification of goal
         loss: function from (spec, program) to real
         timeout: maximum time to run solver, measured in seconds
-        returns: list of (program, loss, time)
+        returns: list of `SearchResult`s
         Should take no longer than timeout seconds."""
         self.reportedSolutions = []
         self.startTime = time.time()
@@ -30,6 +30,12 @@ class Solver:
 
     def _infer(self, spec, loss, timeout):
         assert False, "not implemented"
+
+class SearchResult:
+    def __init__(self, program, loss, time):
+        self.program = program
+        self.loss = loss
+        self.time = time
 
 class DSL:
     def __init__(self, operators, lexicon=None):

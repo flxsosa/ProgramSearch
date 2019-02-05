@@ -6,12 +6,11 @@ import time
 class SMC(Solver):
     def __init__(self, model, _=None,
                  maximumLength=8,
-                 initialParticles=10, exponentialGrowthFactor=2,
+                 initialParticles=100, exponentialGrowthFactor=2,
                  fitnessWeight=2.):
         self.maximumLength = maximumLength
         self.initialParticles = initialParticles
         self.exponentialGrowthFactor = exponentialGrowthFactor
-        self.particles = particles
         self.fitnessWeight = fitnessWeight
         self.model = model
 
@@ -42,7 +41,7 @@ class SMC(Solver):
 
         while True:
             population = [Particle(ProgramGraph([]), numberOfParticles)]
-            for _ in range(maximumLength):
+            for _ in range(self.maximumLength):
                 sampleFrequency = {}
                 for p in population:
                     for newObject in self.model.repeatedlySample(specEncoding, p.graph,

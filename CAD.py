@@ -6,6 +6,7 @@ from API import *
 from pointerNetwork import *
 from programGraph import *
 from SMC import *
+from ForwardSample import *
 from CNN import *
 
 import time
@@ -186,6 +187,7 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, verbose=False):
+    random.seed(0)
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
@@ -238,12 +240,6 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         totalLosses.append(sum(l))
         movedLosses.append(sum(l)/len(l))
         distanceLosses.append(sum(dl)/len(dl))
-        if sum(l) < 2. and iteration%5 == 0:
-            print(f"loss is small! Trying a sample. For reference, here is the goal graph:\n{g.prettyPrint()}")
-            sample = m.sample(s.execute(), maxMoves=5)
-            if sample is None: print("Failed to get a correct sample")
-            else: print(f"Got the following sample:\n{sample.prettyPrint()}")
-            print()
 
         if iteration%reportingFrequency == 0:
             print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\t\tdistance loss {sum(distanceLosses)/len(distanceLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
@@ -255,27 +251,48 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
         iteration += 1
 
-def testCSG(m, getProgram):
-    i = SMC(m, particles=50)
-    for _ in range(100):
+def testCSG(m, getProgram, timeout):
+    solvers = [SMC(m), ForwardSample(m)]
+    loss = lambda spec, program: -max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else -1.
+
+    testResults = [[] for _ in solvers]
+
+    for _ in range(3):
         spec = getProgram()
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec).prettyPrint())
         print()
-        samples = i.infer(spec.execute())
-        for s in samples:
-            print(s.prettyPrint())
-            print("IoU:",max( o.IoU(spec) for o in s.objects() ))
-            print()
-        print(f"Solved task? {any( spec in s.objects() for s in samples )}")
+        for n, solver in enumerate(solvers):
+            testResults[n].append(solver.infer(spec.execute(), loss, timeout))
 
-        print("Trying forward samples...")
-        samples = [m.sample(spec.execute(), maxMoves=6) for _ in range(100)]
-        samples = [sample for sample in samples if sample is not None]
-        print("Sampled IOU:",[max(o.IoU(spec) for o in s.objects() ) for s in samples ])
-        print("Best IOU:",max([max(o.IoU(spec) for o in s.objects() ) for s in samples ]))
-        print(f"{sum( spec in s.objects() for s in samples if s is not None)}/100 samples solved task")
+    plotTestResults(testResults, timeout,
+                    ["SMC", "FS"])
+
+def plotTestResults(testResults, timeout,
+                    names):
+    import matplotlib.pyplot as plot
+
+    def averageLoss(n, T):
+        results = testResults[n] # list of list of results, one for each test case
+        # Filter out results that occurred after time T
+        results = [ [r for r in rs if r.time <= T]
+                    for rs in results ]
+        losses = [ min(r.loss for r in rs) for rs in results ]
+        return sum(losses)/len(losses)
+
+    plot.figure()
+    plot.xlabel('Time')
+    plot.ylabel('Average Loss')
+
+    for n in range(len(testResults)):
+        xs = list(np.arange(0,timeout,0.1))
+        plot.plot(xs, [averageLoss(n,x) for x in xs],
+                  label=names[n])
+    plot.legend()
+    plot.show()
         
+        
+    
         
     
 
@@ -294,6 +311,8 @@ if __name__ == "__main__":
                         help="Number of attention heads")
     parser.add_argument("--hidden", "-H", type=int, default=256,
                         help="Size of hidden layers")
+    parser.add_argument("--timeout", default=5, type=float,
+                        help="Test time maximum timeout")
     arguments = parser.parse_args()
 
     if arguments.mode == "train":
@@ -307,4 +326,4 @@ if __name__ == "__main__":
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
-        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes))
+        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes), arguments.timeout)
