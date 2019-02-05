@@ -188,7 +188,6 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, verbose=False):
-    random.seed(0)
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
@@ -268,10 +267,11 @@ def testCSG(m, getProgram, timeout):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=-1.,
-                    names=["SMC", "FS"])
+                    names=["SMC", "FS"],
+                    export="figures/CAD.png")
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
-                    names=None):
+                    names=None, export=None):
     import matplotlib.pyplot as plot
 
     def averageLoss(n, T):
@@ -291,7 +291,10 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
         plot.plot(xs, [averageLoss(n,x) for x in xs],
                   label=names[n])
     plot.legend()
-    plot.show()
+    if export:
+        plot.savefig(export)
+    else:
+        plot.show()
         
         
     
