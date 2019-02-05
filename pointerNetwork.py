@@ -70,6 +70,9 @@ class LineDecoder(Module):
         hiddenStates = self.decoderToPointer(hiddenStates)
         if objectKeys is None:
             objectKeys = self.encoderToPointer(objectEncodings)
+        else:
+            assert objectEncodings is None, "You either provide object encodings or object keys but not both"
+
 
         _h = hiddenStates.unsqueeze(1).repeat(1, objectKeys.size(0), 1)
         _o = objectKeys.unsqueeze(0).repeat(hiddenStates.size(0), 1, 1)
@@ -217,11 +220,11 @@ class LineDecoder(Module):
             o = o.squeeze(0)
             h = h.squeeze(0)
 
-            outputDistributions = self.output(o).detach().numpy()
+            outputDistributions = self.output(o).detach().cpu().numpy()
             if encodedObjects is not None:
-                attention = self.pointerAttention(h, None, objectKeys=objectKeys).detach().numpy()
+                attention = self.pointerAttention(h, None, objectKeys=objectKeys).detach().cpu().numpy()
             else:
-                attention = None
+                attention = [None]*len(unfinishedParticles)
 
             particles = [child
                          for j,p in enumerate(unfinishedParticles)

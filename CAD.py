@@ -31,7 +31,8 @@ class CSG(Program):
         return self._rendering
 
     def IoU(self, other):
-        return (self.execute()*other.execute()).sum()/(self.execute() + other.execute() - self.execute()*other.execute()).sum()
+        if isinstance(other, CSG): other = other.execute()
+        return (self.execute()*other).sum()/(self.execute() + other - self.execute()*other).sum()
     
     def render(self, w=None, h=None):
         w = w or RESOLUTION

@@ -59,7 +59,7 @@ class DSL:
         f = self.tokenToOperator[tokens[0]]
         if len(tokens) != len(f.argument_types) + 1: return None
 
-        for token, argument_type in zip(tokens, f.argument_types):
+        for token, argument_type in zip(tokens[1:], f.argument_types):
             if not isinstance(token, argument_type): return None
 
         return f(*tokens[1:])
