@@ -1,5 +1,8 @@
 import pickle
 import numpy as np
+
+from API import *
+
 from pointerNetwork import *
 from programGraph import *
 from SMC import *
@@ -14,8 +17,8 @@ RESOLUTION = 32
 import torch
 import torch.nn as nn
 
-class CSG():
-    lexicon = ['+','-','t','c','r'] + list(map(str,range(64)))
+class CSG(Program):
+    lexicon = ['+','-','t','c','r'] + list(range(RESOLUTION))
 
     def __init__(self):
         self._rendering = None
@@ -40,41 +43,12 @@ class CSG():
                     a[x,y] = 1
         return a
 
-    @staticmethod
-    def parseLine(tokens):
-        if len(tokens) == 0: return None
-        if tokens[0] == '+':
-            if len(tokens) != 3: return None
-            if not isinstance(tokens[2],CSG): return None
-            if not isinstance(tokens[1],CSG): return None
-            if tokens[1] == tokens[2]: return None
-            return Union(tokens[1],tokens[2])
-        if tokens[0] == '-':
-            if len(tokens) != 3: return None
-            if not isinstance(tokens[2],CSG): return None
-            if not isinstance(tokens[1],CSG): return None
-            return Difference(tokens[1],tokens[2])
-        if tokens[0] == 't':
-            if len(tokens) != 4: return None
-            if not isinstance(tokens[3],CSG): return None
-            try:
-                return Translation((int(tokens[1]),int(tokens[2])),
-                                   tokens[3])
-            except: return None
-        if tokens[0] == 'r':
-            if len(tokens) != 3: return None
-            try:
-                return Rectangle(int(tokens[1]),
-                                 int(tokens[2]))
-            except: return None
-        if tokens[0] == 'c':
-            if len(tokens) != 2: return None
-            try: return Circle(int(tokens[1]))
-            except: return None
-        return None
-        
 
 class Rectangle(CSG):
+    token = 'r'
+    type = CSG
+    argument_types = (int, int)
+    
     def __init__(self, w, h):
         super(Rectangle, self).__init__()
         self.w = w
@@ -89,13 +63,17 @@ class Rectangle(CSG):
         return hash(('r',self.w,self.h))
 
     def serialize(self):
-        return ('r',str(self.w),str(self.h))
+        return (self.__class__.token, self.w, self.h)
 
     def __contains__(self, p):
         return p[0] >= 0 and p[1] >= 0 and \
             p[0] < self.w and p[1] < self.h
 
 class Circle(CSG):
+    token = 'c'
+    type = CSG
+    argument_types = (int,)
+    
     def __init__(self, r):
         super(Circle, self).__init__()
         self.r = r
@@ -108,12 +86,16 @@ class Circle(CSG):
         return hash(('c', str(self.r)))
 
     def serialize(self):
-        return ('c',str(self.r))
+        return (self.__class__.token, self.r)
 
     def __contains__(self, p):
         return p[0]*p[0] + p[1]*p[1] <= self.r
 
 class Translation(CSG):
+    token = 't'
+    type = CSG
+    argument_types = (int,)
+    
     def __init__(self, p, child):
         super(Translation, self).__init__()
         self.v = p
@@ -122,7 +104,7 @@ class Translation(CSG):
     def children(self): return [self.child]
 
     def serialize(self):
-        return ('t',str(self.v[0]),str(self.v[1]),self.child)
+        return ('t', self.v[0], self.v[1], self.child)
 
     def __eq__(self, o):
         return isinstance(o, Translation) and o.v == self.v and self.child == o.child
@@ -136,6 +118,10 @@ class Translation(CSG):
         return p in self.child
 
 class Union(CSG):
+    token = '+'
+    type = CSG
+    argument_types = (CSG, CSG)
+    
     def __init__(self, a, b):
         super(Union, self).__init__()
         self.elements = frozenset({a,b})
@@ -155,6 +141,10 @@ class Union(CSG):
         return any( p in e for e in self.elements )
 
 class Difference(CSG):
+    token = '-'
+    type = CSG
+    argument_types = (CSG, CSG)
+    
     def __init__(self, a, b):
         super(Difference, self).__init__()
         self.a, self.b = a, b
@@ -170,6 +160,8 @@ class Difference(CSG):
     def __contains__(self, a, b):
         return p in self.a and (not (p in self.b))
 
+dsl = DSL([Rectangle, Circle, Translation, Union, Difference],
+          lexicon=CSG.lexicon)
 
 """Neural networks"""
 class ObjectEncoder(CNN):
@@ -305,7 +297,7 @@ if __name__ == "__main__":
     arguments = parser.parse_args()
 
     if arguments.mode == "train":
-        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), CSG,
+        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)

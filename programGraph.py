@@ -37,7 +37,7 @@ class ProgramGraph:
         index2code = {}
         def getIndex(n):
             if n in node2index: return node2index[n]
-            serialization = [ t if isinstance(t, str) else f"${getIndex(t)}"
+            serialization = [ t if not isinstance(t, Program) else f"${getIndex(t)}"
                               for t in n.serialize() ]
             myIndex = len(index2node)
             index2node.append(n)
@@ -224,7 +224,7 @@ class ProgramPointerNetwork(Module):
 
             h0 = self.initialHidden(scopeEncoding, specEncoding)
             def substitutePointers(serialization):
-                return [token if isinstance(token,str) else object2pointer[token]
+                return [token if not isinstance(token, Pointer) else object2pointer[token]
                         for token in serialization]
 
             targetLines = [substitutePointers(m.serialize()) if not finalMove else m
