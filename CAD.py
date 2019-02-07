@@ -187,8 +187,7 @@ class SpecEncoder(CNN):
 
 
 """Training"""
-def randomScene(resolution=32, maxShapes=3, verbose=False):
-    random.seed(0)
+def randomScene(resolution=32, maxShapes=3, verbose=False, export=None):
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
@@ -218,6 +217,10 @@ def randomScene(resolution=32, maxShapes=3, verbose=False):
         print(ProgramGraph.fromRoot(s).prettyPrint())
         plot.imshow(s.execute())
         plot.show()
+    if export:
+        import matplotlib.pyplot as plot
+        plot.imshow(s.execute())
+        plot.savefig(export)
     
     return s
 
@@ -305,7 +308,7 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
-    parser.add_argument("mode", choices=["train","test"])
+    parser.add_argument("mode", choices=["train","test","demo"])
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
@@ -320,6 +323,14 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", default=5, type=float,
                         help="Test time maximum timeout")
     arguments = parser.parse_args()
+
+    if arguments.mode == "demo":
+        for n in range(100):
+            randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes)
+        import sys
+        sys.exit(0)
+        
+            
 
     if arguments.mode == "train":
         m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,
