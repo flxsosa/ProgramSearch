@@ -96,7 +96,7 @@ class Circle(CSG):
 class Translation(CSG):
     token = 't'
     type = CSG
-    argument_types = (int,)
+    argument_types = (int,int,)
     
     def __init__(self, p, child):
         super(Translation, self).__init__()
