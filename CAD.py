@@ -275,7 +275,7 @@ def testCSG(m, getProgram, timeout):
                 print()
 
     plotTestResults(testResults, timeout,
-                    defaultLoss=-1.,
+                    defaultLoss=1.,
                     names=["SMC", "FS"],
                     export="figures/CAD.png")
 
