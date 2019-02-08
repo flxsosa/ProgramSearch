@@ -34,6 +34,11 @@ class SymbolEncoder(Module):
 
 class LineDecoder(Module):
     def __init__(self, lexicon, H=256, encoderDimensionality=256, layers=1):
+        """
+        H: Hidden size for GRU & size of embedding of output tokens
+        encoderDimensionality: Dimensionality of objects we are attending over (objects we can point to)
+        lexicon: list of symbols that can occur in a line of code. STARTING, ENDING, & POINTER are reserved symbols.
+        """
         super(LineDecoder, self).__init__()
 
         self.encoderDimensionality = encoderDimensionality
@@ -64,7 +69,7 @@ class LineDecoder(Module):
         """
         hiddenStates: BxH
         objectEncodings: (# objects)x(encoder dimensionality); if this is set to none, expects:
-        objectKeys: (# objects)x(key dimensionality)
+        objectKeys: (# objects)x(key dimensionality; this is H passed to constructor)
         OUTPUT: Bx(# objects) attention matrix
         """
         hiddenStates = self.decoderToPointer(hiddenStates)
@@ -72,7 +77,6 @@ class LineDecoder(Module):
             objectKeys = self.encoderToPointer(objectEncodings)
         else:
             assert objectEncodings is None, "You either provide object encodings or object keys but not both"
-
 
         _h = hiddenStates.unsqueeze(1).repeat(1, objectKeys.size(0), 1)
         _o = objectKeys.unsqueeze(0).repeat(hiddenStates.size(0), 1, 1)

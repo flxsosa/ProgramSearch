@@ -125,7 +125,7 @@ class ProgramPointerNetwork(Module):
         self.objectEncoder = objectEncoder
         self.specEncoder = specEncoder
         self.decoder = LineDecoder(DSL.lexicon + ["RETURN"],
-                                   encoderDimensionality=objectEncoder.outputDimensionality,
+                                   encoderDimensionality=H, # self attention outputs size H
                                    H=H)
         self._initialHidden = nn.Sequential(
             nn.Linear(H + specEncoder.outputDimensionality, H),
