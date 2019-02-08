@@ -1,3 +1,4 @@
+from API import *
 from MHDPA import *
 from pointerNetwork import *
 from utilities import *
@@ -37,11 +38,11 @@ class ProgramGraph:
         index2code = {}
         def getIndex(n):
             if n in node2index: return node2index[n]
-            serialization = [ t if isinstance(t, str) else f"${getIndex(t)}"
+            serialization = [ t if not isinstance(t, Program) else f"${getIndex(t)}"
                               for t in n.serialize() ]
             myIndex = len(index2node)
             index2node.append(n)
-            index2code[myIndex] = "(" + " ".join(serialization) + ")"
+            index2code[myIndex] = "(" + " ".join(map(str, serialization)) + ")"
             node2index[n] = myIndex            
             return myIndex
         for n in self.nodes: getIndex(n)
@@ -57,10 +58,11 @@ class ProgramGraph:
     def objects(self):
         return self.nodes
 
-    def policyOracle(self, targetGraph):
-        missingNodes = targetGraph.nodes - self.nodes
+    def policyOracle(self, currentGraph):
+        """Takes the current graph and returns moves that take you closer to the goal graph (self)"""
+        missingNodes = self.nodes - currentGraph.nodes
         for n in missingNodes:
-            if all( child in self.nodes for child in n.children() ):
+            if all( child in currentGraph.nodes for child in n.children() ):
                 yield n
 
     def distanceOracle(self, targetGraph):
@@ -100,11 +102,13 @@ class ScopeEncoding():
 
     def encoding(self, objects):
         """Takes as input O objects (as a list) and returns a OxE tensor of their encodings.
+        If the owner has a self attention module, also applies the attention module.
         If objects is the empty list then return None"""
         if len(objects) == 0: return None
         self.registerObjects(objects)
-        return self.objectEncoding[self.owner.device(torch.tensor([self.object2index[o]
-                                                                   for o in objects ]))]
+        preAttention = self.objectEncoding[self.owner.device(torch.tensor([self.object2index[o]
+                                                                           for o in objects ]))]
+        return self.owner.selfAttention(preAttention)
         
             
 class ProgramPointerNetwork(Module):
@@ -145,7 +149,6 @@ class ProgramPointerNetwork(Module):
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
         else:
-            objectEncodings = self.selfAttention(objectEncodings)
             objectEncodings = objectEncodings.max(0)[0]
         return self._initialHidden(torch.cat([specEncoding, objectEncodings]))
 
@@ -154,7 +157,6 @@ class ProgramPointerNetwork(Module):
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
         else:
-            objectEncodings = self.selfAttention(objectEncodings)
             objectEncodings = objectEncodings.max(0)[0]
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))
@@ -163,7 +165,7 @@ class ProgramPointerNetwork(Module):
         """Returns (policy loss, distance loss)"""
         self.zero_grad()
         
-        optimalMoves = list(currentGraph.policyOracle(goalGraph))
+        optimalMoves = list(goalGraph.policyOracle(currentGraph))
         if len(optimalMoves) == 0:
             optimalMoves = [['RETURN']]
             finalMove = True
@@ -209,7 +211,7 @@ class ProgramPointerNetwork(Module):
         specEncoding = self.specEncoder(spec)
 
         while True:
-            optimalMoves = list(currentGraph.policyOracle(goalGraph))
+            optimalMoves = list(goalGraph.policyOracle(currentGraph))
             if len(optimalMoves) == 0:
                 finalMove = True
                 optimalMoves = [['RETURN']]
@@ -224,7 +226,7 @@ class ProgramPointerNetwork(Module):
 
             h0 = self.initialHidden(scopeEncoding, specEncoding)
             def substitutePointers(serialization):
-                return [token if isinstance(token,str) else object2pointer[token]
+                return [token if not isinstance(token, Program) else object2pointer[token]
                         for token in serialization]
 
             targetLines = [substitutePointers(m.serialize()) if not finalMove else m

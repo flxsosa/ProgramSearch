@@ -1,8 +1,12 @@
 import pickle
 import numpy as np
+
+from API import *
+
 from pointerNetwork import *
 from programGraph import *
 from SMC import *
+from ForwardSample import *
 from CNN import *
 
 import time
@@ -14,8 +18,8 @@ RESOLUTION = 32
 import torch
 import torch.nn as nn
 
-class CSG():
-    lexicon = ['+','-','t','c','r'] + list(map(str,range(64)))
+class CSG(Program):
+    lexicon = ['+','-','t','c','r'] + list(range(RESOLUTION))
 
     def __init__(self):
         self._rendering = None
@@ -27,7 +31,8 @@ class CSG():
         return self._rendering
 
     def IoU(self, other):
-        return (self.execute()*other.execute()).sum()/(self.execute() + other.execute() - self.execute()*other.execute()).sum()
+        if isinstance(other, CSG): other = other.execute()
+        return (self.execute()*other).sum()/(self.execute() + other - self.execute()*other).sum()
     
     def render(self, w=None, h=None):
         w = w or RESOLUTION
@@ -40,41 +45,12 @@ class CSG():
                     a[x,y] = 1
         return a
 
-    @staticmethod
-    def parseLine(tokens):
-        if len(tokens) == 0: return None
-        if tokens[0] == '+':
-            if len(tokens) != 3: return None
-            if not isinstance(tokens[2],CSG): return None
-            if not isinstance(tokens[1],CSG): return None
-            if tokens[1] == tokens[2]: return None
-            return Union(tokens[1],tokens[2])
-        if tokens[0] == '-':
-            if len(tokens) != 3: return None
-            if not isinstance(tokens[2],CSG): return None
-            if not isinstance(tokens[1],CSG): return None
-            return Difference(tokens[1],tokens[2])
-        if tokens[0] == 't':
-            if len(tokens) != 4: return None
-            if not isinstance(tokens[3],CSG): return None
-            try:
-                return Translation((int(tokens[1]),int(tokens[2])),
-                                   tokens[3])
-            except: return None
-        if tokens[0] == 'r':
-            if len(tokens) != 3: return None
-            try:
-                return Rectangle(int(tokens[1]),
-                                 int(tokens[2]))
-            except: return None
-        if tokens[0] == 'c':
-            if len(tokens) != 2: return None
-            try: return Circle(int(tokens[1]))
-            except: return None
-        return None
-        
 
 class Rectangle(CSG):
+    token = 'r'
+    type = CSG
+    argument_types = (int, int)
+    
     def __init__(self, w, h):
         super(Rectangle, self).__init__()
         self.w = w
@@ -89,13 +65,17 @@ class Rectangle(CSG):
         return hash(('r',self.w,self.h))
 
     def serialize(self):
-        return ('r',str(self.w),str(self.h))
+        return (self.__class__.token, self.w, self.h)
 
     def __contains__(self, p):
         return p[0] >= 0 and p[1] >= 0 and \
             p[0] < self.w and p[1] < self.h
 
 class Circle(CSG):
+    token = 'c'
+    type = CSG
+    argument_types = (int,)
+    
     def __init__(self, r):
         super(Circle, self).__init__()
         self.r = r
@@ -108,21 +88,25 @@ class Circle(CSG):
         return hash(('c', str(self.r)))
 
     def serialize(self):
-        return ('c',str(self.r))
+        return (self.__class__.token, self.r)
 
     def __contains__(self, p):
         return p[0]*p[0] + p[1]*p[1] <= self.r
 
 class Translation(CSG):
-    def __init__(self, p, child):
+    token = 't'
+    type = CSG
+    argument_types = (int,int,CSG)
+    
+    def __init__(self, x, y, child):
         super(Translation, self).__init__()
-        self.v = p
+        self.v = (x, y)
         self.child = child
 
     def children(self): return [self.child]
 
     def serialize(self):
-        return ('t',str(self.v[0]),str(self.v[1]),self.child)
+        return ('t', self.v[0], self.v[1], self.child)
 
     def __eq__(self, o):
         return isinstance(o, Translation) and o.v == self.v and self.child == o.child
@@ -136,6 +120,10 @@ class Translation(CSG):
         return p in self.child
 
 class Union(CSG):
+    token = '+'
+    type = CSG
+    argument_types = (CSG, CSG)
+    
     def __init__(self, a, b):
         super(Union, self).__init__()
         self.elements = frozenset({a,b})
@@ -155,6 +143,10 @@ class Union(CSG):
         return any( p in e for e in self.elements )
 
 class Difference(CSG):
+    token = '-'
+    type = CSG
+    argument_types = (CSG, CSG)
+    
     def __init__(self, a, b):
         super(Difference, self).__init__()
         self.a, self.b = a, b
@@ -170,6 +162,8 @@ class Difference(CSG):
     def __contains__(self, a, b):
         return p in self.a and (not (p in self.b))
 
+dsl = DSL([Rectangle, Circle, Translation, Union, Difference],
+          lexicon=CSG.lexicon)
 
 """Neural networks"""
 class ObjectEncoder(CNN):
@@ -193,20 +187,20 @@ class SpecEncoder(CNN):
 
 
 """Training"""
-def randomScene(resolution=32, maxShapes=3, verbose=False):
+def randomScene(resolution=32, maxShapes=3, verbose=False, export=None):
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
         x = random.choice(range(resolution - w))
         y = random.choice(range(resolution - h))
-        return Translation((x,y),
+        return Translation(x,y,
                            Rectangle(w,h))
 
     def circular():
         r = random.choice(range(int(resolution/4))) + 2
         x = random.choice(range(resolution - r*2)) + r
         y = random.choice(range(resolution - r*2)) + r
-        return Translation((x,y),
+        return Translation(x,y,
                            Circle(r))
     s = None
     numberOfShapes = 0
@@ -223,6 +217,10 @@ def randomScene(resolution=32, maxShapes=3, verbose=False):
         print(ProgramGraph.fromRoot(s).prettyPrint())
         plot.imshow(s.execute())
         plot.show()
+    if export:
+        import matplotlib.pyplot as plot
+        plot.imshow(s.execute())
+        plot.savefig(export)
     
     return s
 
@@ -246,12 +244,6 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         totalLosses.append(sum(l))
         movedLosses.append(sum(l)/len(l))
         distanceLosses.append(sum(dl)/len(dl))
-        if sum(l) < 2. and iteration%5 == 0:
-            print(f"loss is small! Trying a sample. For reference, here is the goal graph:\n{g.prettyPrint()}")
-            sample = m.sample(s.execute(), maxMoves=5)
-            if sample is None: print("Failed to get a correct sample")
-            else: print(f"Got the following sample:\n{sample.prettyPrint()}")
-            print()
 
         if iteration%reportingFrequency == 0:
             print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\t\tdistance loss {sum(distanceLosses)/len(distanceLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
@@ -263,34 +255,65 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
         iteration += 1
 
-def testCSG(m, getProgram):
-    i = SMC(m, particles=50)
-    for _ in range(100):
+def testCSG(m, getProgram, timeout):
+    solvers = [SMC(m), ForwardSample(m)]
+    loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
+
+    testResults = [[] for _ in solvers]
+
+    for _ in range(30):
         spec = getProgram()
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec).prettyPrint())
         print()
-        samples = i.infer(spec.execute())
-        for s in samples:
-            print(s.prettyPrint())
-            print("IoU:",max( o.IoU(spec) for o in s.objects() ))
-            print()
-        print(f"Solved task? {any( spec in s.objects() for s in samples )}")
+        for n, solver in enumerate(solvers):
+            testSequence = solver.infer(spec.execute(), loss, timeout)
+            testResults[n].append(testSequence)
+            for result in testSequence:
+                print(f"After time {result.time}, achieved loss {result.loss} w/")
+                print(result.program.prettyPrint())
+                print()
 
-        print("Trying forward samples...")
-        samples = [m.sample(spec.execute(), maxMoves=6) for _ in range(100)]
-        samples = [sample for sample in samples if sample is not None]
-        print("Sampled IOU:",[max(o.IoU(spec) for o in s.objects() ) for s in samples ])
-        print("Best IOU:",max([max(o.IoU(spec) for o in s.objects() ) for s in samples ]))
-        print(f"{sum( spec in s.objects() for s in samples if s is not None)}/100 samples solved task")
+    plotTestResults(testResults, timeout,
+                    defaultLoss=1.,
+                    names=["SMC", "FS"],
+                    export="figures/CAD.png")
+
+def plotTestResults(testResults, timeout, defaultLoss=None,
+                    names=None, export=None):
+    import matplotlib.pyplot as plot
+
+    def averageLoss(n, T):
+        results = testResults[n] # list of list of results, one for each test case
+        # Filter out results that occurred after time T
+        results = [ [r for r in rs if r.time <= T]
+                    for rs in results ]
+        losses = [ min([defaultLoss] + [r.loss for r in rs]) for rs in results ]
+        return sum(losses)/len(losses)
+
+    plot.figure()
+    plot.xlabel('Time')
+    plot.ylabel('Average Loss')
+
+    for n in range(len(testResults)):
+        xs = list(np.arange(0,timeout,0.1))
+        plot.plot(xs, [averageLoss(n,x) for x in xs],
+                  label=names[n])
+    plot.legend()
+    if export:
+        plot.savefig(export)
+    else:
+        plot.show()
         
+        
+    
         
     
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
-    parser.add_argument("mode", choices=["train","test"])
+    parser.add_argument("mode", choices=["train","test","demo"])
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
@@ -302,10 +325,20 @@ if __name__ == "__main__":
                         help="Number of attention heads")
     parser.add_argument("--hidden", "-H", type=int, default=256,
                         help="Size of hidden layers")
+    parser.add_argument("--timeout", default=5, type=float,
+                        help="Test time maximum timeout")
     arguments = parser.parse_args()
 
+    if arguments.mode == "demo":
+        for n in range(100):
+            randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes)
+        import sys
+        sys.exit(0)
+        
+            
+
     if arguments.mode == "train":
-        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), CSG,
+        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)
@@ -315,4 +348,4 @@ if __name__ == "__main__":
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
-        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes))
+        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes), arguments.timeout)
