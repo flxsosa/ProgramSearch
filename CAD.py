@@ -257,7 +257,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 def testCSG(m, getProgram, timeout):
     solvers = [SMC(m), ForwardSample(m)]
-    loss = lambda spec, program: -max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else -1.
+    loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     testResults = [[] for _ in solvers]
 
@@ -271,7 +271,7 @@ def testCSG(m, getProgram, timeout):
             testResults[n].append(testSequence)
             for result in testSequence:
                 print(f"After time {result.time}, achieved loss {result.loss} w/")
-                print(result.program)
+                print(result.program.prettyPrint())
                 print()
 
     plotTestResults(testResults, timeout,
