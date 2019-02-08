@@ -37,6 +37,11 @@ class SearchResult:
         self.loss = loss
         self.time = time
 
+
+class ParseFailure(Exception):
+    """Objects of type Program should throw this exception in their constructor if their arguments are bad"""
+
+
 class DSL:
     def __init__(self, operators, lexicon=None):
         """
@@ -61,8 +66,9 @@ class DSL:
 
         for token, argument_type in zip(tokens[1:], f.argument_types):
             if not isinstance(token, argument_type): return None
-
-        return f(*tokens[1:])
+        try:
+            return f(*tokens[1:])
+        except ParseFailure: return None
 
     
             

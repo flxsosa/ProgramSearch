@@ -58,10 +58,11 @@ class ProgramGraph:
     def objects(self):
         return self.nodes
 
-    def policyOracle(self, targetGraph):
-        missingNodes = targetGraph.nodes - self.nodes
+    def policyOracle(self, currentGraph):
+        """Takes the current graph and returns moves that take you closer to the goal graph (self)"""
+        missingNodes = self.nodes - currentGraph.nodes
         for n in missingNodes:
-            if all( child in self.nodes for child in n.children() ):
+            if all( child in currentGraph.nodes for child in n.children() ):
                 yield n
 
     def distanceOracle(self, targetGraph):
@@ -164,7 +165,7 @@ class ProgramPointerNetwork(Module):
         """Returns (policy loss, distance loss)"""
         self.zero_grad()
         
-        optimalMoves = list(currentGraph.policyOracle(goalGraph))
+        optimalMoves = list(goalGraph.policyOracle(currentGraph))
         if len(optimalMoves) == 0:
             optimalMoves = [['RETURN']]
             finalMove = True
@@ -210,7 +211,7 @@ class ProgramPointerNetwork(Module):
         specEncoding = self.specEncoder(spec)
 
         while True:
-            optimalMoves = list(currentGraph.policyOracle(goalGraph))
+            optimalMoves = list(goalGraph.policyOracle(currentGraph))
             if len(optimalMoves) == 0:
                 finalMove = True
                 optimalMoves = [['RETURN']]
