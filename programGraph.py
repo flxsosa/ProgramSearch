@@ -102,11 +102,13 @@ class ScopeEncoding():
 
     def encoding(self, objects):
         """Takes as input O objects (as a list) and returns a OxE tensor of their encodings.
+        If the owner has a self attention module, also applies the attention module.
         If objects is the empty list then return None"""
         if len(objects) == 0: return None
         self.registerObjects(objects)
-        return self.objectEncoding[self.owner.device(torch.tensor([self.object2index[o]
-                                                                   for o in objects ]))]
+        preAttention = self.objectEncoding[self.owner.device(torch.tensor([self.object2index[o]
+                                                                           for o in objects ]))]
+        return self.owner.selfAttention(preAttention)
         
             
 class ProgramPointerNetwork(Module):
@@ -147,7 +149,6 @@ class ProgramPointerNetwork(Module):
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
         else:
-            objectEncodings = self.selfAttention(objectEncodings)
             objectEncodings = objectEncodings.max(0)[0]
         return self._initialHidden(torch.cat([specEncoding, objectEncodings]))
 
@@ -156,7 +157,6 @@ class ProgramPointerNetwork(Module):
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
         else:
-            objectEncodings = self.selfAttention(objectEncodings)
             objectEncodings = objectEncodings.max(0)[0]
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))

@@ -96,11 +96,11 @@ class Circle(CSG):
 class Translation(CSG):
     token = 't'
     type = CSG
-    argument_types = (int,int,)
+    argument_types = (int,int,CSG)
     
-    def __init__(self, p, child):
+    def __init__(self, x, y, child):
         super(Translation, self).__init__()
-        self.v = p
+        self.v = (x, y)
         self.child = child
 
     def children(self): return [self.child]
@@ -193,14 +193,14 @@ def randomScene(resolution=32, maxShapes=3, verbose=False, export=None):
         h = random.choice(range(int(resolution/2))) + 3
         x = random.choice(range(resolution - w))
         y = random.choice(range(resolution - h))
-        return Translation((x,y),
+        return Translation(x,y,
                            Rectangle(w,h))
 
     def circular():
         r = random.choice(range(int(resolution/4))) + 2
         x = random.choice(range(resolution - r*2)) + r
         y = random.choice(range(resolution - r*2)) + r
-        return Translation((x,y),
+        return Translation(x,y,
                            Circle(r))
     s = None
     numberOfShapes = 0
