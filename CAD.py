@@ -261,7 +261,7 @@ def testCSG(m, getProgram, timeout):
 
     testResults = [[] for _ in solvers]
 
-    for _ in range(3):
+    for _ in range(30):
         spec = getProgram()
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec).prettyPrint())
