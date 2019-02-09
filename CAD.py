@@ -131,7 +131,11 @@ class Union(CSG):
     def children(self): return list(self.elements)
 
     def serialize(self):
-        return ('+',list(self.elements)[0],list(self.elements)[1])
+        if len(self.elements) == 2:
+            return ('+',list(self.elements)[0],list(self.elements)[1])
+        else:
+            assert len(self.elements) == 1
+            return ('+',list(self.elements)[0],list(self.elements)[0])
 
     def __eq__(self, o):
         return isinstance(o, Union) and o.elements == self.elements
