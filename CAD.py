@@ -91,7 +91,7 @@ class Circle(CSG):
         return (self.__class__.token, self.r)
 
     def __contains__(self, p):
-        return p[0]*p[0] + p[1]*p[1] <= self.r
+        return p[0]*p[0] + p[1]*p[1] <= self.r*self.r
 
 class Translation(CSG):
     token = 't'
@@ -201,7 +201,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                            Rectangle(w,h))
 
     def circular():
-        r = random.choice(range(int(resolution/4))) + 2
+        r = random.choice(range(int(resolution/8))) + 2
         x = random.choice(range(resolution - r*2)) + r
         y = random.choice(range(resolution - r*2)) + r
         return Translation(x,y,
@@ -259,7 +259,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
         iteration += 1
 
-def testCSG(m, getProgram, timeout):
+def testCSG(m, getProgram, timeout, export):
     solvers = [SMC(m), ForwardSample(m)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
@@ -281,7 +281,7 @@ def testCSG(m, getProgram, timeout):
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
                     names=["SMC", "FS"],
-                    export="figures/CAD.png")
+                    export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
                     names=None, export=None):
@@ -352,4 +352,6 @@ if __name__ == "__main__":
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
-        testCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes), arguments.timeout)
+        testCSG(m,
+                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes), arguments.timeout,
+                export=f"figures/CAD_{arguments.maxShapes}_shapes.png")
