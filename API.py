@@ -2,7 +2,8 @@ import torch
 import time
 
 class Solver:
-    def __init__(self):
+    def __init__(self, dsl):
+        self.dsl = dsl
         pass
 
     def _report(self, program):
