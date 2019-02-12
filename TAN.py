@@ -28,7 +28,11 @@ RENDER_SCALE = 100
 
 
 class TAN(Program):
-    lexicon = ['+','P1','P2','P3','P4','P5','P6','P7'] +\
+    # lexicon = ['P1','P2','P3','P4','P5','P6','P7'] +\
+    #           ORIENTATIONS +\
+    #           list(range(RESOLUTION))
+
+    lexicon = ['P1','P2','P3','P4'] +\
               ORIENTATIONS +\
               list(range(RESOLUTION))
 
@@ -116,6 +120,9 @@ class P(TAN):
     def __hash__(self):
         return hash((self.__class__.token, self.o, self.x, self.y))
 
+    def serialize(self):
+        return [self.__class__.token] + [self.o, self.x, self.y]
+
 
 class P1(P):
     '''
@@ -139,6 +146,7 @@ class P1(P):
             return int(self.o) == cc
         else:
             return False
+
     def mass(self):
         return 1
 
@@ -223,15 +231,15 @@ class P5(P):
     def mass(self):
         return 2
 
+# A Helper Class that only computes things and is not fundamentally useful
 class Add(TAN):
     token = '+'
     type = TAN
     argument_types = (TAN, TAN)
 
-    def __init__(self, a, b):
+    def __init__(self, list_pieces):
         super(Add, self).__init__()
-        a_elem = list(a.elements) if isinstance(a, Add) else [a]
-        self.elements = frozenset(a_elem + [b])
+        self.elements = frozenset(list_pieces)
 
     def children(self): return list(self.elements)
 
@@ -246,6 +254,9 @@ class Add(TAN):
 
     def mass(self):
         return sum([p.mass() for p in self.elements])
+
+    def serialize(self):
+        return ['+'] + self.children()
 
 # ======= PICTURE RENDERING ========
 def render_board(board, name="board.png"):
@@ -287,6 +298,11 @@ def render_board(board, name="board.png"):
     coords = board_2_coords(board)
     draw(coords)
 
+class TanGraph(ProgramGraph):
+
+    def policyOracle(self, currentGraph):
+        yield from (self.nodes - currentGraph.nodes)
+
 # ======= DATA GENERATION =======
 def random_scene(resolution=RESOLUTION, export=None):
     def random_oxy(x_lim, y_lim):
@@ -306,17 +322,29 @@ def random_scene(resolution=RESOLUTION, export=None):
     def random_P5():
         return P5(*random_oxy(resolution, resolution))
 
-    ret = Add(Add(Add(Add(random_P1(), random_P2()), random_P3()), random_P4()), random_P5())
-    if ret.legal() is not False:
+    ret = [random_P1(), random_P2(), random_P3(), random_P4()]
+
+    if Add(ret).legal() is not False:
         return ret
     else:
         return random_scene()
 
-scene = random_scene()
-print (scene.mass())
-print (scene.to_np_raw())
-if scene.legal() is not False:
-    print (scene.to_board())
-    scene.render()
+def random_graph():
+    return TanGraph(random_scene())
 
+# =================== something ===================
+dsl = DSL([P1, P2, P3, P4],
+          lexicon=TAN.lexicon)
+
+if __name__ == '__main__':
+    scene = random_scene()
+    add_scene = Add(scene)
+    print (add_scene.mass())
+    print (add_scene.to_np_raw())
+    print (add_scene.to_board())
+    add_scene.render()
+
+    print (random_graph())
+    print (dsl)
+    import pdb; pdb.set_trace()
 
