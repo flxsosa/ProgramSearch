@@ -193,7 +193,6 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
-    random.seed(0)
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
