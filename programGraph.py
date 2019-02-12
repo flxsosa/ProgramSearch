@@ -322,6 +322,45 @@ class ProgramPointerNetwork(Module):
         return samples
 
 
+    def beamNextLine(self, specEncoding, graph, objectEncodings, B):
+        """Does a beam search for a single line of code.
+        specEncoding: Encoding of the spec
+        objectEncodings: a ScopeEncoding
+        graph: the current graph
+        B: beam size
+        returns: list of (at most B) beamed (DSL object, log likelihood). None denotes `RETURN`
+        """
+        objectsInScope = list(graph.objects())
+        oe = objectEncodings.encoding(objectsInScope)
+        h0 = self.initialHidden(oe, specEncoding)
+        lines = []
+        for ll, tokens in self.decoder.beam(h0, oe, B, maximumLength=10):
+            tokens = [objectsInScope[t.i] if isinstance(t, Pointer) else t
+                      for t in tokens]
+            if 'RETURN' in tokens:
+                lines.append((None, ll))
+            else:            
+                line = self.DSL.parseLine(tokens)
+                if line is None: continue
+                lines.append((line, ll))
+        return lines
 
-
+    def bestFirstEnumeration(self, specEncoding, graph, objectEncodings):
+        """Does a best first search for a single line of code.
+        specEncoding: Encoding of the spec
+        objectEncodings: a ScopeEncoding
+        graph: current graph
+        yields: stream of (DSL object, log likelihood). None denotes `RETURN'"""
+        objectsInScope = list(graph.objects())
+        oe = objectEncodings.encoding(objectsInScope)
+        h0 = self.initialHidden(oe, specEncoding)
+        for ll, tokens in self.decoder.bestFirstEnumeration(h0, oe):
+            tokens = [objectsInScope[t.i] if isinstance(t, Pointer) else t
+                      for t in tokens]
+            if 'RETURN' in tokens and len(tokens) == 0:
+                yield (None, ll)
+            else:            
+                line = self.DSL.parseLine(tokens)
+                if line is None:  continue
+                yield (line, ll)
 

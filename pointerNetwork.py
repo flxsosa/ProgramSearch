@@ -240,6 +240,68 @@ class LineDecoder(Module):
             if all( p.finished for p in particles ): break
         return [(p.ll, p.trimmed()) for p in particles if p.finished]
             
+
+    def bestFirstEnumeration(self, initialState, encodedObjects):
+        """Given an initial hidden state of size H and the encodings of objects in scope,
+        do a best first search and yield a stream of (log likelihood, sequence of tokens)"""
+        if encodedObjects is not None:
+            objectKeys = self.encoderToPointer(encodedObjects)
+            numberOfObjects = objectKeys.size(0)
+        else:
+            numberOfObjects = 0
+
+        class State():
+            def __init__(self, h, ll, sequence):
+                self.h = h
+                self.ll = ll
+                self.sequence = sequence
+
+            @property
+            def finished(self):
+                return self.sequence[-1] == "ENDING"
+            def trimmed(self):
+                return self.sequence[1:-1]
+
+        frontier = PQ()
+        def addToFrontier(s):
+            frontier.push(s.ll, s)
+        addToFrontier(State(initialState, 0., ["STARTING"]))
+
+        while len(frontier) > 0:
+            best = frontier.popMaximum()
+            if best.finished:
+                yield (best.ll, best.trimmed())
+                continue
+             
+
+            # Calculate the input vector
+            lastWord = best.sequence[-1]
+            if isinstance(lastWord, Pointer):
+                latestPointer = encodedObjects[lastWord.i]
+                lastWord = "POINTER"
+            else:
+                latestPointer = self.device(torch.zeros(self.encoderDimensionality))
+            i = torch.cat([self.embedding(self.tensor(self.wordToIndex[lastWord])), latestPointer])
+
+            # Run the RNN forward
+            i = i.unsqueeze(0).unsqueeze(0)
+            o,h = self.model(i,best.h.unsqueeze(0).unsqueeze(0) if best.h is not None else None)
+
+            # incorporate successors into heap
+            o = self.output(o.squeeze(0).squeeze(0)).cpu().detach().numpy()
+            h = h.squeeze(0)
+            if numberOfObjects > 0:
+                a = self.pointerAttention(h, None, objectKeys=objectKeys).squeeze(0).cpu().detach().numpy()
+            h = h.squeeze(0)
+            for j,w in enumerate(self.lexicon):
+                ll = o[j]
+                if w == "POINTER":
+                    for objectIndex in range(numberOfObjects):
+                        pointer_ll = ll + a[objectIndex]
+                        successor = State(h, best.ll + pointer_ll, best.sequence + [Pointer(objectIndex)])
+                        addToFrontier(successor)
+                else:
+                    addToFrontier(State(h, best.ll + ll, best.sequence + [w]))            
             
             
          
@@ -277,6 +339,11 @@ class PointerNetwork(Module):
                  for ll, sequence in self.decoder.beam(None, self.encoder(inputObjects), B,
                                                        maximumLength=maximumLength)]
 
+    def bestFirstEnumeration(self, inputObjects):
+        for ll, sequence in self.decoder.bestFirstEnumeration(None, self.encoder(inputObjects)):
+            yield ll, [inputObjects[p.i] if isinstance(p, Pointer) else p
+                       for p in sequence] 
+
     
             
 
@@ -310,5 +377,13 @@ if __name__ == "__main__":
             print([x,y],"beams into:")
             for ll, s in m.beam([x,y],10):
                 print(f"{s}\t(w/ ll={ll})")
+            print()
+            print([x,y],"best first into")
+            lines = 0
+            for ll, s in m.bestFirstEnumeration([x,y]):
+                print(f"{s}\t(w/ ll={ll})")
+                lines += 1
+                if lines > 5: break
+                
             print()
             

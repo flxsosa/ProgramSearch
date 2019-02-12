@@ -7,6 +7,7 @@ from pointerNetwork import *
 from programGraph import *
 from SMC import *
 from ForwardSample import *
+from MCTS import MCTS
 from CNN import *
 
 import time
@@ -192,6 +193,7 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
+    random.seed(0)
     def quadrilateral():
         w = random.choice(range(int(resolution/2))) + 3
         h = random.choice(range(int(resolution/2))) + 3
@@ -260,7 +262,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         iteration += 1
 
 def testCSG(m, getProgram, timeout, export):
-    solvers = [SMC(m), ForwardSample(m)]
+    solvers = [MCTS(m, reward=lambda l: 1. - l)]#,SMC(m), ForwardSample(m)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     testResults = [[] for _ in solvers]
@@ -280,7 +282,7 @@ def testCSG(m, getProgram, timeout, export):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=["SMC", "FS"],
+                    names=["MCTS"],#["SMC", "FS"],
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
