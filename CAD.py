@@ -261,7 +261,9 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         iteration += 1
 
 def testCSG(m, getProgram, timeout, export):
-    solvers = [MCTS(m, reward=lambda l: 1. - l)]#,SMC(m), ForwardSample(m)]
+    solvers = [MCTS(m, reward=lambda l: 1. - l),
+               SMC(m),
+               ForwardSample(m)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     testResults = [[] for _ in solvers]
@@ -281,7 +283,7 @@ def testCSG(m, getProgram, timeout, export):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=["MCTS"],#["SMC", "FS"],
+                    names=["MCTS","SMC", "FS"],
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
