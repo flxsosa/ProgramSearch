@@ -73,8 +73,6 @@ class DSL:
 class Program:
 
     # TODO: implement type property
-    @abstractproprty
-    type = None
 
     def execute(self, context):
         assert False, "not implemented"
