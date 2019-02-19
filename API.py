@@ -42,7 +42,6 @@ class SearchResult:
 class ParseFailure(Exception):
     """Objects of type Program should throw this exception in their constructor if their arguments are bad"""
 
-
 class DSL:
     def __init__(self, operators, lexicon=None):
         """
@@ -71,11 +70,12 @@ class DSL:
             return f(*tokens[1:])
         except ParseFailure: return None
 
-    
-            
-
-
 class Program:
+
+    # TODO: implement type property
+    @abstractproprty
+    type = None
+
     def execute(self, context):
         assert False, "not implemented"
 
@@ -83,4 +83,30 @@ class Program:
         assert False, "not implemented"
 
 
+class Type():
+    pass
+
+class BaseType(Type):
+    def __init__(self, thing):
+        self.constructor = thing
+
+class arrow(Type):
+    def __init__(self, *args):
+        assert len(args) > 1
+        for a in args:
+            assert isinstance(a, Type)
+        self.out = args[-1]
+        self.arguments = args[:-1]
+
+    def pretty_print(self):
+        print("Arguments: {}".format(self.arguments))
+        print("Output: {}".format(self.out))
+
+class integer(Type):
+
+    def __init__(self,lower,upper):
+        assert type(lower) is int
+        assert type(upper) is int
+        self.upper = upper
+        self.lower = lower
 
