@@ -46,11 +46,12 @@ class CSG(Program):
                     a[x,y] = 1
         return a
 
+# The type of CSG's
+tCSG = BaseType(CSG)
 
 class Rectangle(CSG):
     token = 'r'
-    type = CSG
-    argument_types = (int, int)
+    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), tCSG)
     
     def __init__(self, w, h):
         super(Rectangle, self).__init__()
@@ -74,8 +75,7 @@ class Rectangle(CSG):
 
 class Circle(CSG):
     token = 'c'
-    type = CSG
-    argument_types = (int,)
+    type = arrow(integer(0, RESOLUTION - 1), tCSG)
     
     def __init__(self, r):
         super(Circle, self).__init__()
@@ -96,8 +96,7 @@ class Circle(CSG):
 
 class Translation(CSG):
     token = 't'
-    type = CSG
-    argument_types = (int,int,CSG)
+    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), tCSG, tCSG)
     
     def __init__(self, x, y, child):
         super(Translation, self).__init__()
@@ -122,8 +121,7 @@ class Translation(CSG):
 
 class Union(CSG):
     token = '+'
-    type = CSG
-    argument_types = (CSG, CSG)
+    type = arrow(tCSG, tCSG, tCSG)
     
     def __init__(self, a, b):
         super(Union, self).__init__()
@@ -149,8 +147,7 @@ class Union(CSG):
 
 class Difference(CSG):
     token = '-'
-    type = CSG
-    argument_types = (CSG, CSG)
+    type = arrow(tCSG, tCSG, tCSG)
     
     def __init__(self, a, b):
         super(Difference, self).__init__()
