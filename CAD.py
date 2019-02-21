@@ -3,6 +3,7 @@ import numpy as np
 
 from API import *
 
+from randomSolver import *
 from pointerNetwork import *
 from programGraph import *
 from SMC import *
@@ -160,8 +161,11 @@ class Difference(CSG):
 
     def __eq__(self, o):
         return isinstance(o, Difference) and self.a == o.a and self.b == o.b
+
+    def __hash__(self):
+        return hash(('-', hash(self.a), hash(self.b)))
     
-    def __contains__(self, a, b):
+    def __contains__(self, p):
         return p in self.a and (not (p in self.b))
 
 dsl = DSL([Rectangle, Circle, Translation, Union, Difference],
@@ -258,7 +262,8 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         iteration += 1
 
 def testCSG(m, getProgram, timeout, export):
-    solvers = [MCTS(m, reward=lambda l: 1. - l),
+    solvers = [RandomSolver(dsl),
+               MCTS(m, reward=lambda l: 1. - l),
                SMC(m),
                ForwardSample(m)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
