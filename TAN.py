@@ -303,6 +303,12 @@ class TanGraph(ProgramGraph):
     def policyOracle(self, currentGraph):
         yield from (self.nodes - currentGraph.nodes)
 
+    def action_space(self):
+        return [P1, P2, P3, P4], ORIENTATIONS, range(RESOLUTION), range(RESOLUTION)
+
+    def extend(self, newNode):
+        return TanGraph(self.nodes | {newNode})
+
 # ======= DATA GENERATION =======
 def random_scene(resolution=RESOLUTION, export=None):
     def random_oxy(x_lim, y_lim):
