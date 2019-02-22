@@ -23,9 +23,10 @@ import torch.nn as nn
 """
 TODO:
 - [X] copy
+- [X] data generation code - shitty version
+- [X] random solver code
 - [ ] rendering code
-- [ ] data generation code
-- [ ] random code
+- [ ] a reasonable loss function
 - [ ] pointer network graph code
 """
 
