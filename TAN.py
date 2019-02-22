@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw
 
 
 RESOLUTION = 3
-ORIENTATIONS = ['1', '2', '3', '4']
+ORIENTATIONS = [1, 2, 3, 4]
 # We have a 6 x 8 x 8 ZA WARLDUUUUU
 # each cell can be of 6 states of filled-ness
 #     empty --- 1 --- 2 --- 3 --- 4 --- full
@@ -93,18 +93,30 @@ class TAN(Program):
                 ret[x, y] = np.argmax(self_np[:,x,y])
         return ret
 
+    def tan_distance(self, spec_np):
+        my_np = self.to_np()
+        acc = np.sum(np.logical_and(my_np, spec_np)) / (np.sum(my_np + spec_np) / 2)
+        return 1 - acc
+
     # note: this render is NOT what execute does, this literally render a png thats it
-    def render(self):
-        render_board(self.to_board())
+    def render(self, name = "board.png"):
+        render_board(self.to_board(), name)
+
+    def execute(self):
+        return self.to_np()
+
+# The type of TAN's
+tTAN = BaseType(TAN)
 
 
 class P(TAN):
     """
     THE BASIC PIECES
     """
-    type = TAN
-    # orientation, x, y
-    argument_types = (str, int, int)
+    type = arrow(integer(1, 4), 
+                 integer(0, RESOLUTION - 1), 
+                integer(0, RESOLUTION - 1), 
+                tTAN)
 
     def __init__(self, o, x, y):
         super(P, self).__init__()
@@ -185,18 +197,18 @@ class P4(P):
         cc, yy, xx = p
         # at the coordinate of exact positioning
         if xx == self.x and yy == self.y:
-            if self.o == '1': return cc == 2
-            if self.o == '2': return cc == 3
-            if self.o == '3': return cc == 3
-            if self.o == '4': return cc == 4
+            if self.o == 1: return cc == 2
+            if self.o == 2: return cc == 3
+            if self.o == 3: return cc == 3
+            if self.o == 4: return cc == 4
         # one down
         if xx == self.x and yy == self.y + 1:
-            if self.o == '1': return cc == 1
-            if self.o == '3': return cc == 4
+            if self.o == 1: return cc == 1
+            if self.o == 3: return cc == 4
         # one right
         if xx == self.x + 1 and yy == self.y:
-            if self.o == '2': return cc == 2
-            if self.o == '4': return cc == 1
+            if self.o == 2: return cc == 2
+            if self.o == 4: return cc == 1
         else:
             return False
 
@@ -213,18 +225,18 @@ class P5(P):
         cc, yy, xx = p
         # at the coordinate of exact positioning
         if xx == self.x and yy == self.y:
-            if self.o == '1': return cc == 2
-            if self.o == '2': return cc == 3
-            if self.o == '3': return cc == 3
-            if self.o == '4': return cc == 4
+            if self.o == 1: return cc == 2
+            if self.o == 2: return cc == 3
+            if self.o == 3: return cc == 3
+            if self.o == 4: return cc == 4
         # one down
         if xx == self.x and yy == self.y + 1:
-            if self.o == '1': return cc == 4
-            if self.o == '3': return cc == 1
+            if self.o == 1: return cc == 4
+            if self.o == 3: return cc == 1
         # one right
         if xx == self.x + 1 and yy == self.y:
-            if self.o == '2': return cc == 1
-            if self.o == '4': return cc == 2
+            if self.o == 2: return cc == 1
+            if self.o == 4: return cc == 2
         else:
             return False
 
@@ -233,13 +245,13 @@ class P5(P):
 
 # A Helper Class that only computes things and is not fundamentally useful
 class Add(TAN):
-    token = '+'
-    type = TAN
-    argument_types = (TAN, TAN)
 
-    def __init__(self, list_pieces):
+    token = '+'
+    type = arrow(tTAN, tTAN, tTAN)
+
+    def __init__(self, tan1, tan2):
         super(Add, self).__init__()
-        self.elements = frozenset(list_pieces)
+        self.elements = frozenset([tan1, tan2])
 
     def children(self): return list(self.elements)
 
@@ -259,7 +271,7 @@ class Add(TAN):
         return ['+'] + self.children()
 
 # ======= PICTURE RENDERING ========
-def render_board(board, name="board.png"):
+def render_board(board, name):
     def board_2_coords(board):
         coords = []
         for x in range(RESOLUTION):
@@ -328,9 +340,13 @@ def random_scene(resolution=RESOLUTION, export=None):
     def random_P5():
         return P5(*random_oxy(resolution, resolution))
 
-    ret = [random_P1(), random_P2(), random_P3(), random_P4()]
+    ret_args = [random_P1(), random_P2(), random_P3(), random_P4()]
+    
+    ret = ret_args[0]
+    for x in ret_args[1:]:
+        ret = Add(ret, x)
 
-    if Add(ret).legal() is not False:
+    if ret.legal() is not False:
         return ret
     else:
         return random_scene()
@@ -339,18 +355,32 @@ def random_graph():
     return TanGraph(random_scene())
 
 # =================== something ===================
-dsl = DSL([P1, P2, P3, P4],
+dsl = DSL([P1, P2, P3, P4, Add],
           lexicon=TAN.lexicon)
 
+def test_constructor():
+    scene1 = random_scene()
+    print (scene1.mass())
+    print (scene1.to_np_raw())
+    print (scene1.to_board())
+    scene1.render('tan_drawings/board.png')
+
+    spec = random_scene().to_np()
+    print (scene1.tan_distance(spec))
+
+def test_random():
+    from randomSolver import RandomSolver
+    loss = lambda spec, program: program.get_root().tan_distance(spec)
+
+    r_solver = RandomSolver(dsl)
+    program = random_scene()
+    testSequence = r_solver.infer(program.execute(), loss, 100)
+
+    print (testSequence)
+    for idx, ppp in enumerate(testSequence):
+        ppp.program.get_root().render(f'tan_drawings/{idx}.png')
+    program.render('tan_drawings/goal.png')
+
 if __name__ == '__main__':
-    scene = random_scene()
-    add_scene = Add(scene)
-    print (add_scene.mass())
-    print (add_scene.to_np_raw())
-    print (add_scene.to_board())
-    add_scene.render()
-
-    print (random_graph())
-    print (dsl)
-    import pdb; pdb.set_trace()
-
+    # test_constructor()
+    test_random()

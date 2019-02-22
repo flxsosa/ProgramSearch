@@ -38,6 +38,9 @@ class SearchResult:
         self.loss = loss
         self.time = time
 
+    def __repr__(self):
+        return f"{self.program} {self.loss} {self.time}"
+
 
 class ParseFailure(Exception):
     """Objects of type Program should throw this exception in their constructor if their arguments are bad"""

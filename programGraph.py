@@ -35,9 +35,6 @@ class ProgramGraph:
         for n in self.nodes: getIndex(n)
         return "\n".join( f"${i} <- {index2code[i]}"
                           for i in range(len(index2node)))
-                          
-            
-            
 
     def extend(self, newNode):
         return ProgramGraph(self.nodes | {newNode})
@@ -55,3 +52,8 @@ class ProgramGraph:
     def distanceOracle(self, targetGraph):
         return len(self.nodes^targetGraph.nodes)
 
+    def get_root(self):
+        """
+        set of all objects such that it is not a child of anything
+        """
+        return [n for n in self.nodes if not any(n in nn.children() for nn in self.nodes)][0]
