@@ -55,3 +55,8 @@ class ProgramGraph:
     def distanceOracle(self, targetGraph):
         return len(self.nodes^targetGraph.nodes)
 
+    def get_root(self):
+        """
+        set of all objects such that it is not a child of anything
+        """
+        return [n for n in self.nodes if not any(n in nn.children() for nn in self.nodes)][0]
