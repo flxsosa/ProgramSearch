@@ -108,7 +108,6 @@ class TAN(Program):
 # The type of TAN's
 tTAN = BaseType(TAN)
 
-
 class P(TAN):
     """
     THE BASIC PIECES
@@ -245,7 +244,6 @@ class P5(P):
 
 # A Helper Class that only computes things and is not fundamentally useful
 class Add(TAN):
-
     token = '+'
     type = arrow(tTAN, tTAN, tTAN)
 
