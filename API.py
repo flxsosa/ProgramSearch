@@ -4,7 +4,6 @@ import time
 class Solver:
     def __init__(self, dsl):
         self.dsl = dsl
-        pass
 
     def _report(self, program):
         l = self.loss(program)
