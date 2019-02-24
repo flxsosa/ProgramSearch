@@ -417,15 +417,15 @@ class ProgramPointerNetwork(Module):
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
         else:
-            objectEncodings = objectEncodings.max(0)[0]
-        return self._initialHidden(torch.cat([specEncoding, objectEncodings]))
+            objectEncodings = objectEncodings.sum(0)
+        self._initialHidden(torch.cat([specEncoding, objectEncodings]))
 
     def distance(self, objectEncodings, specEncoding):
         """Returns a 1-dimensional tensor which should be the sum of (# objects to create) + (# spurious objects created)"""
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
         else:
-            objectEncodings = objectEncodings.max(0)[0]
+            objectEncodings = objectEncodings.sum(0)
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))
 

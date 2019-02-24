@@ -195,17 +195,17 @@ class SpecEncoder(CNN):
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
     def quadrilateral():
-        w = random.choice(range(int(resolution/2))) + 3
-        h = random.choice(range(int(resolution/2))) + 3
-        x = random.choice(range(resolution - w))
-        y = random.choice(range(resolution - h))
+        w = random.choice(range(4, int(resolution/2), 2))
+        h = random.choice(range(4, int(resolution/2), 2))
+        x = random.choice(range(2, resolution - w, 2))
+        y = random.choice(range(2, resolution - h, 2))
         return Translation(x,y,
                            Rectangle(w,h))
 
     def circular():
-        r = random.choice(range(int(resolution/8))) + 2
-        x = random.choice(range(resolution - r*2)) + r
-        y = random.choice(range(resolution - r*2)) + r
+        r = random.choice(range(2, int(resolution/4), 2))
+        x = random.choice(range(r, resolution - r, 2))
+        y = random.choice(range(r, resolution - r, 2))
         return Translation(x,y,
                            Circle(r))
     s = None
