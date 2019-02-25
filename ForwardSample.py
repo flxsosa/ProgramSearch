@@ -1,11 +1,12 @@
 from programGraph import *
 from API import *
 from pointerNetwork import *
+from exit import *
 
 import time
 
 
-class ForwardSample(Solver):
+class ForwardSample(ExitSolver):
     def __init__(self, model, _=None, maximumLength=8):
         self.maximumLength = maximumLength
         self.model = model
@@ -19,8 +20,10 @@ class ForwardSample(Solver):
 
         while time.time() - t0 < timeout:
             g = ProgramGraph([])
+            trajectory = []
             for _ in range(self.maximumLength):
                 newObjects = self.model.repeatedlySample(specEncoding, g, objectEncodings, 1)
-                if len(newObjects) == 0 or newObjects[0] is None: break
+                if len(newObjects) == 0 or newObjects[0] is None or newObjects[0] in g.objects(): break
                 g = g.extend(newObjects[0])
-            self._report(g)
+                trajectory.append(g)
+            self._report(g, trajectory)

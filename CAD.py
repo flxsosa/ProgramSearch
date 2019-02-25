@@ -155,7 +155,7 @@ class Union(CSG):
     def children(self): return self.elements
 
     def serialize(self):
-        return ('+',list(self.elements)[0],list(self.elements)[1])
+        return ('+',self.elements[0],self.elements[1])
 
     def __eq__(self, o):
         return isinstance(o, Union) and tuple(o.elements) == tuple(self.elements)

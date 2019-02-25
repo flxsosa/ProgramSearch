@@ -21,5 +21,8 @@ class ExitSolver(Solver):
         self.bestTrajectory = None
         return trajectory
 
-    
+    def train(self, getSpec, loss, timeout):
+        self.sampleTrainingTrajectory(spec, loss, timeout)
+
+
             
