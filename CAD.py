@@ -26,6 +26,9 @@ class CSG(Program):
     def __init__(self):
         self._rendering = None
 
+    def __repr__(self):
+        return str(self)
+
     def __ne__(self, o): return not (self == o)
 
     def execute(self):
@@ -59,6 +62,11 @@ class Rectangle(CSG):
         self.w = w
         self.h = h
 
+    def toTrace(self): return [self]
+
+    def __str__(self):
+        return f"(r {self.w} {self.h})"
+
     def children(self): return []
 
     def __eq__(self, o):
@@ -82,6 +90,11 @@ class Circle(CSG):
         super(Circle, self).__init__()
         self.r = r
 
+    def toTrace(self): return [self]
+        
+    def __str__(self):
+        return f"(c {self.r})"
+
     def children(self): return []
 
     def __eq__(self, o):
@@ -103,6 +116,11 @@ class Translation(CSG):
         super(Translation, self).__init__()
         self.v = (x, y)
         self.child = child
+
+    def toTrace(self): return self.child.toTrace() + [self]
+    
+    def __str__(self):
+        return f"(t {self.v} {self.child})"
 
     def children(self): return [self.child]
 
@@ -128,6 +146,12 @@ class Union(CSG):
         super(Union, self).__init__()
         self.elements = [a,b]
 
+    def toTrace(self):
+        return self.elements[0].toTrace() + self.elements[1].toTrace() + [self]
+
+    def __str__(self):
+        return f"(+ {str(self.elements[0])} {str(self.elements[1])})"
+
     def children(self): return self.elements
 
     def serialize(self):
@@ -149,6 +173,12 @@ class Difference(CSG):
     def __init__(self, a, b):
         super(Difference, self).__init__()
         self.a, self.b = a, b
+
+    def toTrace(self):
+        return self.a.toTrace() + self.b.toTrace() + [self]
+
+    def __str__(self):
+        return f"(- {self.a} {self.b})"
         
     def children(self): return [self.a, self.b]
 
@@ -219,8 +249,9 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             s = Union(s,o)
         numberOfShapes += 1
     if verbose:
+        print(s)
+        print(ProgramGraph.fromRoot(s, oneParent=True).prettyPrint())
         import matplotlib.pyplot as plot
-        print(ProgramGraph.fromRoot(s).prettyPrint())
         plot.imshow(s.execute())
         plot.show()
     if export:
@@ -240,22 +271,18 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     reportingFrequency = 100
     totalLosses = []
     movedLosses = []
-    distanceLosses = []
     iteration = 0
 
     while trainTime is None or time.time() - startTime < trainTime:
         s = getProgram()
-        g = ProgramGraph.fromRoot(s)
-        l,dl = m.gradientStepTrace(optimizer, s.execute(), g)
+        l = m.gradientStepTrace(optimizer, s.execute(), s.toTrace())
         totalLosses.append(sum(l))
         movedLosses.append(sum(l)/len(l))
-        distanceLosses.append(sum(dl)/len(dl))
 
         if iteration%reportingFrequency == 0:
-            print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\t\tdistance loss {sum(distanceLosses)/len(distanceLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
+            print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
             totalLosses = []
             movedLosses = []
-            distanceLosses = []
             with open(checkpoint,"wb") as handle:
                 pickle.dump(m, handle)
 
@@ -336,6 +363,7 @@ if __name__ == "__main__":
                         help="Size of hidden layers")
     parser.add_argument("--timeout", default=5, type=float,
                         help="Test time maximum timeout")
+    parser.add_argument("--oneParent", default=False, action='store_true')
     arguments = parser.parse_args()
 
     if arguments.mode == "demo":
@@ -348,6 +376,7 @@ if __name__ == "__main__":
 
     if arguments.mode == "train":
         m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,
+                                  oneParent=arguments.oneParent,
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)
