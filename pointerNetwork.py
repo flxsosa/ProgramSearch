@@ -431,44 +431,6 @@ class ProgramPointerNetwork(Module):
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))
 
-    def gradientStep(self, optimizer, spec, currentGraph, goalGraph):
-        """Returns (policy loss, distance loss)"""
-        self.zero_grad()
-        
-        optimalMoves = list(goalGraph.policyOracle(currentGraph))
-        if len(optimalMoves) == 0:
-            optimalMoves = [['RETURN']]
-            finalMove = True
-        else:
-            finalMove = False
-
-        se = self.specEncoder(spec)
-        objects = currentGraph.objects(oneParent=self.oneParent)
-        objectEncodings = ScopeEncoding(self, spec).encoding(objects)
-        object2pointer = {o: Pointer(i)
-                          for i,o in enumerate(objects) }
-
-        h0 = self.initialHidden(objectEncodings, se)
-
-        def substitutePointers(serialization):
-            return [token if isinstance(token,str) else object2pointer[token]
-                    for token in serialization]
-
-        targetLines = [substitutePointers(m.serialize()) if not finalMove else m
-                       for m in optimalMoves]
-        targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, objectEncodings)
-                             for targetLine in targetLines]
-        policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
-
-
-        actualDistance = currentGraph.distanceOracle(goalGraph)
-        predictedDistance = self.distance(objectEncodings, se)
-        distanceLoss = (predictedDistance - float(actualDistance))**2
-        
-        (policyLoss + distanceLoss).backward()
-        optimizer.step()
-        return policyLoss.data.item(), distanceLoss.data.item()
-
     def traceLogLikelihood(self, spec, trace, scopeEncoding=None):
         scopeEncoding = scopeEncoding or ScopeEncoding(self, spec).registerObjects(set(trace))
         currentGraph = ProgramGraph([])
