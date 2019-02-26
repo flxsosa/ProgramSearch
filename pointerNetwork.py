@@ -536,13 +536,53 @@ class ProgramPointerNetwork(Module):
             targetLikelihoods = [tl/sum(targetLikelihoods) for tl in targetLikelihoods ]
             move = np.random.choice(optimalMoves, p=targetLikelihoods)
             currentGraph = currentGraph.extend(move)
-            
+
+    def traceLikelihood(self, spec, trace):
+        trace = trace + [['RETURN']]
+        
+        currentGraph = ProgramGraph([])
+
+        objectEncodings = ScopeEncoding(self, spec).registerObjects(trace[:-1])
+        specEncoding = self.specEncoder(spec)
+
+        likelihood = 0.0
+        for tr in trace:
+            finalMove = tr == ['RETURN']
+            # Gather together objects in scope
+            objectsInScope = list(currentGraph.objects())
+            scopeEncoding = objectEncodings.encoding(objectsInScope)
+            object2pointer = {o: Pointer(i)
+                              for i, o  in enumerate(objectsInScope)}
+
+            h0 = self.initialHidden(scopeEncoding, specEncoding)
+            def substitutePointers(serialization):
+                return [token if not isinstance(token, Program) else object2pointer[token]
+                        for token in serialization]
+
+            targetLine = substitutePointers(tr.serialize()) if not finalMove else tr
+            targetLikelihood = self.decoder.logLikelihood(h0, targetLine, scopeEncoding)
+            likelihood += targetLikelihood
+
+            if not finalMove:
+                currentGraph = currentGraph.extend(tr)
+        return likelihood
 
     def sample(self, spec, maxMoves=None):
+        listObjs = self.roll_out(spec, maxMoves)
+        if listObjs is None:
+            return None
+        else:
+            return ProgramGraph(listObjs)
+
+    def roll_out(self, spec, maxMoves=None):
+        """
+        perform a single rollout
+        """
         specEncoding = self.specEncoder(spec)
         objectEncodings = ScopeEncoding(self, spec)
 
         graph = ProgramGraph([])
+        ret = []
 
         while True:
             # Make the encoding matrix
@@ -555,12 +595,31 @@ class ProgramPointerNetwork(Module):
             nextLineOfCode = [objectsInScope[t.i] if isinstance(t, Pointer) else t
                               for t in nextLineOfCode ]
 
-            if 'RETURN' in nextLineOfCode or len(graph) >= maxMoves: return graph
+            if 'RETURN' in nextLineOfCode or len(graph) >= maxMoves: return ret
 
             nextObject = self.DSL.parseLine(nextLineOfCode)
+            ret.append(nextObject)
             if nextObject is None: return None
 
             graph = graph.extend(nextObject)
+
+        return ret
+
+    def reinforce(self, specs, reward_func, maxMoves, optimizer):
+        # get the roll outs
+        with torch.no_grad():
+            rollouts = [self.roll_out(spec, maxMoves) for spec in specs]
+            rollouts_specs = [x for x in zip(rollouts, specs) if x[0] is not None]
+
+        loglikelihoods = [self.traceLikelihood(spec, ro) for ro, spec in rollouts_specs]
+
+        rewards = [reward_func(spec, ProgramGraph(ro)) for ro, spec in rollouts_specs]
+
+        log_expected_reward = sum(loglik * r for loglik, r in zip(loglikelihoods, rewards))
+        loss = -log_expected_reward
+        self.zero_grad()
+        loss.backward()
+        optimizer.step()
 
     def repeatedlySample(self, specEncoding, graph, objectEncodings, n_samples):
         """Repeatedly samples a single line of code.

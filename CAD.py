@@ -261,6 +261,42 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
         iteration += 1
 
+def trainCSGReinforce(getProgram, trainTime=None, checkpoint=None):
+    with open(checkpoint,"rb") as handle:
+        m = pickle.load(handle)
+    print("cuda?",m.use_cuda)
+    assert checkpoint is not None, "must provide a checkpoint path to export to"
+    
+    optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
+    
+    startTime = time.time()
+    reportingFrequency = 100
+    totalLosses = []
+    movedLosses = []
+    distanceLosses = []
+    iteration = 0
+
+    def reward_func(spec, program):
+        loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
+        return 1.0 - loss(spec, program)
+
+    while trainTime is None or time.time() - startTime < trainTime:
+        s = getProgram()
+
+        ppp = ProgramGraph.fromRoot(s).prettyPrint()
+        print ("spec ppp")
+        print (ppp)
+
+        spec = s.execute()
+        # g = ProgramGraph.fromRoot(s)
+        m.reinforce([spec], reward_func, 20, optimizer)
+
+        #if iteration%reportingFrequency == 0:
+        #    with open(checkpoint,"wb") as handle:
+        #        pickle.dump(m, handle)
+
+        iteration += 1
+
 def testCSG(m, getProgram, timeout, export):
     solvers = [RandomSolver(dsl),
                MCTS(m, reward=lambda l: 1. - l),
@@ -313,16 +349,11 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
         plot.savefig(export)
     else:
         plot.show()
-        
-        
-    
-        
-    
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
-    parser.add_argument("mode", choices=["train","test","demo"])
+    parser.add_argument("mode", choices=["train","test","demo","reinforce"])
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
@@ -345,6 +376,10 @@ if __name__ == "__main__":
         sys.exit(0)
         
             
+    if arguments.mode == "reinforce":
+        trainCSGReinforce(lambda: randomScene(maxShapes=arguments.maxShapes),
+                 trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
+                 checkpoint=arguments.checkpoint)
 
     if arguments.mode == "train":
         m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,

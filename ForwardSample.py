@@ -24,3 +24,4 @@ class ForwardSample(Solver):
                 if len(newObjects) == 0 or newObjects[0] is None: break
                 g = g.extend(newObjects[0])
             self._report(g)
+

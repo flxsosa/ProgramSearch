@@ -57,3 +57,13 @@ class ProgramGraph:
         set of all objects such that it is not a child of anything
         """
         return [n for n in self.nodes if not any(n in nn.children() for nn in self.nodes)][0]
+
+    def get_trace(self):
+        trace = []
+        while len(trace) < len(self.nodes):
+            trace_set = set(trace)
+            for node in self.nodes - trace_set:
+                if ( set(node.children()) & trace_set ) == set(node.children()):
+                    trace.append(node)
+                    continue
+        return trace
