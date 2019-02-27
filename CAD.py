@@ -220,9 +220,10 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
+    dc = 8 # number of distinct coordinates
     def quadrilateral():
         choices = [c
-                   for c in range(resolution//8, resolution, resolution//4) ]
+                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
         w = random.choice([2,5])
         h = random.choice([2,5])
         x = random.choice(choices)
@@ -233,7 +234,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     def circular():
         r = random.choice([2,4])
         choices = [c
-                   for c in range(resolution//8, resolution, resolution//4) ]
+                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
         x = random.choice(choices)
         y = random.choice(choices)
         return Translation(x,y,
