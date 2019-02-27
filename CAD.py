@@ -289,10 +289,11 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         iteration += 1
 
 def testCSG(m, getProgram, timeout, export):
-    solvers = [RandomSolver(dsl),
-               MCTS(m, reward=lambda l: 1. - l),
-               SMC(m),
-               ForwardSample(m)]
+    oneParent = m.oneParent
+    solvers = [# RandomSolver(dsl),
+               # MCTS(m, reward=lambda l: 1. - l),
+               # SMC(m),
+               ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     testResults = [[] for _ in solvers]
@@ -300,7 +301,7 @@ def testCSG(m, getProgram, timeout, export):
     for _ in range(30):
         spec = getProgram()
         print("Trying to explain the program:")
-        print(ProgramGraph.fromRoot(spec).prettyPrint())
+        print(ProgramGraph.fromRoot(oneParent=oneParent).prettyPrint())
         print()
         for n, solver in enumerate(solvers):
             testSequence = solver.infer(spec.execute(), loss, timeout)
@@ -312,7 +313,8 @@ def testCSG(m, getProgram, timeout, export):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=["MCTS","SMC", "FS"],
+                    names=[# "MCTS","SMC", 
+                           "FS"],
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
