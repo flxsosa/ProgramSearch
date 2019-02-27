@@ -342,7 +342,7 @@ def random_scene(resolution=RESOLUTION, export=None):
     
     ret = ret_args[0]
     for x in ret_args[1:]:
-        ret = Add(ret, x)
+        ret = Add(x, ret)
 
     if ret.legal() is not False:
         return ret
@@ -351,6 +351,14 @@ def random_scene(resolution=RESOLUTION, export=None):
 
 def random_graph():
     return TanGraph(random_scene())
+
+# takes in a tangram tree of adds and decode out the individual pieces
+def decompose(tree):
+    if isinstance(tree, P):
+        return [tree]
+    else:
+        left, right = tree.elements
+        return decompose(left) + decompose(right)
 
 # =================== something ===================
 dsl = DSL([P1, P2, P3, P4, Add],
@@ -366,6 +374,10 @@ def test_constructor():
     spec = random_scene().to_np()
     print (scene1.tan_distance(spec))
 
+    dec = decompose(scene1)
+    print (dec[0])
+    print (isinstance(dec[0], P2))
+
 def test_random():
     from randomSolver import RandomSolver
     loss = lambda spec, program: program.get_root().tan_distance(spec)
@@ -380,5 +392,5 @@ def test_random():
     program.render('tan_drawings/goal.png')
 
 if __name__ == '__main__':
-    # test_constructor()
-    test_random()
+    test_constructor()
+    # test_random()
