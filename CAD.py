@@ -301,7 +301,7 @@ def testCSG(m, getProgram, timeout, export):
     for _ in range(30):
         spec = getProgram()
         print("Trying to explain the program:")
-        print(ProgramGraph.fromRoot(oneParent=oneParent).prettyPrint())
+        print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
         for n, solver in enumerate(solvers):
             testSequence = solver.infer(spec.execute(), loss, timeout)
