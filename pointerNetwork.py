@@ -82,6 +82,7 @@ class LineDecoder(Module):
         _h = hiddenStates.unsqueeze(1).repeat(1, objectKeys.size(0), 1)
         _o = objectKeys.unsqueeze(0).repeat(hiddenStates.size(0), 1, 1)
         attention = self.attentionSelector(torch.tanh(_h + _o)).squeeze(2)
+        #attention = self.attentionSelector(torch.tanh(_h * some_bilinear * _o)).squeeze(2)
 
         mask = np.zeros((hiddenStates.size(0), objectKeys.size(0)))
 
