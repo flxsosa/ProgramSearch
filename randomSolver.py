@@ -1,5 +1,6 @@
 from API import *
 from programGraph import *
+from CAD import *
 
 import time
 import random
@@ -39,5 +40,5 @@ class RandomSolver(Solver):
 
             if object not in g.objects():
                 g = g.extend(object)
+                print(ProgramGraph.fromRoot(object).prettyPrint())
                 self._report(ProgramGraph.fromRoot(object))
-                

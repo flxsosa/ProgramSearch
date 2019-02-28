@@ -10,7 +10,12 @@ class Solver:
         l = self.loss(program)
         if len(self.reportedSolutions) == 0 or self.reportedSolutions[-1].loss > l:
             self.reportedSolutions.append(SearchResult(program, l, time.time() - self.startTime))            
-        
+        return l
+
+    def _loss(self, program):
+        # print("Program in Loss: {}".format(program))
+        return self.loss(program)
+
     def infer(self, spec, loss, timeout):
         """
         spec: specification of goal

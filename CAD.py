@@ -3,6 +3,7 @@ import numpy as np
 
 from API import *
 
+from evolution import *
 from randomSolver import *
 from pointerNetwork import *
 from programGraph import *
@@ -262,10 +263,8 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         iteration += 1
 
 def testCSG(m, getProgram, timeout, export):
-    solvers = [RandomSolver(dsl),
-               MCTS(m, reward=lambda l: 1. - l),
-               SMC(m),
-               ForwardSample(m)]
+    solvers = [Evolution(dsl)]
+    
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     testResults = [[] for _ in solvers]
@@ -285,7 +284,7 @@ def testCSG(m, getProgram, timeout, export):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=["MCTS","SMC", "FS"],
+                    names=["Evo"],
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
@@ -355,8 +354,8 @@ if __name__ == "__main__":
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "test":
-        with open(arguments.checkpoint,"rb") as handle:
-            m = pickle.load(handle)
-        testCSG(m,
+        # with open(arguments.checkpoint,"rb") as handle:
+        #     m = pickle.load(handle)
+        testCSG(None,
                 lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes), arguments.timeout,
                 export=f"figures/CAD_{arguments.maxShapes}_shapes.png")

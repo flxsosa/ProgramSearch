@@ -1,4 +1,5 @@
 import heapq
+import random
 
 import torch
 import torch.nn as nn
@@ -43,3 +44,20 @@ class PQ(object):
             yield self.index2value[v]
 
     def __len__(self): return len(self.h)
+
+def getArgument(requestedType, graph):
+    '''
+    Returns arguments of a given type
+    '''
+    # Return integers for integer types
+    if requestedType.isInteger:
+        return random.choice(range(requestedType.lower, requestedType.upper + 1))
+
+    # Otherwise, return object types
+    choices = [o for o in graph.objects() if requestedType.instance(o)]
+    # If any are found, return them
+    if choices: 
+        return random.choice(choices)
+    # Otherwise, return None
+    else: 
+        return None
