@@ -230,6 +230,73 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     
     return s
 
+def randomSceneTest(resolution=32, maxShapes=1, minShapes=1, verbose=True, export=None):
+
+    number_of_shapes = random.choice(range(minShapes, 1+maxShapes))
+    curr_number_of_shapes = 0
+    g = ProgramGraph([])
+
+    while curr_number_of_shapes != number_of_shapes:
+        
+        def getArgument(requestedType):
+            if requestedType.isInteger:
+                return random.choice(range(requestedType.lower, requestedType.upper + 1))
+
+            choices = [o for o in g.objects() if requestedType.instance(o)]
+            if choices: 
+                return random.choice(choices)
+            else: 
+                return None
+
+        # Pick a random DSL production
+        operator = random.choice(dsl.operators)
+        operator_token = operator.token
+        operator_type = operator.type
+
+        # Check operator 
+        if operator_token in ['r','c']:
+            curr_number_of_shapes += 1
+            print("Shape")
+        elif curr_number_of_shapes < 2:
+            print("Operation")
+            continue
+        print("passed")
+
+        # Operator is not an arrow type
+        if not operator_type.isArrow:
+            object = operator()
+
+        # Operator is an arrow type
+        else:
+            # Sample random arguments
+            arguments = [getArgument(t) for t in operator_type.arguments]
+
+            # Check that they have meaning
+            if any(arg is None for arg in arguments): 
+                continue
+
+            # Try to execute the operator
+            try:
+                object = operator(*arguments)
+            except: 
+                continue
+
+        # Check that the object is not already in the graph
+        if object not in g.objects():
+            g = g.extend(object)
+
+    if verbose:
+        import matplotlib.pyplot as plot
+        # scene = g[0]
+        # print(g.objects())
+        print(g.prettyPrint())
+        for obj in g.objects():
+            plot.imshow(obj.execute())
+        # print(g.prettyPrint())
+        # plot.imshow(ProgramGraph.fromRoot(g).execute())
+        plot.show()
+
+
 def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     print("cuda?",m.use_cuda)
     assert checkpoint is not None, "must provide a checkpoint path to export to"
