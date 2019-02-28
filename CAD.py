@@ -126,22 +126,18 @@ class Union(CSG):
     
     def __init__(self, a, b):
         super(Union, self).__init__()
-        self.elements = frozenset({a,b})
+        self.elements = [a,b]
 
-    def children(self): return list(self.elements)
+    def children(self): return self.elements
 
     def serialize(self):
-        if len(self.elements) == 2:
-            return ('+',list(self.elements)[0],list(self.elements)[1])
-        else:
-            assert len(self.elements) == 1
-            return ('+',list(self.elements)[0],list(self.elements)[0])
+        return ('+',list(self.elements)[0],list(self.elements)[1])
 
     def __eq__(self, o):
-        return isinstance(o, Union) and o.elements == self.elements
+        return isinstance(o, Union) and tuple(o.elements) == tuple(self.elements)
 
     def __hash__(self):
-        return hash(('u', self.elements))
+        return hash(('u', tuple(self.elements)))
 
     def __contains__(self, p):
         return any( p in e for e in self.elements )
@@ -195,23 +191,27 @@ class SpecEncoder(CNN):
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
     def quadrilateral():
-        w = random.choice(range(int(resolution/2))) + 3
-        h = random.choice(range(int(resolution/2))) + 3
-        x = random.choice(range(resolution - w))
-        y = random.choice(range(resolution - h))
+        choices = [c
+                   for c in range(resolution//8, resolution, resolution//4) ]
+        w = random.choice([2,5])
+        h = random.choice([2,5])
+        x = random.choice(choices)
+        y = random.choice(choices)
         return Translation(x,y,
                            Rectangle(w,h))
 
     def circular():
-        r = random.choice(range(int(resolution/8))) + 2
-        x = random.choice(range(resolution - r*2)) + r
-        y = random.choice(range(resolution - r*2)) + r
+        r = random.choice([2,4])
+        choices = [c
+                   for c in range(resolution//8, resolution, resolution//4) ]
+        x = random.choice(choices)
+        y = random.choice(choices)
         return Translation(x,y,
                            Circle(r))
     s = None
     numberOfShapes = 0
     desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
-    while numberOfShapes < desiredShapes:
+    for _ in range(desiredShapes):
         o = quadrilateral() if random.choice([True,False]) else circular()
         if s is None: s = o
         else:
