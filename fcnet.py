@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 import time
+import random
 
 # ===================== FC NN CLASSIFIER =====================
 if torch.cuda.is_available():
@@ -28,13 +29,15 @@ class FCNet(nn.Module):
         self.name = "FCNet"
         self.in_dim = in_dim
         h_dim = 100
-        self.fc = nn.Linear(in_dim, h_dim)
+        self.fc1 = nn.Linear(in_dim, h_dim)
+        self.fc2 = nn.Linear(h_dim, h_dim)
         self.pred = nn.Linear(h_dim, out_dim)
         self.opt = torch.optim.Adam(self.parameters(), lr=0.001)
 
     def forward(self, x):
         x = x.view(-1, self.in_dim)
-        x = F.relu(self.fc(x))
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         x = F.log_softmax(self.pred(x), dim=1)
         return x
 
@@ -73,5 +76,24 @@ class Agent:
     def learn_supervised(self, states, actions):
         states = np.array(states)
         actions = np.array([self.actions.index(a) for a in actions])
-        self.nn.learn_supervised(states, actions)
+        loss = self.nn.learn_supervised(states, actions)
+        print (loss)
+
+class MEMAgent:
+    def __init__(self, input_dim, actions):
+        self.actions = actions
+        self.input_dim = input_dim
+        self.moves = dict()
+
+    def act(self, state):
+        if str(state) in self.moves:
+            return self.moves[str(state)]
+        else:
+            return 'C'
+
+    # not a symbolic state here
+    # actions are 2, 3 instead of 0,1 index here
+    def learn_supervised(self, states, actions):
+        for s, a in zip(states, actions):
+            self.moves[str(s)] = a
 

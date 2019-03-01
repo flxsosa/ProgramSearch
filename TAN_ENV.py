@@ -10,6 +10,9 @@ from TAN import random_scene, Add, P1, P2, P3, P4, RESOLUTION, decompose
 # UP, DOWN, LEFT, RIGHT, SPIN, COMMIT
 ACTIONS = ['U', 'D', 'L', 'R', 'S', 'C']
 
+BLANK = np.zeros((6,RESOLUTION, RESOLUTION))
+BLANK[0, :, :] = 1.0
+
 # TAN ENVIRONMENT 
 class TAN_ENV:
 
@@ -22,7 +25,7 @@ class TAN_ENV:
 
     def render(self):
 
-        committed = np.zeros(self.tan.to_np().shape) if self.cur_prog is None else self.cur_prog.to_np()
+        committed = BLANK if self.cur_prog is None else self.cur_prog.to_np()
         scratch = self.scratch[0](*self.scratch[1:]).to_np()
 
         together = np.concatenate((self.spec, committed, scratch))
@@ -130,17 +133,36 @@ def get_rollout(env, policy, max_iter = 50):
         oracle_a = env.oracle()
         a = policy.act(cur_state)
         next_state, r, done = env.step(a)
+        # next_state, r, done = env.step(a)
         trace.append((cur_state, a, oracle_a, r, next_state))
+        cur_state = next_state
+    return trace
+
+def get_supervision(env, max_iter = 50):
+    cur_state = env.reset()
+    done = False
+    trace = []
+    iter_k = 0
+    while not done:
+        iter_k += 1
+        if iter_k > max_iter:
+            break
+        oracle_a = env.oracle()
+        next_state, r, done = env.step(oracle_a)
+        # next_state, r, done = env.step(a)
+        trace.append((cur_state, oracle_a, r, next_state))
+        cur_state = next_state
     return trace
 
 def train_dagger(env, student):
     init_state = env.reset()
     s_a_agg = []
+    batch_size = 10
 
-    for i in range(10000):
+    for i in range(1000000):
 
         # learning
-        trace = get_rollout(env, student, max_iter = 50)
+        trace = get_rollout(env, student, max_iter = 20)
         state_sample = [x[0] for x in trace]
         action_sample = [x[2] for x in trace]
         s_a_agg += list(zip(state_sample, action_sample))
@@ -152,10 +174,37 @@ def train_dagger(env, student):
             print ("Student Actions")
             print ([x[1] for x in trace])
 
-        for i in range(10):
-            sub_sample = random.sample(s_a_agg, 40)
-            sub_states, sub_actions = [x[0] for x in sub_sample], [x[1] for x in sub_sample]
-            student.learn_supervised(sub_states, sub_actions)
+        if len(s_a_agg) > batch_size:
+            for i in range(2):
+                sub_sample = random.sample(s_a_agg, batch_size)
+                sub_states, sub_actions = [x[0] for x in sub_sample], [x[1] for x in sub_sample]
+                student.learn_supervised(sub_states, sub_actions)
+
+def train_supervised(env, student):
+    init_state = env.reset()
+    s_a_agg = []
+
+    for i in range(100000):
+        # learning
+        trace = get_supervision(env, 30)
+        states = [x[0] for x in trace]
+        actions = [x[1] for x in trace]
+        student.learn_supervised(states, actions)
+
+        if i % 1000 == 0:
+            trace = get_rollout(env, student, max_iter = 30)
+            try:
+                env.render_pix()
+            except:
+                pass
+            state_sample = [x[0] for x in trace]
+            action_sample = [x[2] for x in trace]
+            s_a_agg += list(zip(state_sample, action_sample))
+            print ("======== diagnostics ==========")
+            print ("Oracle Actions")
+            print (action_sample)
+            print ("Student Actions")
+            print ([x[1] for x in trace])
 
 # =================== something ===================
 def test_env():
@@ -164,12 +213,14 @@ def test_env():
     print (cur_state.shape)
     done = False
     while not done:
-        # tenv.render_pix()
+        tenv.render_pix()
         oracle_move = tenv.oracle()
         print ("oracle says ", oracle_move)
         a = input('input\n')
-        cur_state, r, done = tenv.step(a)
+        nxt_state, r, done = tenv.step(a)
+        print (np.where(cur_state != nxt_state))
         print ("reward ", r)
+        cur_state = nxt_state
 
 def test_ro():
     from fcnet import Agent
@@ -179,15 +230,20 @@ def test_ro():
     trace = get_rollout(env, agent, max_iter = 50)
     print (trace)
 
-def test_dagger():
-    from fcnet import Agent
+def test_supervised():
+    from fcnet import Agent, MEMAgent
     env = TAN_ENV()
     agent = Agent(18*3*3, ACTIONS)
+    train_supervised(env, agent)
 
+def test_dagger():
+    from fcnet import Agent, MEMAgent
+    env = TAN_ENV()
+    agent = Agent(18*3*3, ACTIONS)
     train_dagger(env, agent)
 
 if __name__ == '__main__':
-    # test_env()
+    test_env()
     # test_ro()
-    test_dagger()
+    # test_supervised()
 

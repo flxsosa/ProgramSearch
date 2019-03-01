@@ -43,6 +43,11 @@ class TAN(Program):
                 for y in range(RESOLUTION):
                     if (ch, x, y) in self:
                         ret[ch, x, y] = 1
+
+        for x in range(RESOLUTION):
+            for y in range(RESOLUTION):
+                if sum(ret[:,x,y]) == 0:
+                    ret[0, x, y] = 1
         return ret
 
     def legal(self):
@@ -332,13 +337,20 @@ def random_scene(resolution=RESOLUTION, export=None):
     def random_P2():
         return P2(*random_oxy(resolution, resolution))
     def random_P3():
-        return P3(*random_oxy(resolution, resolution))
+        return P3(1, *random_oxy(resolution, resolution)[1:])
     def random_P4():
         return P4(*random_oxy(resolution, resolution))
     def random_P5():
         return P5(*random_oxy(resolution, resolution))
 
     ret_args = [random_P1(), random_P2(), random_P3(), random_P4()]
+
+    # ret_args = [
+    #             P1(1, 0, 0),
+    #             P2(2, 0, 1),
+    #             P3(1, 1, 0),
+    #             P4(4, 1, 1),
+    #             ]
     
     ret = ret_args[0]
     for x in ret_args[1:]:
