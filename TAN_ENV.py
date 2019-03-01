@@ -5,7 +5,7 @@ from API import *
 
 import time
 import random
-from TAN import random_scene, Add, P1, P2, P3, P4, RESOLUTION, decompose
+from TAN import random_scene, Add, P1, P2, P3, P4, P5, RESOLUTION, decompose
 
 # UP, DOWN, LEFT, RIGHT, SPIN, COMMIT
 ACTIONS = ['U', 'D', 'L', 'R', 'S', 'C']
@@ -46,7 +46,7 @@ class TAN_ENV:
         self.cur_prog = None
 
         # we gonna try piece 1 first
-        self.pieces = [P2, P3, P4]
+        self.pieces = [P2, P3, P4, P5]
         self.scratch = [P1, 1, 0, 0]
 
         return self.render()
@@ -180,19 +180,20 @@ def train_dagger(env, student):
                 sub_states, sub_actions = [x[0] for x in sub_sample], [x[1] for x in sub_sample]
                 student.learn_supervised(sub_states, sub_actions)
 
-def train_supervised(env, student):
+def train_supervised(env, student, max_iter):
     init_state = env.reset()
     s_a_agg = []
 
-    for i in range(100000):
+    for i in range(1000000):
         # learning
-        trace = get_supervision(env, 30)
+        trace = get_supervision(env, max_iter)
         states = [x[0] for x in trace]
         actions = [x[1] for x in trace]
-        student.learn_supervised(states, actions)
+        loss = student.learn_supervised(states, actions)
 
         if i % 1000 == 0:
-            trace = get_rollout(env, student, max_iter = 30)
+            print (f"loss {loss}")
+            trace = get_rollout(env, student, max_iter)
             try:
                 env.render_pix()
             except:
@@ -206,6 +207,8 @@ def train_supervised(env, student):
             print ("Student Actions")
             print ([x[1] for x in trace])
 
+            student.save("tan1.mdl")
+
 # =================== something ===================
 def test_env():
     tenv = TAN_ENV()
@@ -218,32 +221,44 @@ def test_env():
         print ("oracle says ", oracle_move)
         a = input('input\n')
         nxt_state, r, done = tenv.step(a)
-        print (np.where(cur_state != nxt_state))
         print ("reward ", r)
         cur_state = nxt_state
 
 def test_ro():
     from fcnet import Agent
     env = TAN_ENV()
-    agent = Agent(18*3*3, ACTIONS)
+    agent = Agent(18*RESOLUTION*RESOLUTION, ACTIONS)
 
     trace = get_rollout(env, agent, max_iter = 50)
     print (trace)
 
+def train_supervised():
+    from fcnet import Agent, MEMAgent
+    env = TAN_ENV()
+    agent = Agent(18*RESOLUTION*RESOLUTION, ACTIONS)
+    train_supervised(env, agent, RESOLUTION*2*4)
+
 def test_supervised():
     from fcnet import Agent, MEMAgent
     env = TAN_ENV()
-    agent = Agent(18*3*3, ACTIONS)
-    train_supervised(env, agent)
+    agent = Agent(18*RESOLUTION*RESOLUTION, ACTIONS)
+    agent.load("tan.mdl")
+    for i in range(10):
+        ro = get_rollout(env, agent, RESOLUTION*2*4)
+        env.render_pix()
+        print ("sequence . . . ")
+        print ([x[1] for x in ro])
+        input("yo")
+
 
 def test_dagger():
     from fcnet import Agent, MEMAgent
     env = TAN_ENV()
-    agent = Agent(18*3*3, ACTIONS)
+    agent = Agent(18*RESOLUTION*RESOLUTION, ACTIONS)
     train_dagger(env, agent)
 
 if __name__ == '__main__':
-    test_env()
+    # test_env()
     # test_ro()
-    # test_supervised()
+    test_supervised()
 

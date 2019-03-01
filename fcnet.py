@@ -54,6 +54,12 @@ class FCNet(nn.Module):
 
         return loss
 
+    def save(self, loc):
+        torch.save(self.state_dict(), loc)
+
+    def load(self, loc):
+        self.load_state_dict(torch.load(loc))
+
 class Agent:
     def __init__(self, input_dim, actions):
         self.actions = actions
@@ -77,7 +83,13 @@ class Agent:
         states = np.array(states)
         actions = np.array([self.actions.index(a) for a in actions])
         loss = self.nn.learn_supervised(states, actions)
-        print (loss)
+        return loss
+
+    def save(self, loc):
+        self.nn.save(loc)
+
+    def load(self, loc):
+        self.nn.load(loc)
 
 class MEMAgent:
     def __init__(self, input_dim, actions):

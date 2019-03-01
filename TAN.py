@@ -14,7 +14,7 @@ import random
 from PIL import Image, ImageDraw
 
 
-RESOLUTION = 3
+RESOLUTION = 4
 ORIENTATIONS = [1, 2, 3, 4]
 # We have a 6 x 8 x 8 ZA WARLDUUUUU
 # each cell can be of 6 states of filled-ness
@@ -343,7 +343,7 @@ def random_scene(resolution=RESOLUTION, export=None):
     def random_P5():
         return P5(*random_oxy(resolution, resolution))
 
-    ret_args = [random_P1(), random_P2(), random_P3(), random_P4()]
+    ret_args = [random_P1(), random_P2(), random_P3(), random_P4(), random_P5()]
 
     # ret_args = [
     #             P1(1, 0, 0),
