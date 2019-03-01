@@ -14,7 +14,6 @@ from CNN import *
 import time
 import random
 
-
 RESOLUTION = 32
 
 import torch
@@ -187,7 +186,6 @@ class SpecEncoder(CNN):
         super(SpecEncoder, self).__init__(channels=1,
                                           inputImageDimension=RESOLUTION)
 
-
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
     def quadrilateral():
@@ -230,7 +228,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     
     return s
 
-def randomSceneTest(resolution=32, maxShapes=1, minShapes=1, verbose=True, export=None):
+def randomSceneTest(resolution=32, maxShapes=3, minShapes=3, verbose=True, export=None):
 
     number_of_shapes = random.choice(range(minShapes, 1+maxShapes))
     curr_number_of_shapes = 0
@@ -256,11 +254,8 @@ def randomSceneTest(resolution=32, maxShapes=1, minShapes=1, verbose=True, expor
         # Check operator 
         if operator_token in ['r','c']:
             curr_number_of_shapes += 1
-            print("Shape")
         elif curr_number_of_shapes < 2:
-            print("Operation")
             continue
-        print("passed")
 
         # Operator is not an arrow type
         if not operator_type.isArrow:
@@ -287,13 +282,16 @@ def randomSceneTest(resolution=32, maxShapes=1, minShapes=1, verbose=True, expor
 
     if verbose:
         import matplotlib.pyplot as plot
-        # scene = g[0]
-        # print(g.objects())
+        plot.figure()
+        ax = plot.gca()
+        print("Program Generated:")
         print(g.prettyPrint())
+        scene = np.zeros((RESOLUTION,RESOLUTION))
         for obj in g.objects():
-            plot.imshow(obj.execute())
-        # print(g.prettyPrint())
-        # plot.imshow(ProgramGraph.fromRoot(g).execute())
+            scene += obj.execute()
+        scene = np.where(scene > 1, 1, scene)
+        plot.imshow(scene)
+        print(scene)
         plot.show()
 
 
@@ -380,11 +378,6 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
         plot.savefig(export)
     else:
         plot.show()
-        
-        
-    
-        
-    
 
 if __name__ == "__main__":
     import argparse
