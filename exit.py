@@ -21,8 +21,30 @@ class ExitSolver(Solver):
         self.bestTrajectory = None
         return trajectory
 
-    def train(self, getSpec, loss, timeout):
-        self.sampleTrainingTrajectory(spec, loss, timeout)
+    def train(self, getSpec, loss, timeout,
+              _=None, exitIterations=1, trainingSetSize=100):
+        if exitIterations < 1: return 
+
+        print(f"Generating {trainingSetSize} expert trajectories")
+        trainingData = []
+        for _ in range(trainingSetSize):
+            spec = getSpec()
+            trajectory = self.sampleTrainingTrajectory(spec, loss, timeout)
+            trainingData.append((spec, trajectory))
+
+        print(f"Taking gradient steps...")
+        for spec, trace in trainingData:
+            self.model.gradientStepTrace(spec, trace)
+
+        self.train(getSpec, loss, timeout,
+                   exitIterations=exitIterations, trainingSetSize=trainingSetSize)
+        
+        
+            
+            
+
+        
+            
 
 
             
