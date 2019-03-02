@@ -26,6 +26,9 @@ class CSG(Program):
     def __init__(self):
         self._rendering = None
 
+    def __repr__(self):
+        return str(self)
+
     def __ne__(self, o): return not (self == o)
 
     def execute(self):
@@ -59,6 +62,11 @@ class Rectangle(CSG):
         self.w = w
         self.h = h
 
+    def toTrace(self): return [self]
+
+    def __str__(self):
+        return f"(r {self.w} {self.h})"
+
     def children(self): return []
 
     def __eq__(self, o):
@@ -82,6 +90,11 @@ class Circle(CSG):
         super(Circle, self).__init__()
         self.r = r
 
+    def toTrace(self): return [self]
+        
+    def __str__(self):
+        return f"(c {self.r})"
+
     def children(self): return []
 
     def __eq__(self, o):
@@ -103,6 +116,11 @@ class Translation(CSG):
         super(Translation, self).__init__()
         self.v = (x, y)
         self.child = child
+
+    def toTrace(self): return self.child.toTrace() + [self]
+    
+    def __str__(self):
+        return f"(t {self.v} {self.child})"
 
     def children(self): return [self.child]
 
@@ -128,6 +146,12 @@ class Union(CSG):
         super(Union, self).__init__()
         self.elements = [a,b]
 
+    def toTrace(self):
+        return self.elements[0].toTrace() + self.elements[1].toTrace() + [self]
+
+    def __str__(self):
+        return f"(+ {str(self.elements[0])} {str(self.elements[1])})"
+
     def children(self): return self.elements
 
     def serialize(self):
@@ -149,6 +173,12 @@ class Difference(CSG):
     def __init__(self, a, b):
         super(Difference, self).__init__()
         self.a, self.b = a, b
+
+    def toTrace(self):
+        return self.a.toTrace() + self.b.toTrace() + [self]
+
+    def __str__(self):
+        return f"(- {self.a} {self.b})"
         
     def children(self): return [self.a, self.b]
 
@@ -190,9 +220,10 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
+    dc = 8 # number of distinct coordinates
     def quadrilateral():
         choices = [c
-                   for c in range(resolution//8, resolution, resolution//4) ]
+                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
         w = random.choice([2,5])
         h = random.choice([2,5])
         x = random.choice(choices)
@@ -203,7 +234,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     def circular():
         r = random.choice([2,4])
         choices = [c
-                   for c in range(resolution//8, resolution, resolution//4) ]
+                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
         x = random.choice(choices)
         y = random.choice(choices)
         return Translation(x,y,
@@ -219,8 +250,9 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             s = Union(s,o)
         numberOfShapes += 1
     if verbose:
+        print(s)
+        print(ProgramGraph.fromRoot(s, oneParent=True).prettyPrint())
         import matplotlib.pyplot as plot
-        print(ProgramGraph.fromRoot(s).prettyPrint())
         plot.imshow(s.execute())
         plot.show()
     if export:
@@ -240,32 +272,29 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     reportingFrequency = 100
     totalLosses = []
     movedLosses = []
-    distanceLosses = []
     iteration = 0
 
     while trainTime is None or time.time() - startTime < trainTime:
         s = getProgram()
-        g = ProgramGraph.fromRoot(s)
-        l,dl = m.gradientStepTrace(optimizer, s.execute(), g)
+        l = m.gradientStepTrace(optimizer, s.execute(), s.toTrace())
         totalLosses.append(sum(l))
         movedLosses.append(sum(l)/len(l))
-        distanceLosses.append(sum(dl)/len(dl))
 
         if iteration%reportingFrequency == 0:
-            print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\t\tdistance loss {sum(distanceLosses)/len(distanceLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
+            print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
             totalLosses = []
             movedLosses = []
-            distanceLosses = []
             with open(checkpoint,"wb") as handle:
                 pickle.dump(m, handle)
 
         iteration += 1
 
 def testCSG(m, getProgram, timeout, export):
-    solvers = [RandomSolver(dsl),
-               MCTS(m, reward=lambda l: 1. - l),
-               SMC(m),
-               ForwardSample(m)]
+    oneParent = m.oneParent
+    solvers = [# RandomSolver(dsl),
+               # MCTS(m, reward=lambda l: 1. - l),
+               # SMC(m),
+               ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     testResults = [[] for _ in solvers]
@@ -273,7 +302,7 @@ def testCSG(m, getProgram, timeout, export):
     for _ in range(30):
         spec = getProgram()
         print("Trying to explain the program:")
-        print(ProgramGraph.fromRoot(spec).prettyPrint())
+        print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
         for n, solver in enumerate(solvers):
             testSequence = solver.infer(spec.execute(), loss, timeout)
@@ -285,7 +314,8 @@ def testCSG(m, getProgram, timeout, export):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=["MCTS","SMC", "FS"],
+                    names=[# "MCTS","SMC", 
+                           "FS"],
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
@@ -336,6 +366,7 @@ if __name__ == "__main__":
                         help="Size of hidden layers")
     parser.add_argument("--timeout", default=5, type=float,
                         help="Test time maximum timeout")
+    parser.add_argument("--oneParent", default=False, action='store_true')
     arguments = parser.parse_args()
 
     if arguments.mode == "demo":
@@ -348,6 +379,7 @@ if __name__ == "__main__":
 
     if arguments.mode == "train":
         m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,
+                                  oneParent=arguments.oneParent,
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)

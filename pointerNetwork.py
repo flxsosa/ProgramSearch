@@ -382,15 +382,17 @@ class ScopeEncoding():
             
 class ProgramPointerNetwork(Module):
     """A network that looks at the objects in a ProgramGraph and then predicts what to add to the graph"""
-    def __init__(self, objectEncoder, specEncoder, DSL, H=256,
-                 attentionRounds=1, heads=4):
+    def __init__(self, objectEncoder, specEncoder, DSL, oneParent=False,
+                 H=256, attentionRounds=1, heads=4):
         """
         specEncoder: Module that encodes spec to initial hidden state of RNN
         objectEncoder: Module that encodes (spec, object) to features we attend over
+        oneParent: Whether each node in the program graph is constrained to have no more than one parent
         """
         super(ProgramPointerNetwork, self).__init__()
 
         self.DSL = DSL
+        self.oneParent = oneParent
         self.objectEncoder = objectEncoder
         self.specEncoder = specEncoder
         self.decoder = LineDecoder(DSL.lexicon + ["RETURN"],
@@ -430,114 +432,40 @@ class ProgramPointerNetwork(Module):
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))
 
-    def gradientStep(self, optimizer, spec, currentGraph, goalGraph):
-        """Returns (policy loss, distance loss)"""
-        self.zero_grad()
-        
-        optimalMoves = list(goalGraph.policyOracle(currentGraph))
-        if len(optimalMoves) == 0:
-            optimalMoves = [['RETURN']]
-            finalMove = True
-        else:
-            finalMove = False
-
-        se = self.specEncoder(spec)
-        objects = currentGraph.objects()
-        objectEncodings = ScopeEncoding(self, spec).encoding(objects)
-        object2pointer = {o: Pointer(i)
-                          for i,o in enumerate(objects) }
-
-        h0 = self.initialHidden(objectEncodings, se)
-
-        def substitutePointers(serialization):
-            return [token if isinstance(token,str) else object2pointer[token]
-                    for token in serialization]
-
-        targetLines = [substitutePointers(m.serialize()) if not finalMove else m
-                       for m in optimalMoves]
-        targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, objectEncodings)
-                             for targetLine in targetLines]
-        policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
-
-
-        actualDistance = currentGraph.distanceOracle(goalGraph)
-        predictedDistance = self.distance(objectEncodings, se)
-        distanceLoss = (predictedDistance - float(actualDistance))**2
-        
-        (policyLoss + distanceLoss).backward()
-        optimizer.step()
-        return policyLoss.data.item(), distanceLoss.data.item()
-
-    def gradientStepTrace(self, optimizer, spec, goalGraph):
-        """Returns ([policy losses], [distance losses])"""
-        self.zero_grad()
-        
+    def traceLogLikelihood(self, spec, trace, scopeEncoding=None):
+        scopeEncoding = scopeEncoding or ScopeEncoding(self, spec).registerObjects(set(trace))
         currentGraph = ProgramGraph([])
-        policyLosses, distanceLosses = [], []
-
-        objects = list(goalGraph.objects())
-        objectEncodings = ScopeEncoding(self, spec).registerObjects(objects)
         specEncoding = self.specEncoder(spec)
-
-        while True:
-            optimalMoves = list(goalGraph.policyOracle(currentGraph))
-            if len(optimalMoves) == 0:
-                finalMove = True
-                optimalMoves = [['RETURN']]
-            else:
-                finalMove = False
+        lls = []
+        for obj in trace + [['RETURN']]:
+            finalMove = obj == ['RETURN']
 
             # Gather together objects in scope
-            objectsInScope = list(currentGraph.objects())
-            scopeEncoding = objectEncodings.encoding(objectsInScope)
+            objectsInScope = list(currentGraph.objects(oneParent=self.oneParent))
+            scope = scopeEncoding.encoding(objectsInScope)
             object2pointer = {o: Pointer(i)
                               for i, o  in enumerate(objectsInScope)}
 
-            h0 = self.initialHidden(scopeEncoding, specEncoding)
+            h0 = self.initialHidden(scope, specEncoding)
             def substitutePointers(serialization):
-                return [token if not isinstance(token, Program) else object2pointer[token]
+                return [object2pointer.get(token, token)
                         for token in serialization]
+            lls.append(self.decoder.logLikelihood(h0,
+                                                  substitutePointers(obj.serialize()) if not finalMove else obj,
+                                                  scope))
+            if not finalMove:
+                currentGraph = currentGraph.extend(obj)
+        return sum(lls), lls        
 
-            targetLines = [substitutePointers(m.serialize()) if not finalMove else m
-                           for m in optimalMoves]
-            targetLikelihoods = [self.decoder.logLikelihood(h0, targetLine, scopeEncoding)
-                                 for targetLine in targetLines]
-            policyLoss = -torch.logsumexp(torch.cat([l.view(1) for l in targetLikelihoods ]), dim=0)
-            policyLosses.append(policyLoss)
+    def gradientStepTrace(self, optimizer, spec, trace):
+        """Returns [policy losses]"""
+        self.zero_grad()
 
-            actualDistance = currentGraph.distanceOracle(goalGraph)
-            predictedDistance = self.distance(scopeEncoding, specEncoding)
-            distanceLoss = (predictedDistance - float(actualDistance))**2
+        ll, lls = self.traceLogLikelihood(spec, trace)
 
-            # On-policy sample
-            onPolicy = self.decoder.sample(h0, scopeEncoding)
-            if onPolicy is not None:
-                onPolicy = [objectsInScope[token.i] if isinstance(token, Pointer) else token
-                            for token in onPolicy]
-                onPolicy = self.DSL.parseLine(onPolicy)
-                if onPolicy is not None:
-                    onPolicyGraph = currentGraph.extend(onPolicy)
-                    onPolicyObjects = objectEncodings.encoding(onPolicyGraph.objects())
-                    actualDistance = onPolicyGraph.distanceOracle(goalGraph)
-                        
-                    predictedDistance = self.distance(onPolicyObjects, specEncoding)
-                    distanceLoss += (predictedDistance - float(actualDistance))**2                
-
-            
-            distanceLosses.append(distanceLoss)
-
-            if finalMove:
-                (sum(policyLosses) + sum(distanceLosses)).backward()
-                optimizer.step()
-                return [l.data.item() for l in policyLosses], [l.data.item() for l in distanceLosses]
-
-            # Sample the next (optimal) line of code predicted by the model
-            targetLikelihoods = [math.exp(tl.data.item() + policyLoss) for tl in targetLikelihoods]
-            # This shouldn't be necessary - normalize :/
-            targetLikelihoods = [tl/sum(targetLikelihoods) for tl in targetLikelihoods ]
-            move = np.random.choice(optimalMoves, p=targetLikelihoods)
-            currentGraph = currentGraph.extend(move)
-            
+        (-ll).backward()
+        optimizer.step()
+        return [-l.data.item() for l in lls]
 
     def sample(self, spec, maxMoves=None):
         specEncoding = self.specEncoder(spec)
@@ -547,7 +475,7 @@ class ProgramPointerNetwork(Module):
 
         while True:
             # Make the encoding matrix
-            objectsInScope = list(graph.objects())
+            objectsInScope = list(graph.objects(oneParent=self.oneParent))
             oe = objectEncodings.encoding(objectsInScope)
             h0 = self.initialHidden(oe, specEncoding)
 
@@ -571,7 +499,7 @@ class ProgramPointerNetwork(Module):
         n_samples: how many samples to draw
         returns: list of sampled DSL objects. If the sample is `RETURN` then that entry in the list is None.
         """
-        objectsInScope = list(graph.objects())
+        objectsInScope = list(graph.objects(oneParent=self.oneParent))
         oe = objectEncodings.encoding(objectsInScope)
         h0 = self.initialHidden(oe, specEncoding)
 
@@ -599,7 +527,7 @@ class ProgramPointerNetwork(Module):
         B: beam size
         returns: list of (at most B) beamed (DSL object, log likelihood). None denotes `RETURN`
         """
-        objectsInScope = list(graph.objects())
+        objectsInScope = list(graph.objects(oneParent=self.oneParent))
         oe = objectEncodings.encoding(objectsInScope)
         h0 = self.initialHidden(oe, specEncoding)
         lines = []
@@ -620,7 +548,7 @@ class ProgramPointerNetwork(Module):
         objectEncodings: a ScopeEncoding
         graph: current graph
         yields: stream of (DSL object, log likelihood). None denotes `RETURN'"""
-        objectsInScope = list(graph.objects())
+        objectsInScope = list(graph.objects(oneParent=self.oneParent))
         oe = objectEncodings.encoding(objectsInScope)
         h0 = self.initialHidden(oe, specEncoding)
         for ll, tokens in self.decoder.bestFirstEnumeration(h0, oe):
