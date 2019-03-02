@@ -220,6 +220,8 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
+    random.seed()
+    random.seed(random.choice(range(10)))
     dc = 8 # number of distinct coordinates
     def quadrilateral():
         choices = [c
@@ -352,7 +354,7 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
-    parser.add_argument("mode", choices=["train","test","demo"])
+    parser.add_argument("mode", choices=["imitation","exit","test","demo"])
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
@@ -377,7 +379,7 @@ if __name__ == "__main__":
         
             
 
-    if arguments.mode == "train":
+    if arguments.mode == "imitation":
         m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,
                                   oneParent=arguments.oneParent,
                                   attentionRounds=arguments.attention,
@@ -386,6 +388,14 @@ if __name__ == "__main__":
         trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
+    elif arguments.mode == "exit":
+        with open(arguments.checkpoint,"rb") as handle:
+            m = pickle.load(handle)
+        searchAlgorithm = ForwardSample(m, maximumLength=arguments.maxShapes*3 + 1)
+        loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
+        searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes),
+                              loss=loss,
+                              timeout=1)
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)

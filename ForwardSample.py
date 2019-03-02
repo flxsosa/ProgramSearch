@@ -25,5 +25,5 @@ class ForwardSample(ExitSolver):
                 newObjects = self.model.repeatedlySample(specEncoding, g, objectEncodings, 1)
                 if len(newObjects) == 0 or newObjects[0] is None or newObjects[0] in g.objects(): break
                 g = g.extend(newObjects[0])
-                trajectory.append(g)
+                trajectory.append(newObjects[0])
             self._report(g, trajectory)
