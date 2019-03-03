@@ -45,7 +45,10 @@ class CNN(Module):
         if isinstance(v, list): v = np.array(v)
         if self.channels == 1: # input is either BxWxH or WxH
             if len(v.shape) == 2: squeeze = 2
-            elif len(v.shape) == 3: squeeze = 1
+            elif len(v.shape) == 3:
+                # insert channel
+                v = self.encoder(self.device(self.tensor(v).float()).unsqueeze(1))
+                return v
             else: assert False
         else: # either [b,c,w,h] or [c,w,h]
             if len(v.shape) == 3: squeeze = 1

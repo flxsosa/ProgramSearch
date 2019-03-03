@@ -341,27 +341,27 @@ class PointerNetwork(Module):
         
 class ScopeEncoding():
     """A cache of the encodings of objects in scope"""
-    def __init__(self, owner, spec):
+    def __init__(self, owner):
         """owner: a ProgramPointerNetwork that "owns" this scope encoding"""
-        self.spec = spec
         self.owner = owner
         self.object2index = {}
         self.objectEncoding = None
 
-    def registerObject(self, o):
-        if o in self.object2index: return self
-        oe = self.owner.objectEncoder(self.spec, o.execute())
+    def registerObject(self, o, s):
+        if (o,s) in self.object2index: return self
+        oe = self.owner.objectEncoder(s.execute(), o.execute())
         if self.objectEncoding is None:
             self.objectEncoding = oe.view(1,-1)
         else:
             self.objectEncoding = torch.cat([self.objectEncoding, oe.view(1,-1)])
-        self.object2index[o] = len(self.object2index)
+        self.object2index[(o,s)] = len(self.object2index)
         return self
 
-    def registerObjects(self, os):
-        os = [o for o in os if o not in self.object2index ]
+    def registerObjects(self, objectsAndSpecs):
+        os = [o for o in objectsAndSpecs if o not in self.object2index ]
         if len(os) == 0: return self
-        encodings = self.owner.objectEncoder(self.spec, [o.execute() for o in os])
+        encodings = self.owner.objectEncoder([s.execute() for _,s in os ],
+                                             [o.execute() for o,_ in os])
         if self.objectEncoding is None:
             self.objectEncoding = encodings
         else:
@@ -370,13 +370,13 @@ class ScopeEncoding():
             self.object2index[o] = len(self.object2index)
         return self
 
-    def encoding(self, objects):
-        """Takes as input O objects (as a list) and returns a OxE tensor of their encodings.
+    def encoding(self, spec, objects):
+        """Takes as input a spec and O objects (as a list) and returns a OxE tensor of their encodings.
         If the owner has a self attention module, also applies the attention module.
         If objects is the empty list then return None"""
         if len(objects) == 0: return None
-        self.registerObjects(objects)
-        preAttention = self.objectEncoding[self.owner.device(torch.tensor([self.object2index[o]
+        self.registerObjects([(o,spec) for o in objects])
+        preAttention = self.objectEncoding[self.owner.device(torch.tensor([self.object2index[(o,spec)]
                                                                            for o in objects ]))]
         return self.owner.selfAttention(preAttention)
             
@@ -432,17 +432,19 @@ class ProgramPointerNetwork(Module):
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))
 
-    def traceLogLikelihood(self, spec, trace, scopeEncoding=None):
-        scopeEncoding = scopeEncoding or ScopeEncoding(self, spec).registerObjects(set(trace))
+    def traceLogLikelihood(self, spec, trace, scopeEncoding=None, specEncoding=None):
+        scopeEncoding = scopeEncoding or ScopeEncoding(self).\
+                        registerObjects([(o,spec)
+                                         for o in set(trace)])
         currentGraph = ProgramGraph([])
-        specEncoding = self.specEncoder(spec)
+        specEncoding = specEncoding if specEncoding is not None else self.specEncoder(spec.execute())
         lls = []
         for obj in trace + [['RETURN']]:
             finalMove = obj == ['RETURN']
 
             # Gather together objects in scope
             objectsInScope = list(currentGraph.objects(oneParent=self.oneParent))
-            scope = scopeEncoding.encoding(objectsInScope)
+            scope = scopeEncoding.encoding(spec, objectsInScope)
             object2pointer = {o: Pointer(i)
                               for i, o  in enumerate(objectsInScope)}
 
@@ -467,16 +469,39 @@ class ProgramPointerNetwork(Module):
         optimizer.step()
         return [-l.data.item() for l in lls]
 
+    def gradientStepTraceBatched(self, optimizer, specsAndTraces):
+        """Returns [[policy losses]]"""
+        self.zero_grad()
+
+        scopeEncoding = ScopeEncoding(self)
+        scopeEncoding.registerObjects([(o,spec)
+                                       for spec, trace in specsAndTraces
+                                       for o in trace ])
+        specRenderings = np.array([s.execute()
+                                   for s,_ in specsAndTraces ])
+        specEncodings = self.specEncoder(specRenderings)
+        losses = []
+        totalLikelihood = []
+        for b, (spec, trace) in enumerate(specsAndTraces):
+            ll, lls = self.traceLogLikelihood(spec, trace,
+                                              specEncoding=specEncodings[b],
+                                              scopeEncoding=scopeEncoding)
+            totalLikelihood.append(ll)
+            losses.append([-l.data.item() for l in lls])
+        (-sum(totalLikelihood)).backward()
+        optimizer.step()
+        return losses
+
     def sample(self, spec, maxMoves=None):
-        specEncoding = self.specEncoder(spec)
-        objectEncodings = ScopeEncoding(self, spec)
+        specEncoding = self.specEncoder(spec.execute())
+        objectEncodings = ScopeEncoding(self) 
 
         graph = ProgramGraph([])
 
         while True:
             # Make the encoding matrix
             objectsInScope = list(graph.objects(oneParent=self.oneParent))
-            oe = objectEncodings.encoding(objectsInScope)
+            oe = objectEncodings.encoding(spec, objectsInScope)
             h0 = self.initialHidden(oe, specEncoding)
 
             nextLineOfCode = self.decoder.sample(h0, oe)
@@ -491,7 +516,7 @@ class ProgramPointerNetwork(Module):
 
             graph = graph.extend(nextObject)
 
-    def repeatedlySample(self, specEncoding, graph, objectEncodings, n_samples):
+    def repeatedlySample(self, spec, specEncoding, graph, objectEncodings, n_samples):
         """Repeatedly samples a single line of code.
         specEncoding: Encoding of the spec
         objectEncodings: a ScopeEncoding
@@ -500,7 +525,7 @@ class ProgramPointerNetwork(Module):
         returns: list of sampled DSL objects. If the sample is `RETURN` then that entry in the list is None.
         """
         objectsInScope = list(graph.objects(oneParent=self.oneParent))
-        oe = objectEncodings.encoding(objectsInScope)
+        oe = objectEncodings.encoding(spec, objectsInScope)
         h0 = self.initialHidden(oe, specEncoding)
 
         samples = []
@@ -519,7 +544,7 @@ class ProgramPointerNetwork(Module):
         return samples
 
 
-    def beamNextLine(self, specEncoding, graph, objectEncodings, B):
+    def beamNextLine(self, spec, specEncoding, graph, objectEncodings, B):
         """Does a beam search for a single line of code.
         specEncoding: Encoding of the spec
         objectEncodings: a ScopeEncoding
@@ -528,7 +553,7 @@ class ProgramPointerNetwork(Module):
         returns: list of (at most B) beamed (DSL object, log likelihood). None denotes `RETURN`
         """
         objectsInScope = list(graph.objects(oneParent=self.oneParent))
-        oe = objectEncodings.encoding(objectsInScope)
+        oe = objectEncodings.encoding(spec, objectsInScope)
         h0 = self.initialHidden(oe, specEncoding)
         lines = []
         for ll, tokens in self.decoder.beam(h0, oe, B, maximumLength=10):
@@ -542,7 +567,7 @@ class ProgramPointerNetwork(Module):
                 lines.append((line, ll))
         return lines
 
-    def bestFirstEnumeration(self, specEncoding, graph, objectEncodings):
+    def bestFirstEnumeration(self, spec, specEncoding, graph, objectEncodings):
         """Does a best first search for a single line of code.
         specEncoding: Encoding of the spec
         objectEncodings: a ScopeEncoding

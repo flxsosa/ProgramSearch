@@ -204,7 +204,13 @@ class ObjectEncoder(CNN):
                                             inputImageDimension=RESOLUTION)
 
     def forward(self, spec, obj):
-        if isinstance(obj, list): # batched - expect a single spec and multiple objects
+        if isinstance(spec, list):
+            # batching both along specs and objects
+            assert isinstance(obj, list)
+            B = len(spec)
+            assert len(obj) == B
+            return super(ObjectEncoder, self).forward(np.stack([np.stack([s,o]) for s,o in zip(spec, obj)]))
+        elif isinstance(obj, list): # batched - expect a single spec and multiple objects
             spec = np.repeat(spec[np.newaxis,:,:],len(obj),axis=0)
             obj = np.stack(obj)
             return super(ObjectEncoder, self).forward(np.stack([spec, obj],1))
@@ -221,7 +227,7 @@ class SpecEncoder(CNN):
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
     random.seed()
-    random.seed(random.choice(range(10)))
+    random.seed(random.choice(range(2)))
     dc = 8 # number of distinct coordinates
     def quadrilateral():
         choices = [c
@@ -276,14 +282,18 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     movedLosses = []
     iteration = 0
 
+    B = 16
+
     while trainTime is None or time.time() - startTime < trainTime:
-        s = getProgram()
-        l = m.gradientStepTrace(optimizer, s.execute(), s.toTrace())
-        totalLosses.append(sum(l))
-        movedLosses.append(sum(l)/len(l))
+        ss = [getProgram() for _ in range(B)]
+        ls = m.gradientStepTraceBatched(optimizer, [(s, s.toTrace())
+                                                    for s in ss])
+        for l in ls:
+            totalLosses.append(sum(l))
+            movedLosses.append(sum(l)/len(l))
 
         if iteration%reportingFrequency == 0:
-            print(f"\n\nAfter {iteration} gradient steps...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n{iteration/(time.time() - startTime)} grad steps/sec")
+            print(f"\n\nAfter {iteration*B} training examples...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n{iteration*B/(time.time() - startTime)} examples/sec\n{iteration/(time.time() - startTime)} grad steps/sec")
             totalLosses = []
             movedLosses = []
             with open(checkpoint,"wb") as handle:

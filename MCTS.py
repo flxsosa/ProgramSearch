@@ -37,7 +37,7 @@ class MCTS(Solver):
                 self.graph = graph
                 self.visits = 0
                 self.edges = []
-                self.generator = owner.model.bestFirstEnumeration(specEncoding, graph, objectEncodings)
+                self.generator = owner.model.bestFirstEnumeration(spec, specEncoding, graph, objectEncodings)
 
         class Edge:
             def __init__(self, parent, child, logLikelihood):
@@ -47,7 +47,7 @@ class MCTS(Solver):
                 self.traversals = 0
                 self.totalReward = 0
 
-        specEncoding = self.model.specEncoder(spec)
+        specEncoding = self.model.specEncoder(spec.execute())
         objectEncodings = ScopeEncoding(self.model, spec)
 
 
