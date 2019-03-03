@@ -395,7 +395,9 @@ if __name__ == "__main__":
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
         searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes),
                               loss=loss,
-                              timeout=1)
+                              policyOracle=lambda spec: spec.toTrace(),
+                              timeout=1,
+                              exitIterations=-1)
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)

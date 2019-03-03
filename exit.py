@@ -22,11 +22,13 @@ class ExitSolver(Solver):
         return trajectory
 
     def train(self, getSpec, loss, timeout,
-              _=None, exitIterations=1, trainingSetSize=10):
-        if exitIterations < 1: return 
+              _=None, exitIterations=1, trainingSetSize=10,
+              policyOracle=None):
+        if exitIterations == 0: return 
 
         print(f"Generating {trainingSetSize} expert trajectories")
         trainingData = []
+        n_solutions = 0
         for _ in range(trainingSetSize):
             spec = getSpec()
             trajectory = self.sampleTrainingTrajectory(spec.execute(), loss, timeout)
@@ -39,12 +41,20 @@ class ExitSolver(Solver):
                 trainingData.append((spec.execute(), trajectory))
                 print(trajectory[-1])
                 print("SOLVED")
-            else: print("Did not solve!")
+                n_solutions += 1
+            else:
+                print("Did not solve!")
+                if policyOracle is not None:
+                    print("Asking the Oracle for solution!")
+                    trajectory = policyOracle(spec)
+                    trainingData.append((spec.execute(), trajectory))
 
-        print(f"Taking {len(trainingData)} gradient steps...")
+        print(f"Taking {len(trainingData)} gradient steps - {n_solutions} of which we found ourselves...")
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
         for spec, trace in trainingData:
             self.model.gradientStepTrace(optimizer, spec, trace)
 
         self.train(getSpec, loss, timeout,
-                   exitIterations=exitIterations - 1, trainingSetSize=trainingSetSize)
+                   exitIterations=exitIterations - 1,
+                   trainingSetSize=trainingSetSize,
+                   policyOracle=policyOracle)
