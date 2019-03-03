@@ -317,7 +317,7 @@ def testCSG(m, getProgram, timeout, export):
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
         for n, solver in enumerate(solvers):
-            testSequence = solver.infer(spec.execute(), loss, timeout)
+            testSequence = solver.infer(spec, loss, timeout)
             testResults[n].append(testSequence)
             for result in testSequence:
                 print(f"After time {result.time}, achieved loss {result.loss} w/")
