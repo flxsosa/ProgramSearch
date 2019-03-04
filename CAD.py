@@ -230,23 +230,27 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     random.seed(random.choice(range(2)))
     dc = 8 # number of distinct coordinates
     def quadrilateral():
-        choices = [c
-                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
-        w = random.choice([2,5])
-        h = random.choice([2,5])
-        x = random.choice(choices)
-        y = random.choice(choices)
-        return Translation(x,y,
-                           Rectangle(w,h))
+        while True:
+            choices = [c
+                       for c in range(resolution//(dc*2), resolution, resolution//dc) ]
+            w = random.choice([2,5])
+            h = random.choice([2,5])
+            x = random.choice(choices)
+            y = random.choice(choices)
+            if x + w < resolution and y + h < resolution:
+                return Translation(x,y,
+                                   Rectangle(w,h))
 
     def circular():
-        r = random.choice([2,4])
-        choices = [c
-                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
-        x = random.choice(choices)
-        y = random.choice(choices)
-        return Translation(x,y,
-                           Circle(r))
+        while True:
+            r = random.choice([2,4])
+            choices = [c
+                       for c in range(resolution//(dc*2), resolution, resolution//dc) ]
+            x = random.choice(choices)
+            y = random.choice(choices)
+            if x - r >= 0 and x + r < resolution and y - r >= 0 and y + r < resolution:
+                return Translation(x,y,
+                                   Circle(r))
     s = None
     numberOfShapes = 0
     desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
