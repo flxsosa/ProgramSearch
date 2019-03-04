@@ -228,7 +228,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     
     return s
 
-def randomSceneTest(resolution=32, maxShapes=3, minShapes=3, verbose=True, export=None):
+def randomSceneTest(num=1,save_fig=False,resolution=32, maxShapes=3, minShapes=3, verbose=True, export=None):
 
     number_of_shapes = random.choice(range(minShapes, 1+maxShapes))
     curr_number_of_shapes = 0
@@ -291,8 +291,8 @@ def randomSceneTest(resolution=32, maxShapes=3, minShapes=3, verbose=True, expor
             scene += obj.execute()
         scene = np.where(scene > 1, 1, scene)
         plot.imshow(scene)
-        print(scene)
-        plot.show()
+        if save_fig:
+            plot.savefig('test{}'.format(num))
 
 
 def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
