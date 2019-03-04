@@ -226,15 +226,13 @@ class SpecEncoder(CNN):
 
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
-    random.seed()
-    random.seed(random.choice(range(2)))
     dc = 8 # number of distinct coordinates
     def quadrilateral():
         while True:
             choices = [c
                        for c in range(resolution//(dc*2), resolution, resolution//dc) ]
-            w = random.choice([2,5])
-            h = random.choice([2,5])
+            w = random.choice(range(2, resolution, resolution//dc))
+            h = random.choice(range(2, resolution, resolution//dc))
             x = random.choice(choices)
             y = random.choice(choices)
             if x + w < resolution and y + h < resolution:
@@ -243,7 +241,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
 
     def circular():
         while True:
-            r = random.choice([2,4])
+            r = random.choice(range(2,10,2))
             choices = [c
                        for c in range(resolution//(dc*2), resolution, resolution//dc) ]
             x = random.choice(choices)
@@ -386,6 +384,10 @@ if __name__ == "__main__":
     arguments = parser.parse_args()
 
     if arguments.mode == "demo":
+        startTime = time.time()
+        for _ in range(100):
+            randomScene(maxShapes=arguments.maxShapes).execute()
+        print(f"{100/(time.time() - startTime)} renders/second")
         for n in range(100):
             randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes)
         import sys
