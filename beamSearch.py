@@ -1,5 +1,6 @@
 from API import *
 from programGraph import *
+from pointerNetwork import *
 
 class BeamSearch(Solver):
     def __init__(self, model):
@@ -7,7 +8,7 @@ class BeamSearch(Solver):
 
     def _infer(self, spec, loss, timeout):
 
-        specEncoding = self.model.specEncoder(spec)
+        specEncoding = self.model.specEncoder(spec.execute())
 
         objectEncodings = ScopeEncoding(self.model)
 
@@ -24,7 +25,7 @@ class BeamSearch(Solver):
 
         while any( not p.finished for p in population ):
             children = []
-            for p in particles:
+            for p in population:
                 if p.finished: continue
                 
                 for o, l in self.model.beamNextLine(spec, specEncoding, p.graph, objectEncodings, B):

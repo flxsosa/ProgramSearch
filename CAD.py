@@ -9,6 +9,7 @@ from programGraph import *
 from SMC import *
 from ForwardSample import *
 from MCTS import MCTS
+from beamSearch import *
 from CNN import *
 
 import time
@@ -308,6 +309,7 @@ def testCSG(m, getProgram, timeout, export):
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
                # SMC(m),
+        BeamSearch(m),
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
