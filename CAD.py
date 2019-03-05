@@ -308,7 +308,7 @@ def testCSG(m, getProgram, timeout, export):
     oneParent = m.oneParent
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
-               # SMC(m),
+               SMC(m),
         BeamSearch(m),
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
@@ -321,6 +321,7 @@ def testCSG(m, getProgram, timeout, export):
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
         for n, solver in enumerate(solvers):
+            print(f"Running solver {solver}")
             testSequence = solver.infer(spec, loss, timeout)
             testResults[n].append(testSequence)
             for result in testSequence:

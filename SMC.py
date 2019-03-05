@@ -19,10 +19,10 @@ class SMC(Solver):
         startTime = time.time()
         numberOfParticles = self.initialParticles
         
-        specEncoding = self.model.specEncoder(spec)
+        specEncoding = self.model.specEncoder(spec.execute())
         
         # Maps from an object to its embedding
-        objectEncodings = ScopeEncoding(self.model, spec)
+        objectEncodings = ScopeEncoding(self.model)
 
         # Maps from a graph to its distance
         _distance = {}
@@ -37,7 +37,6 @@ class SMC(Solver):
             def __init__(self, graph, frequency):
                 self.frequency = frequency
                 self.graph = graph
-                self.distance = distance(graph)
 
 
         while True:
@@ -45,7 +44,7 @@ class SMC(Solver):
             for _ in range(self.maximumLength):
                 sampleFrequency = {}
                 for p in population:
-                    for newObject in self.model.repeatedlySample(specEncoding, p.graph,
+                    for newObject in self.model.repeatedlySample(spec.execute(), specEncoding, p.graph,
                                                                  objectEncodings, p.frequency):
                         if newObject is None: newGraph = p.graph
                         else: newGraph = p.graph.extend(newObject)                        
@@ -60,7 +59,7 @@ class SMC(Solver):
                            for g, f in sampleFrequency.items() ]
 
                 # Resample
-                logWeights = [math.log(p.frequency) - p.distance
+                logWeights = [math.log(p.frequency)
                               for p in samples]
                 ps = [ math.exp(lw - max(logWeights)) for lw in logWeights ]
                 ps = [p/sum(ps) for p in ps]
