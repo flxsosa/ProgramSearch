@@ -28,13 +28,28 @@ class FCNet(nn.Module):
         self.name = "FCNet"
         self.in_dim = in_dim
         h_dim = 100
+
+        # def conv_block(in_channels, out_channels, p=True):
+        #     return nn.Sequential(
+        #         nn.Conv2d(in_channels, out_channels, 3, padding=1),
+        #         nn.ReLU(),
+        #         nn.Conv2d(out_channels, out_channels, 3, padding=1),
+        #         nn.ReLU(),
+        #         nn.MaxPool2d(2))
+
+        #self.cnn = conv_block(in_channels, hid_dim)
+
         self.fc = nn.Linear(in_dim, h_dim)
+        #self.fc2 = nn.Linear(h_dim, h_dim)
         self.pred = nn.Linear(h_dim, out_dim)
+
+
         self.opt = torch.optim.Adam(self.parameters(), lr=0.001)
 
     def forward(self, x):
         x = x.view(-1, self.in_dim)
         x = F.relu(self.fc(x))
+        #x = F.relu(self.fc2(x))
         x = F.log_softmax(self.pred(x), dim=1)
         return x
 
@@ -50,6 +65,12 @@ class FCNet(nn.Module):
         self.opt.step()
 
         return loss
+
+    def save(self, loc):
+        torch.save(self.state_dict(), loc)
+
+    def load(self, loc):
+        self.load_state_dict(torch.load(loc))
 
 class Agent:
     def __init__(self, input_dim, actions):
@@ -73,5 +94,11 @@ class Agent:
     def learn_supervised(self, states, actions):
         states = np.array(states)
         actions = np.array([self.actions.index(a) for a in actions])
-        self.nn.learn_supervised(states, actions)
+        loss = self.nn.learn_supervised(states, actions)
+        return loss
 
+    def save(self, loc):
+        self.nn.save(loc)
+
+    def load(self, loc):
+        self.nn.load(loc)
