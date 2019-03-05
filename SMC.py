@@ -24,15 +24,6 @@ class SMC(Solver):
         # Maps from an object to its embedding
         objectEncodings = ScopeEncoding(self.model)
 
-        # Maps from a graph to its distance
-        _distance = {}
-        def distance(g):
-            if g in _distance: return _distance[g]
-            se = objectEncodings.encoding(list(g.objects()))
-            d = self.model.distance(se, specEncoding)
-            _distance[g] = d
-            return d            
-        
         class Particle():
             def __init__(self, graph, frequency):
                 self.frequency = frequency
@@ -44,7 +35,7 @@ class SMC(Solver):
             for _ in range(self.maximumLength):
                 sampleFrequency = {}
                 for p in population:
-                    for newObject in self.model.repeatedlySample(spec.execute(), specEncoding, p.graph,
+                    for newObject in self.model.repeatedlySample(spec, specEncoding, p.graph,
                                                                  objectEncodings, p.frequency):
                         if newObject is None: newGraph = p.graph
                         else: newGraph = p.graph.extend(newObject)                        
