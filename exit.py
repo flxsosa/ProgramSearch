@@ -3,6 +3,8 @@ ExIt-style training
 https://davidbarber.github.io/blog/2017/11/07/Learning-From-Scratch-by-Thinking-Fast-and-Slow-with-Deep-Learning-and-Tree-Search/
 """
 
+import pickle
+
 from API import *
 
 class ExitSolver(Solver):
