@@ -31,7 +31,7 @@ class ExitSolver(Solver):
         n_solutions = 0
         for _ in range(trainingSetSize):
             spec = getSpec()
-            trajectory = self.sampleTrainingTrajectory(spec.execute(), loss, timeout)
+            trajectory = self.sampleTrainingTrajectory(spec, loss, timeout)
 
             print("For the spec:")
             print(spec)
