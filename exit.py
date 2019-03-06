@@ -30,7 +30,7 @@ class ExitSolver(Solver):
         n_attempts = 0
         n_successes = 0
 
-        for iteration in range(exitIterations):
+        for iteration in range(1000000):
             print(f"Generating {trainingSetSize} expert trajectories")
             trainingData = []
             n_solutions = 0
