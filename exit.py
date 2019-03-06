@@ -57,7 +57,7 @@ class ExitSolver(Solver):
                         trainingData.append((spec, trajectory))
 
             print(f"Taking {len(trainingData)} gradient steps - {n_solutions} of which we found ourselves...")
-            gradientStepTraceBatched(optimizer, trainingData)
+            self.model.gradientStepTraceBatched(optimizer, trainingData)
 
             if iteration > 0 and iteration%reportingFrequency == 0:
                 print(f"After {iteration*trainingSetSize} episodes, average success rate is {n_successes/n_attempts}")
