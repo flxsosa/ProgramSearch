@@ -28,7 +28,7 @@ class ExitSolver(Solver):
               policyOracle=None):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
 
-        reportingFrequency = 1
+        reportingFrequency = 10
         n_attempts = 0
         n_successes = 0
 
