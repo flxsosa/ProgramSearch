@@ -38,7 +38,7 @@ class ExitSolver(Solver):
             print("We get the training trajectory:")
             print(trajectory)
             if self.reportedSolutions[-1].loss < 0.01:
-                trainingData.append((spec.execute(), trajectory))
+                trainingData.append((spec, trajectory))
                 print(trajectory[-1])
                 print("SOLVED")
                 n_solutions += 1
