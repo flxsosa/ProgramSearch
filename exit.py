@@ -45,14 +45,15 @@ class ExitSolver(Solver):
                 print(spec)
                 print("We get the training trajectory:")
                 print(trajectory)
-                if self.reportedSolutions[-1].loss < 0.01:
+                if self.reportedSolutions[-1].loss < 0.01 and \
+                   (policyOracle is None or len(policyOracle(spec)) == len(trajectory)):
                     trainingData.append((spec, trajectory))
                     print(trajectory[-1])
                     print("SOLVED")
                     n_solutions += 1
                     n_successes += 1
                 else:
-                    print("Did not solve!")
+                    print("Did not solve! Or the solution wasn't short enough according to the Oracle")
                     if policyOracle is not None:
                         print("Asking the Oracle for solution!")
                         trajectory = policyOracle(spec)
