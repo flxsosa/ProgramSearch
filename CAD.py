@@ -195,7 +195,42 @@ class Difference(CSG):
     def __contains__(self, p):
         return p in self.a and (not (p in self.b))
 
-dsl = DSL([Rectangle, Circle, Translation, Union, Difference],
+class Repeat(CSG):
+    token = 'repeat'
+    type = arrow(tCSG,
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 integer(1, 5),
+                 tCSG)
+    
+    def __init__(self, child, dx, dy, n):
+        super(Repeat, self).__init__()
+        self.dx, self.dy, self.n, self.child = dx, dy, n, child
+
+    def toTrace(self):
+        return self.child.toTrace() + [self]
+
+    def __str__(self):
+        return f"(repeat ({self.dx}, {self.dy}) {self.n} {self.child})"
+        
+    def children(self): return [self.child]
+
+    def serialize(self):
+        return ('repeat',self.child,self.dx,self.dy,self.n)
+
+    def __eq__(self, o):
+        return isinstance(o, Repeat) and self.serialize() == o.serialize()
+
+    def __hash__(self):
+        return hash(self.serialize())
+    
+    def __contains__(self, p):
+        for i in range(self.n):
+            if p in self.child: return True
+            p = (p[0] - self.dx,
+                 p[1] - self.dy)
+        return False
+
+dsl = DSL([Rectangle, Circle, Translation, Union, Difference, Repeat],
           lexicon=CSG.lexicon)
 
 """Neural networks"""
