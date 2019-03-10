@@ -42,14 +42,15 @@ class BeamSearch(ExitSolver):
             children.sort(key=lambda p: -p.ll)
             population = children[:B]
 
-            print("Population:")
-            for p in population:
-                print(p)
+            if False:
+                print("Population:")
+                for p in population:
+                    print(p)
 
             for p in children:
                 if p.finished and not p.reported:
                     self._report(p.graph, p.trajectory)
                     p.reported = True
             if self.maximumLength is not None and self.maximumLength <= max(len(p.graph) for p in children):
-                print("Exiting early because we went beyond the maximum length")
+                # print("Exiting early because we went beyond the maximum length")
                 return 
