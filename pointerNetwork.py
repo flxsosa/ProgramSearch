@@ -171,6 +171,8 @@ class LineDecoder(Module):
                 
         return sequence[1:]
 
+    
+
     def beam(self, initialState, encodedObjects, B,
              maximumLength=50):
         """Given an initial hidden state, of size H, and the encodings of the

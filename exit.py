@@ -53,7 +53,7 @@ class ExitSolver(Solver):
                     n_solutions += 1
                     n_successes += 1
                 else:
-                    print("Did not solve! Or the solution wasn't short enough according to the Oracle")
+                    print("Did not solve! Or the solution wasn't short enough according to the oracle")
                     if policyOracle is not None:
                         print("Asking the Oracle for solution!")
                         trajectory = policyOracle(spec)
