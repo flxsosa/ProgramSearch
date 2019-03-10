@@ -4,7 +4,8 @@ from pointerNetwork import *
 from exit import *
 
 class BeamSearch(ExitSolver):
-    def __init__(self, model):
+    def __init__(self, model, maximumLength=None):
+        self.maximumLength = maximumLength
         self.model = model
 
     def _infer(self, spec, loss, timeout):
@@ -43,3 +44,5 @@ class BeamSearch(ExitSolver):
                 if p.finished and not p.reported:
                     self._report(p.graph, p.trajectory)
                     p.reported = True
+            if maximumLength is not None and maximumLength <= max(len(p.graph) for p in children):
+                return 

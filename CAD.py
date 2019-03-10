@@ -410,7 +410,7 @@ if __name__ == "__main__":
     elif arguments.mode == "exit":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
-        searchAlgorithm = ForwardSample(m, maximumLength=arguments.maxShapes*3 + 1)
+        searchAlgorithm = BeamSearch(m, maximumLength=arguments.maxShapes*3 + 1)
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
         searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes),
                               loss=loss,
