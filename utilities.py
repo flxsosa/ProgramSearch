@@ -3,6 +3,7 @@ import heapq
 import torch
 import torch.nn as nn
 
+   
 class Module(nn.Module):
     """Wrapper over torch Module class that handles GPUs elegantly"""
     def __init__(self):
@@ -16,6 +17,21 @@ class Module(nn.Module):
         else: return t
     def finalize(self):
         if self.use_cuda: self.cuda()
+
+class LayerNorm(Module):
+    "Adapted from http://nlp.seas.harvard.edu/2018/04/03/attention.html"
+    def __init__(self, features, eps=1e-6):
+        super(LayerNorm, self).__init__()
+        self.a_2 = nn.Parameter(torch.ones(features))
+        self.b_2 = nn.Parameter(torch.zeros(features))
+        self.eps = eps
+
+        self.finalize()
+
+    def forward(self, x):
+        mean = x.mean(-1, keepdim=True)
+        std = x.std(-1, keepdim=True)
+        return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
 
 
 class PQ(object):

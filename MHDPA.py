@@ -25,6 +25,8 @@ class MultiHeadAttention(Module):
         self.rounds = rounds
         self.residual = residual
 
+        #self.lm = LayerNorm() # TODO: is layer normalization a good idea?
+
         self.finalize()
 
     def forward(self, entities):

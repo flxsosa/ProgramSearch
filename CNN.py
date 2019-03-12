@@ -12,7 +12,7 @@ class Flatten(nn.Module):
 
 
 class CNN(Module):
-    def __init__(self, _=None, channels=1, layers=4,
+    def __init__(self, _=None, channels=1, layers=2,
                  inputImageDimension=None, hiddenChannels=64, outputChannels=64):
         super(CNN, self).__init__()
         assert inputImageDimension is not None

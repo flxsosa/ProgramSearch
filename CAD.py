@@ -139,6 +139,18 @@ class Translation(CSG):
              p[1] - self.v[1])
         return p in self.child
 
+    def toNudge(self):
+        child = self.child
+        x = self.v[0]
+        y = self.v[1]
+        while x > 0:
+            child = Translation(1,0,child)
+            x -= 1
+        while y > 0:
+            child = Translation(0,1,child)
+            y -= 1
+        return child
+
 class Union(CSG):
     token = '+'
     type = arrow(tCSG, tCSG, tCSG)
@@ -261,7 +273,10 @@ class SpecEncoder(CNN):
 
 
 """Training"""
-def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None):
+def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None, nudge=False):
+    def maybeNudge(t):
+        if nudge: return t.toNudge()
+        return t
     dc = 8 # number of distinct coordinates
     def quadrilateral():
         while True:
@@ -272,8 +287,8 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             x = random.choice(choices)
             y = random.choice(choices)
             if x + w < resolution and y + h < resolution:
-                return Translation(x,y,
-                                   Rectangle(w,h))
+                return maybeNudge(Translation(x,y,
+                                              Rectangle(w,h)))
 
     def circular():
         while True:
@@ -283,8 +298,8 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             x = random.choice(choices)
             y = random.choice(choices)
             if x - r >= 0 and x + r < resolution and y - r >= 0 and y + r < resolution:
-                return Translation(x,y,
-                                   Circle(r))
+                return maybeNudge(Translation(x,y,
+                                              Circle(r)))
     s = None
     numberOfShapes = 0
     desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
@@ -418,6 +433,7 @@ if __name__ == "__main__":
                         help="Size of hidden layers")
     parser.add_argument("--timeout", default=5, type=float,
                         help="Test time maximum timeout")
+    parser.add_argument("--nudge", default=False, action='store_true')
     parser.add_argument("--oneParent", default=False, action='store_true')
     arguments = parser.parse_args()
 
@@ -439,7 +455,7 @@ if __name__ == "__main__":
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)
-        trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes),
+        trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "exit":
@@ -447,7 +463,7 @@ if __name__ == "__main__":
             m = pickle.load(handle)
         searchAlgorithm = BeamSearch(m, maximumLength=arguments.maxShapes*3 + 1)
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
-        searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes),
+        searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge),
                               loss=loss,
                               policyOracle=lambda spec: spec.toTrace(),
                               timeout=1,
@@ -456,5 +472,5 @@ if __name__ == "__main__":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
         testCSG(m,
-                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes), arguments.timeout,
+                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge), arguments.timeout,
                 export=f"figures/CAD_{arguments.maxShapes}_shapes.png")
