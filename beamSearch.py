@@ -14,7 +14,7 @@ class BeamSearch(ExitSolver):
 
         objectEncodings = ScopeEncoding(self.model)
 
-        B = 5
+        B = 20
 
         class Particle():
             def __init__(self, graph, ll, trajectory, finished=False):
@@ -31,7 +31,9 @@ class BeamSearch(ExitSolver):
         while any( not p.finished for p in population ):
             children = []
             for p in population:
-                if p.finished: continue
+                if p.finished:
+                    children.append(p)
+                    continue
                 
                 for o, l in self.model.beamNextLine(spec, specEncoding, p.graph, objectEncodings, B):
                     if o is None:

@@ -310,6 +310,10 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             if (s.execute()*o.execute()).sum() > 0.5: continue
             s = Union(s,o)
         numberOfShapes += 1
+    if numberOfShapes != desiredShapes:
+        return randomScene(resolution=resolution,
+                           maxShapes=maxShapes, minShapes=minShapes, nudge=nudge,
+verbose=verbose, export=export)
     if verbose:
         print(s)
         print(ProgramGraph.fromRoot(s, oneParent=True).prettyPrint())
@@ -356,9 +360,10 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 def testCSG(m, getProgram, timeout, export):
     oneParent = m.oneParent
+    print(f"One parent restriction?  {oneParent}")
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
-               SMC(m),
+               #SMC(m),
         BeamSearch(m),
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
@@ -372,6 +377,7 @@ def testCSG(m, getProgram, timeout, export):
         print()
         for n, solver in enumerate(solvers):
             print(f"Running solver {solver}")
+            solver.maximumLength = len(ProgramGraph.fromRoot(spec).nodes) + 1
             testSequence = solver.infer(spec, loss, timeout)
             testResults[n].append(testSequence)
             for result in testSequence:
@@ -381,7 +387,7 @@ def testCSG(m, getProgram, timeout, export):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=[# "MCTS","SMC", 
+                    names=["BM",
                            "FS"],
                     export=export)
 
@@ -389,10 +395,10 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
                     names=None, export=None):
     import matplotlib.pyplot as plot
 
-    def averageLoss(n, T):
+    def averageLoss(n, predicate):
         results = testResults[n] # list of list of results, one for each test case
         # Filter out results that occurred after time T
-        results = [ [r for r in rs if r.time <= T]
+        results = [ [r for r in rs if predicate(r)]
                     for rs in results ]
         losses = [ min([defaultLoss] + [r.loss for r in rs]) for rs in results ]
         return sum(losses)/len(losses)
@@ -400,14 +406,27 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
     plot.figure()
     plot.xlabel('Time')
     plot.ylabel('Average Loss')
-
+    plot.ylim(bottom=0.)
     for n in range(len(testResults)):
         xs = list(np.arange(0,timeout,0.1))
-        plot.plot(xs, [averageLoss(n,x) for x in xs],
+        plot.plot(xs, [averageLoss(n,lambda r: r.time < x) for x in xs],
                   label=names[n])
     plot.legend()
     if export:
         plot.savefig(export)
+    else:
+        plot.show()
+    plot.figure()
+    plot.xlabel('Evaluations')
+    plot.ylabel('Average Loss')
+    plot.ylim(bottom=0.)
+    for n in range(len(testResults)):
+        xs = list(range(max(r.evaluations for tr in testResults[n] for r in tr )))
+        plot.plot(xs, [averageLoss(n,lambda r: r.evaluations < x) for x in xs],
+                  label=names[n])
+    plot.legend()
+    if export:
+        plot.savefig(f"{export}_evaluations.png")
     else:
         plot.show()
         

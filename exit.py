@@ -12,8 +12,9 @@ class ExitSolver(Solver):
 
     def _report(self, program, trajectory):
         l = self.loss(program)
+        self.evaluations += 1
         if len(self.reportedSolutions) == 0 or self.reportedSolutions[-1].loss > l:
-            self.reportedSolutions.append(SearchResult(program, l, time.time() - self.startTime))
+            self.reportedSolutions.append(SearchResult(program, l, time.time() - self.startTime, self.evaluations))
             self.bestTrajectory = trajectory
 
     def sampleTrainingTrajectory(self, spec, loss, timeout):

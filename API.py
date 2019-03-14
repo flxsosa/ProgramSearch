@@ -7,8 +7,10 @@ class Solver:
 
     def _report(self, program):
         l = self.loss(program)
+        self.evaluations += 1
         if len(self.reportedSolutions) == 0 or self.reportedSolutions[-1].loss > l:
-            self.reportedSolutions.append(SearchResult(program, l, time.time() - self.startTime))            
+            self.reportedSolutions.append(SearchResult(program, l, time.time() - self.startTime,
+                                                       self.evaluations))
         
     def infer(self, spec, loss, timeout):
         """
@@ -19,6 +21,7 @@ class Solver:
         Should take no longer than timeout seconds."""
         self.reportedSolutions = []
         self.startTime = time.time()
+        self.evaluations = 0
         self.loss = lambda p: loss(spec, p)
 
         with torch.no_grad():
@@ -32,7 +35,8 @@ class Solver:
         assert False, "not implemented"
 
 class SearchResult:
-    def __init__(self, program, loss, time):
+    def __init__(self, program, loss, time, evaluations):
+        self.evaluations = evaluations
         self.program = program
         self.loss = loss
         self.time = time
