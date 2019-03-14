@@ -21,6 +21,8 @@ RESOLUTION = 32
 import torch
 import torch.nn as nn
 
+class BadCSG(Exception): pass
+
 class CSG(Program):
     lexicon = ['+','-','t','c','r'] + list(range(RESOLUTION))
 
@@ -50,6 +52,8 @@ class CSG(Program):
                 if (x,y) in self:
                     a[x,y] = 1
         return a
+
+    def removeDeadCode(self): return self
 
 # The type of CSG's
 tCSG = BaseType(CSG)
@@ -179,6 +183,20 @@ class Union(CSG):
     def __contains__(self, p):
         return any( p in e for e in self.elements )
 
+    def removeDeadCode(self):
+        a = self.elements[0].removeDeadCode()
+        b = self.elements[1].removeDeadCode()
+
+        self = Union(a,b)
+
+        me = self.render()
+        l = a.render()
+        r = b.render()
+        if np.all(me == l): return a
+        if np.all(me == r): return b
+        return self
+        
+
 class Difference(CSG):
     token = '-'
     type = arrow(tCSG, tCSG, tCSG)
@@ -206,6 +224,20 @@ class Difference(CSG):
     
     def __contains__(self, p):
         return p in self.a and (not (p in self.b))
+
+    def removeDeadCode(self):
+        a = self.a.removeDeadCode()
+        b = self.b.removeDeadCode()
+
+        self = Difference(a,b)
+
+        me = self.render()
+        l = a.render()
+        r = b.render()
+        if np.all(l < r): raise BadCSG()
+        if np.all(me == l): return a
+        if np.all(me == r): return b
+        return self
 
 class Repeat(CSG):
     token = 'repeat'
@@ -272,11 +304,17 @@ class SpecEncoder(CNN):
                                           inputImageDimension=RESOLUTION)
 
 
+
+    
 """Training"""
-def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None, nudge=False):
-    def maybeNudge(t):
-        if nudge: return t.toNudge()
-        return t
+def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None, nudge=False, disjointUnion=True):
+    def translation(x,y,child):
+        if not nudge: return Translation(x,y,child)
+        for _ in range(x):
+            child = Translation(1,0,child)
+        for _ in range(y):
+            child = Translation(0,1,child)
+        return child
     dc = 8 # number of distinct coordinates
     def quadrilateral():
         while True:
@@ -287,8 +325,8 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             x = random.choice(choices)
             y = random.choice(choices)
             if x + w < resolution and y + h < resolution:
-                return maybeNudge(Translation(x,y,
-                                              Rectangle(w,h)))
+                return translation(x,y,
+                                   Rectangle(w,h))
 
     def circular():
         while True:
@@ -298,22 +336,40 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             x = random.choice(choices)
             y = random.choice(choices)
             if x - r >= 0 and x + r < resolution and y - r >= 0 and y + r < resolution:
-                return maybeNudge(Translation(x,y,
-                                              Circle(r)))
-    s = None
-    numberOfShapes = 0
-    desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
-    for _ in range(desiredShapes):
-        o = quadrilateral() if random.choice([True,False]) else circular()
-        if s is None: s = o
-        else:
-            if (s.execute()*o.execute()).sum() > 0.5: continue
-            s = Union(s,o)
-        numberOfShapes += 1
-    if numberOfShapes != desiredShapes:
-        return randomScene(resolution=resolution,
-                           maxShapes=maxShapes, minShapes=minShapes, nudge=nudge,
-verbose=verbose, export=export)
+                return translation(x,y,
+                                   Circle(r))
+    while True:
+        s = None
+        numberOfShapes = 0
+        desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
+        for _ in range(desiredShapes):
+            o = quadrilateral() if random.choice([True,False]) else circular()
+            if s is None:
+                s = o
+            else:
+                if disjointUnion:
+                    if (o.render()*s.render()).sum() > 0.5: continue
+                    s = Union(s,o)
+                    continue
+                
+                if random.choice([True,False]):
+                    new = Union(s,o)
+                elif random.choice([True,False]):
+                    new = Difference(s,o)
+                else:
+                    new = Difference(o,s)
+                # Change at least ten percent of the pixels
+                oldOn = s.render().sum()
+                newOn = new.render().sum()
+                if abs(oldOn - newOn)/oldOn < 0.1:
+                    continue
+                s = new
+        try:
+            s = s.removeDeadCode()
+            break
+        except BadCSG:
+            continue
+    
     if verbose:
         print(s)
         print(ProgramGraph.fromRoot(s, oneParent=True).prettyPrint())
