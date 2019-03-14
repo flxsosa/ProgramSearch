@@ -24,7 +24,7 @@ import torch.nn as nn
 class BadCSG(Exception): pass
 
 class CSG(Program):
-    lexicon = ['+','-','t','c','r'] + list(range(RESOLUTION))
+    lexicon = ['+','-','t','c','r','tr','tc'] + list(range(RESOLUTION))
 
     def __init__(self):
         self._rendering = None
@@ -87,6 +87,39 @@ class Rectangle(CSG):
         return p[0] >= 0 and p[1] >= 0 and \
             p[0] < self.w and p[1] < self.h
 
+class TRectangle(CSG):
+    token = 'tr'
+    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 tCSG)
+    
+    def __init__(self, x0, y0, x1, y1):
+        super(TRectangle, self).__init__()
+        self.x0 = x0
+        self.y0 = y0
+        self.x1 = x1
+        self.y1 = y1
+
+    def toTrace(self): return [self]
+
+    def __str__(self):
+        return f"(tr {self.x0} {self.y0} {self.x1} {self.y1})"
+
+    def children(self): return []
+
+    def __eq__(self, o):
+        return isinstance(o, TRectangle) and self.serialize() == o.serialize()
+
+    def __hash__(self):
+        return hash(self.serialize())
+
+    def serialize(self):
+        return (self.__class__.token, self.x0, self.y0, self.x1, self.y1)
+
+    def __contains__(self, p):
+        return p[0] >= self.x0 and p[1] >= self.y0 and \
+            p[0] < self.x1 and p[1] < self.y1
+
 class Circle(CSG):
     token = 'c'
     type = arrow(integer(0, RESOLUTION - 1), tCSG)
@@ -112,6 +145,37 @@ class Circle(CSG):
 
     def __contains__(self, p):
         return p[0]*p[0] + p[1]*p[1] <= self.r*self.r
+
+class TCircle(CSG):
+    token = 'tc'
+    type = arrow(integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1),
+                 tCSG)
+    
+    def __init__(self, x,y,r):
+        super(TCircle, self).__init__()
+        self.r = r
+        self.x = x
+        self.y = y
+
+    def toTrace(self): return [self]
+        
+    def __str__(self):
+        return f"(tc ({self.x}, {self.y}) {self.r})"
+
+    def children(self): return []
+
+    def __eq__(self, o):
+        return isinstance(o, TCircle) and self.serialize() == o.serialize()
+    def __hash__(self):
+        return hash(self.serialize())
+
+    def serialize(self):
+        return (self.__class__.token, self.x,self.y,self.r)
+
+    def __contains__(self, p):
+        return (p[0]-self.x)*(p[0]-self.x) + (p[1] - self.y)*(p[1] - self.y) <= self.r*self.r
 
 class Translation(CSG):
     token = 't'
@@ -274,7 +338,7 @@ class Repeat(CSG):
                  p[1] - self.dy)
         return False
 
-dsl = DSL([Rectangle, Circle, Translation, Union, Difference, Repeat],
+dsl = DSL([Rectangle, Circle, Translation, Union, Difference, Repeat, TRectangle, TCircle],
           lexicon=CSG.lexicon)
 
 """Neural networks"""
@@ -307,7 +371,8 @@ class SpecEncoder(CNN):
 
     
 """Training"""
-def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None, nudge=False, disjointUnion=True):
+def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None,
+                nudge=False, disjointUnion=True, translate=True):
     def translation(x,y,child):
         if not nudge: return Translation(x,y,child)
         for _ in range(x):
@@ -316,10 +381,18 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             child = Translation(0,1,child)
         return child
     dc = 8 # number of distinct coordinates
+    choices = [c
+               for c in range(resolution//(dc*2), resolution, resolution//dc) ]
     def quadrilateral():
+        if not translate:
+            x0 = random.choice(choices[:-1])
+            y0 = random.choice(choices[:-1])
+            x1 = random.choice([x for x in choices if x > x0 ])
+            y1 = random.choice([y for y in choices if y > y0 ])
+            return TRectangle(x0,y0,x1,y1)
+            
         while True:
-            choices = [c
-                       for c in range(resolution//(dc*2), resolution, resolution//dc) ]
+            
             w = random.choice(range(2, resolution, resolution//dc))
             h = random.choice(range(2, resolution, resolution//dc))
             x = random.choice(choices)
@@ -329,6 +402,14 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                                    Rectangle(w,h))
 
     def circular():
+        choices = [c
+                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
+
+        if not translate:
+            r = random.choice(range(2,10,2))
+            x = random.choice([x for x in choices if x - r > 0 and x + r < resolution ])
+            y = random.choice([y for y in choices if y - r > 0 and y + r < resolution ])
+            return TCircle(x,y,r)
         while True:
             r = random.choice(range(2,10,2))
             choices = [c
@@ -510,15 +591,19 @@ if __name__ == "__main__":
                         help="Test time maximum timeout")
     parser.add_argument("--nudge", default=False, action='store_true')
     parser.add_argument("--oneParent", default=False, action='store_true')
+    parser.add_argument("--noTranslate", default=False, action='store_true')
+    
     arguments = parser.parse_args()
+    arguments.translate = not arguments.noTranslate
 
     if arguments.mode == "demo":
         startTime = time.time()
         for _ in range(100):
-            randomScene(maxShapes=arguments.maxShapes).execute()
+            randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate).execute()
         print(f"{100/(time.time() - startTime)} renders/second")
         for n in range(100):
-            randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes)
+            randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes,
+                        nudge=arguments.nudge, translate=arguments.translate)
         import sys
         sys.exit(0)
         
@@ -530,7 +615,8 @@ if __name__ == "__main__":
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)
-        trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge),
+        trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
+                                        translate=arguments.translate),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "exit":
@@ -538,7 +624,8 @@ if __name__ == "__main__":
             m = pickle.load(handle)
         searchAlgorithm = BeamSearch(m, maximumLength=arguments.maxShapes*3 + 1)
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
-        searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge),
+        searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
+                                                  translate=arguments.translate),
                               loss=loss,
                               policyOracle=lambda spec: spec.toTrace(),
                               timeout=1,
@@ -547,5 +634,5 @@ if __name__ == "__main__":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
         testCSG(m,
-                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge), arguments.timeout,
+                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate), arguments.timeout,
                 export=f"figures/CAD_{arguments.maxShapes}_shapes.png")
