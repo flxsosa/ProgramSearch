@@ -55,6 +55,13 @@ class CSG(Program):
 
     def removeDeadCode(self): return self
 
+    def show(self):
+        """Open up a new window and show the CSG"""
+        import matplotlib.pyplot as plot
+        plot.imshow(self.execute())
+        plot.show()
+        
+                
 # The type of CSG's
 tCSG = BaseType(CSG)
 
@@ -373,6 +380,8 @@ class SpecEncoder(CNN):
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None,
                 nudge=False, disjointUnion=True, translate=True):
+    import matplotlib.pyplot as plot
+    
     def translation(x,y,child):
         if not nudge: return Translation(x,y,child)
         for _ in range(x):
@@ -435,18 +444,21 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                 
                 if random.choice([True,False]):
                     new = Union(s,o)
-                elif random.choice([True,False]):
+                elif True or random.choice([True,False]):
                     new = Difference(s,o)
                 else:
                     new = Difference(o,s)
                 # Change at least ten percent of the pixels
                 oldOn = s.render().sum()
                 newOn = new.render().sum()
-                if abs(oldOn - newOn)/oldOn < 0.1:
+                pc = abs(oldOn - newOn)/oldOn
+                if pc > 0.1:
                     continue
                 s = new
         try:
-            s = s.removeDeadCode()
+            finalScene = s.removeDeadCode()
+            assert np.all(finalScene.render() == s.render())
+            s = finalScene
             break
         except BadCSG:
             continue
@@ -454,11 +466,8 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     if verbose:
         print(s)
         print(ProgramGraph.fromRoot(s, oneParent=True).prettyPrint())
-        import matplotlib.pyplot as plot
-        plot.imshow(s.execute())
-        plot.show()
+        s.show()
     if export:
-        import matplotlib.pyplot as plot
         plot.imshow(s.execute())
         plot.savefig(export)
     
@@ -592,18 +601,21 @@ if __name__ == "__main__":
     parser.add_argument("--nudge", default=False, action='store_true')
     parser.add_argument("--oneParent", default=False, action='store_true')
     parser.add_argument("--noTranslate", default=False, action='store_true')
+    parser.add_argument("--disjointUnion", default=False, action='store_true')
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
 
     if arguments.mode == "demo":
         startTime = time.time()
-        for _ in range(100):
-            randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate).execute()
-        print(f"{100/(time.time() - startTime)} renders/second")
+        ns = 50
+        for _ in range(ns):
+            randomScene(maxShapes=arguments.maxShapes, disjointUnion=arguments.disjointUnion, nudge=arguments.nudge, translate=arguments.translate).execute()
+        print(f"{ns/(time.time() - startTime)} (renders + samples)/second")
         for n in range(100):
             randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes,
-                        nudge=arguments.nudge, translate=arguments.translate)
+                        nudge=arguments.nudge, disjointUnion=arguments.disjointUnion, 
+                        translate=arguments.translate)
         import sys
         sys.exit(0)
         
@@ -616,6 +628,7 @@ if __name__ == "__main__":
                                   heads=arguments.heads,
                                   H=arguments.hidden)
         trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
+                                        disjointUnion=arguments.disjointUnion,
                                         translate=arguments.translate),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
@@ -625,6 +638,7 @@ if __name__ == "__main__":
         searchAlgorithm = BeamSearch(m, maximumLength=arguments.maxShapes*3 + 1)
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
         searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
+                                                  disjointUnion=arguments.disjointUnion,
                                                   translate=arguments.translate),
                               loss=loss,
                               policyOracle=lambda spec: spec.toTrace(),
@@ -634,5 +648,5 @@ if __name__ == "__main__":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
         testCSG(m,
-                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate), arguments.timeout,
+                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate, disjointUnion=arguments.disjointUnion), arguments.timeout,
                 export=f"figures/CAD_{arguments.maxShapes}_shapes.png")
