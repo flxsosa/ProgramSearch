@@ -29,6 +29,10 @@ class CSG(Program):
     def __init__(self):
         self._rendering = None
 
+    def clearRendering(self):
+        self._rendering = None
+        for c in self.children(): c.clearRendering()
+
     def __repr__(self):
         return str(self)
 
@@ -52,6 +56,16 @@ class CSG(Program):
                 if (x,y) in self:
                     a[x,y] = 1
         return a
+
+    def highresolution(self, hr):
+        assert hr > RESOLUTION
+        a = np.zeros((hr,hr))
+        for x in range(hr):
+            for y in range(hr):
+                if (RESOLUTION*x/hr, RESOLUTION*y/hr) in self:
+                    a[x,y] = 1
+        return a
+                
 
     def removeDeadCode(self): return self
 
@@ -389,7 +403,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
         for _ in range(y):
             child = Translation(0,1,child)
         return child
-    dc = 8 # number of distinct coordinates
+    dc = 16 # number of distinct coordinates
     choices = [c
                for c in range(resolution//(dc*2), resolution, resolution//dc) ]
     def quadrilateral():
@@ -452,7 +466,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                 oldOn = s.render().sum()
                 newOn = new.render().sum()
                 pc = abs(oldOn - newOn)/oldOn
-                if pc > 0.1:
+                if pc < 0.1 or pc > 0.6:
                     continue
                 s = new
         try:
@@ -470,6 +484,8 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     if export:
         plot.imshow(s.execute())
         plot.savefig(export)
+        plot.imshow(s.highresolution(256))
+        plot.savefig(f"{export}_hr.png")
     
     return s
 
@@ -578,13 +594,79 @@ def plotTestResults(testResults, timeout, defaultLoss=None,
         
         
     
-        
+def makeTrainingData():
+    import os
+    import matplotlib.pyplot as plot
+    
+    data = {} # Map from image to (size, {programs})
+    lastUpdate = time.time()
+    n_samples = 0
+    maximumSize = 0
+    startTime = time.time()
+    while time.time() < startTime + 3600*5:
+        n_samples += 1
+        program = randomScene(maxShapes=20, minShapes=5, disjointUnion=False, translate=False)
+        size = len(program.toTrace())
+        im = program.render()
+        im = tuple( im[x,y] > 0.5
+                    for x in range(RESOLUTION)
+                    for y in range(RESOLUTION) )
+        program.clearRendering()
+        if im in data:
+            oldSize, oldPrograms = data[im]
+            if oldSize < size:
+                pass
+            elif oldSize == size:
+                data[im] = (size, {program}|oldPrograms)
+            elif oldSize > size:
+                data[im] = (size, {program})
+            else:
+                assert False
+        else:
+            data[im] = (size, {program})
+            maximumSize = max(maximumSize,size)
+
+        if time.time() > lastUpdate + 10:
+            print(f"After {n_samples} samples; {n_samples/(time.time() - startTime)} samples per second")
+            for sz in range(maximumSize):
+                n = sum(size == sz
+                        for (size,_) in data.values() )
+                print(f"{n} images w/ programs of size {sz}")
+            print()
+            lastUpdate = time.time()
+
+    with open('CSG_data.p','wb') as handle:
+        pickle.dump(data, handle)
+
+    return 
+            
+    os.system("rm  -fr /tmp/CSG_data")
+    os.system("mkdir /tmp/CSG_data")
+    for sz in range(maximumSize):
+        n = sum(size == sz
+                for (size,_) in data.values() )
+        print(f"{n} images w/ programs of size {sz}")
+        if n == 0: continue
+        os.system(f"mkdir /tmp/CSG_data/{sz}")
+        fn = 0
+        for i,(n,ps) in data.items():
+            if n != sz: continue
+            
+            p = next(iter(ps))
+            fn += 1
+            plot.imshow(p.highresolution(256))
+            plot.savefig(f"/tmp/CSG_data/{sz}/{fn}.png")
+        print("Exported a bunch of images!!")
+            
+            
+    
+                    
     
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
-    parser.add_argument("mode", choices=["imitation","exit","test","demo"])
+    parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData"])
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
@@ -610,10 +692,11 @@ if __name__ == "__main__":
         startTime = time.time()
         ns = 50
         for _ in range(ns):
-            randomScene(maxShapes=arguments.maxShapes, disjointUnion=arguments.disjointUnion, nudge=arguments.nudge, translate=arguments.translate).execute()
+            randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, disjointUnion=arguments.disjointUnion, nudge=arguments.nudge, translate=arguments.translate).execute()
         print(f"{ns/(time.time() - startTime)} (renders + samples)/second")
         for n in range(100):
             randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes,
+                        minShapes=arguments.maxShapes,
                         nudge=arguments.nudge, disjointUnion=arguments.disjointUnion, 
                         translate=arguments.translate)
         import sys
@@ -632,6 +715,8 @@ if __name__ == "__main__":
                                         translate=arguments.translate),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
+    elif arguments.mode == "makeData":
+        makeTrainingData()
     elif arguments.mode == "exit":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
