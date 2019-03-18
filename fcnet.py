@@ -60,6 +60,11 @@ class FCNet(nn.Module):
     def load(self, loc):
         self.load_state_dict(torch.load(loc))
 
+def exp_normalize(x):
+    b = x.max()
+    y = np.exp(x - b)
+    return y / y.sum()
+
 class Agent:
     def __init__(self, input_dim, actions):
         self.actions = actions
@@ -74,8 +79,9 @@ class Agent:
         state_torch = to_torch(np.array([state]), "float")
         
         action_logprob = self.nn(state_torch).detach().cpu().numpy()[0]
-        best_action_idx = np.argmax(action_logprob) 
-        return self.actions[best_action_idx]
+        action_prob = exp_normalize(action_logprob)
+        best_action = np.random.choice(self.actions, p=action_prob)
+        return best_action
 
     # not a symbolic state here
     # actions are 2, 3 instead of 0,1 index here

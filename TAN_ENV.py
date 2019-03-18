@@ -23,6 +23,21 @@ class TAN_ENV:
         self.scratch = None
         self.pieces = []
 
+    def clone_state(self):
+        return self.tan,
+               self.spec
+               self.cur_prog
+               self.pieces
+               self.scratch
+
+    def load_state(self, cloned_state):
+        tan, spec, cur_prog, pieces, scratch = cloned_state
+        self.tan = tan
+        self.spec = spec
+        self.cur_prog = cur_prog
+        self.pieces = pieces
+        self.scratch = scratch
+
     def render(self):
 
         committed = BLANK if self.cur_prog is None else self.cur_prog.to_np()
@@ -154,7 +169,7 @@ def get_supervision(env, max_iter = 50):
         cur_state = next_state
     return trace
 
-def train_dagger(env, student):
+def train_dagger(env, student, max_iter):
     init_state = env.reset()
     s_a_agg = []
     batch_size = 10
@@ -162,7 +177,7 @@ def train_dagger(env, student):
     for i in range(1000000):
 
         # learning
-        trace = get_rollout(env, student, max_iter = 20)
+        trace = get_rollout(env, student, max_iter)
         state_sample = [x[0] for x in trace]
         action_sample = [x[2] for x in trace]
         s_a_agg += list(zip(state_sample, action_sample))
@@ -175,7 +190,7 @@ def train_dagger(env, student):
             print ([x[1] for x in trace])
 
         if len(s_a_agg) > batch_size:
-            for i in range(2):
+            for i in range(len(s_a_agg) // batch_size // 10):
                 sub_sample = random.sample(s_a_agg, batch_size)
                 sub_states, sub_actions = [x[0] for x in sub_sample], [x[1] for x in sub_sample]
                 student.learn_supervised(sub_states, sub_actions)
@@ -209,6 +224,20 @@ def train_supervised(env, student, max_iter):
 
             student.save("tan1.mdl")
 
+def beam_search(goal_spec, student, max_iter, beam_width):
+    env = TAN_ENV()
+    env.reset()
+    tan, spec, cur_prog, pieces, scratch = env.clone_state()
+    spec = goal_spec
+
+    init_state = [tan, spec, cur_prog, pieces, scratch]
+
+    beam = [init_state for _ in range(beam_width)]
+
+    for i in range(max_iter):
+        pass
+
+
 # =================== something ===================
 def test_env():
     tenv = TAN_ENV()
@@ -232,11 +261,11 @@ def test_ro():
     trace = get_rollout(env, agent, max_iter = 50)
     print (trace)
 
-def train_supervised():
+def run_train_supervised():
     from fcnet import Agent, MEMAgent
     env = TAN_ENV()
     agent = Agent(18*RESOLUTION*RESOLUTION, ACTIONS)
-    train_supervised(env, agent, RESOLUTION*2*4)
+    train_supervised(env, agent, RESOLUTION*2*5)
 
 def test_supervised():
     from fcnet import Agent, MEMAgent
@@ -244,21 +273,21 @@ def test_supervised():
     agent = Agent(18*RESOLUTION*RESOLUTION, ACTIONS)
     agent.load("tan.mdl")
     for i in range(10):
-        ro = get_rollout(env, agent, RESOLUTION*2*4)
+        ro = get_rollout(env, agent, RESOLUTION*2*5)
         env.render_pix()
         print ("sequence . . . ")
         print ([x[1] for x in ro])
         input("yo")
 
-
-def test_dagger():
+def run_train_dagger():
     from fcnet import Agent, MEMAgent
     env = TAN_ENV()
     agent = Agent(18*RESOLUTION*RESOLUTION, ACTIONS)
-    train_dagger(env, agent)
+    train_dagger(env, agent, RESOLUTION*2*5)
 
 if __name__ == '__main__':
     # test_env()
     # test_ro()
-    test_supervised()
+    # test_supervised()
+    run_train_dagger()
 
