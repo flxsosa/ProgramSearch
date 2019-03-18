@@ -644,9 +644,9 @@ def getTrainingData(path):
     
     with open(path,'rb') as handle:
         data = pickle.load(handle)
-    print("Loaded {len(data)} images from {path}")
-    print("Contains {sum(len(ps) for _,ps in data.values() )}")
-    data = list(data.values())
+    print(f"Loaded {len(data)} images from {path}")
+    print(f"Contains {sum(len(ps) for _,ps in data.values() )}")
+    data = [list(ps) for _,ps in data.values()]
 
     def getData():
         size, programs = random.choice(data)
