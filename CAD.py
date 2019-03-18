@@ -649,7 +649,7 @@ def getTrainingData(path):
     data = [list(ps) for _,ps in data.values()]
 
     def getData():
-        size, programs = random.choice(data)
+        programs = random.choice(data)
         # make a deep copy because we are caching the renders, and we want these to be garbage collected
         return copy.deepcopy(random.choice(programs))
 
