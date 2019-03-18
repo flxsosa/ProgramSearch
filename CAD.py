@@ -510,15 +510,15 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
         for l in ls:
             totalLosses.append(sum(l))
             movedLosses.append(sum(l)/len(l))
-
-        if iteration%reportingFrequency == 0:
+        iteration += 1
+        if iteration%reportingFrequency == 1:
             print(f"\n\nAfter {iteration*B} training examples...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n{iteration*B/(time.time() - startTime)} examples/sec\n{iteration/(time.time() - startTime)} grad steps/sec")
             totalLosses = []
             movedLosses = []
             with open(checkpoint,"wb") as handle:
                 pickle.dump(m, handle)
 
-        iteration += 1
+
 
 def testCSG(m, getProgram, timeout, export):
     oneParent = m.oneParent
