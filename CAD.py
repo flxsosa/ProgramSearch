@@ -439,6 +439,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
     B = 32
 
     if os.path.exists(checkpoint):
+        print("Found checkpoint - going to do a demo, and then resume training")
         with open(checkpoint,'rb') as handle:
             hm = pickle.load(handle)
         with torch.no_grad():
@@ -458,9 +459,8 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
             for j in range(3):
                 saveMatrixAsImage(t[:,:,j], f"data/hm/{b}_{j}_target.png")
                 saveMatrixAsImage(predictions[b,j,:,:], f"data/hm/{b}_{j}_prediction.png")
-            
-        
-    hm = HeatMap()
+    else:        
+        hm = HeatMap()
     startTime = time.time()
     optimizer = torch.optim.Adam(hm.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     i = 0
