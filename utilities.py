@@ -59,3 +59,9 @@ class PQ(object):
             yield self.index2value[v]
 
     def __len__(self): return len(self.h)
+
+def saveMatrixAsImage(m, fn):
+    import matplotlib.pyplot as plot
+
+    plot.imshow(m)
+    plot.savefig(fn)

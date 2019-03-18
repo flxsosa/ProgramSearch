@@ -1,3 +1,4 @@
+import os
 import pickle
 import numpy as np
 
@@ -433,11 +434,33 @@ class HeatMap(Module):
         return self.model(x)
 
 
-def learnHeatMap():
+def learnHeatMap(checkpoint='checkpoints/hm.p'):
     data = getTrainingData('CSG_data.p')
-    hm = HeatMap()
     B = 32
 
+    if os.path.exists(checkpoint):
+        with open(checkpoint,'rb') as handle:
+            hm = pickle.load(handle)
+        with torch.no_grad():
+            ps = [data() for _ in range(B)]
+            xs = hm.device(torch.tensor(np.array([p.execute() for p in ps ])).float())
+            xs = xs.unsqueeze(1)
+            ys = hm.tensor(torch.tensor(1.*np.array([p.heatMapTarget() for p in ps])).float())
+            ys = ys.permute(*[0,3,1,2])
+            predictions = F.sigmoid(hm(xs)).cpu().numpy()
+
+        os.system("mkdir  -p data/hm/")
+
+        for b in range(B):
+            i = ps[b].execute()
+            saveMatrixAsImage(i, f"data/hm/{b}.png")
+            t = ps[b].heatMapTarget()
+            for j in range(3):
+                saveMatrixAsImage(t[:,:,j], f"data/hm/{b}_{j}_target.png")
+                saveMatrixAsImage(predictions[b,j,:,:], f"data/hm/{b}_{j}_prediction.png")
+            
+        
+    hm = HeatMap()
     startTime = time.time()
     optimizer = torch.optim.Adam(hm.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     i = 0
@@ -458,7 +481,7 @@ def learnHeatMap():
 
         if i%1000 == 1:
             print(l.data)
-            with open('checkpoints/hm.p','wb') as handle:
+            with open(checkpoint,'wb') as handle:
                 pickle.dump(hm,handle)
         
     
