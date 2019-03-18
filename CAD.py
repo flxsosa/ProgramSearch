@@ -20,6 +20,7 @@ RESOLUTION = 32
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class BadCSG(Exception): pass
 
@@ -32,6 +33,13 @@ class CSG(Program):
     def clearRendering(self):
         self._rendering = None
         for c in self.children(): c.clearRendering()
+
+    def heatMapTarget(self):
+        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
+        for c in self.children():
+            hm = np.logical_or(hm,c.heatMapTarget())
+        return hm
+
 
     def __repr__(self):
         return str(self)
@@ -90,6 +98,8 @@ class Rectangle(CSG):
 
     def toTrace(self): return [self]
 
+    def heatMapTarget(self): assert False
+
     def __str__(self):
         return f"(r {self.w} {self.h})"
 
@@ -123,6 +133,12 @@ class TRectangle(CSG):
 
     def toTrace(self): return [self]
 
+    def heatMapTarget(self):
+        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
+        hm[self.x0,self.y0,0] = True
+        hm[self.x1,self.y1,1] = True
+        return hm
+
     def __str__(self):
         return f"(tr {self.x0} {self.y0} {self.x1} {self.y1})"
 
@@ -150,6 +166,8 @@ class Circle(CSG):
         self.r = r
 
     def toTrace(self): return [self]
+
+    def heatMapTarget(self): assert False
         
     def __str__(self):
         return f"(c {self.r})"
@@ -181,6 +199,11 @@ class TCircle(CSG):
         self.y = y
 
     def toTrace(self): return [self]
+
+    def heatMapTarget(self):
+        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
+        hm[self.x,self.y,2] = 1
+        return hm
         
     def __str__(self):
         return f"(tc ({self.x}, {self.y}) {self.r})"
@@ -208,6 +231,8 @@ class Translation(CSG):
         self.child = child
 
     def toTrace(self): return self.child.toTrace() + [self]
+
+    def heatMapTarget(self): assert False
     
     def __str__(self):
         return f"(t {self.v} {self.child})"
@@ -389,6 +414,55 @@ class SpecEncoder(CNN):
                                           inputImageDimension=RESOLUTION)
 
 
+class HeatMap(Module):
+    def __init__(self):
+        super(HeatMap, self).__init__()
+
+        h = 64
+        o = 3
+        def residual():
+            return ResidualCNNBlock(h)
+        self.model = nn.Sequential(nn.Conv2d(1, h, 3, padding=1),
+                                   nn.ReLU(),
+                                   residual(), residual(), residual(), residual(),
+                                   nn.Conv2d(h, o, 3, padding=1))
+
+        self.finalize()
+
+    def forward(self, x):
+        return self.model(x)
+
+
+def learnHeatMap():
+    data = getTrainingData('CSG_data.p')
+    hm = HeatMap()
+    B = 32
+
+    startTime = time.time()
+    optimizer = torch.optim.Adam(hm.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
+    i = 0
+    while time.time() < startTime + 3600*5:
+        i += 1
+        
+        hm.zero_grad()
+        
+        ps = [data() for _ in range(B)]
+        xs = hm.device(torch.tensor(np.array([p.execute() for p in ps ])).float())
+        xs = xs.unsqueeze(1)
+        ys = hm.tensor(torch.tensor(1.*np.array([p.heatMapTarget() for p in ps])).float())
+        ys = ys.permute(*[0,3,1,2])
+        predictions = hm(xs)
+        l = F.binary_cross_entropy_with_logits(predictions,ys,reduction='sum')/B
+        l.backward()
+        optimizer.step()
+
+        if i%1000 == 1:
+            print(l.data)
+            with open('checkpoints/hm.p','wb') as handle:
+                pickle.dump(hm,handle)
+        
+    
+
 
     
 """Training"""
@@ -486,6 +560,10 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
         plot.savefig(export)
         plot.imshow(s.highresolution(256))
         plot.savefig(f"{export}_hr.png")
+        if not translate:
+            for j in range(3):
+                plot.imshow(s.heatMapTarget()[:,:,j])
+                plot.savefig(f"{export}_hm_{j}.png")
     
     return s
 
@@ -660,7 +738,7 @@ def getTrainingData(path):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
-    parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData"])
+    parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData","heatMap"])
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
@@ -707,6 +785,8 @@ if __name__ == "__main__":
         trainCSG(m, getTrainingData('CSG_data.p'),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
+    elif arguments.mode == "heatMap":
+        learnHeatMap()
     elif arguments.mode == "makeData":
         makeTrainingData()
     elif arguments.mode == "exit":
