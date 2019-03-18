@@ -638,29 +638,23 @@ def makeTrainingData():
     with open('CSG_data.p','wb') as handle:
         pickle.dump(data, handle)
 
-    return 
-            
-    os.system("rm  -fr /tmp/CSG_data")
-    os.system("mkdir /tmp/CSG_data")
-    for sz in range(maximumSize):
-        n = sum(size == sz
-                for (size,_) in data.values() )
-        print(f"{n} images w/ programs of size {sz}")
-        if n == 0: continue
-        os.system(f"mkdir /tmp/CSG_data/{sz}")
-        fn = 0
-        for i,(n,ps) in data.items():
-            if n != sz: continue
-            
-            p = next(iter(ps))
-            fn += 1
-            plot.imshow(p.highresolution(256))
-            plot.savefig(f"/tmp/CSG_data/{sz}/{fn}.png")
-        print("Exported a bunch of images!!")
-            
-            
+
+def getTrainingData(path):
+    import copy
     
-                    
+    with open(path,'rb') as handle:
+        data = pickle.load(handle)
+    print("Loaded {len(data)} images from {path}")
+    print("Contains {sum(len(ps) for _,ps in data.values() )}")
+    data = list(data.values())
+
+    def getData():
+        size, programs = random.choice(data)
+        # make a deep copy because we are caching the renders, and we want these to be garbage collected
+        return copy.deepcopy(random.choice(programs))
+
+    return getData
+        
     
 
 if __name__ == "__main__":
@@ -710,9 +704,7 @@ if __name__ == "__main__":
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)
-        trainCSG(m, lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
-                                        disjointUnion=arguments.disjointUnion,
-                                        translate=arguments.translate),
+        trainCSG(m, getTrainingData('CSG_data.p'),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "makeData":
