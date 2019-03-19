@@ -633,11 +633,14 @@ def testCSG(m, getProgram, timeout, export):
 
     testResults = [[] for _ in solvers]
 
-    for _ in range(30):
+    os.system("mkdir data/test")
+
+    for ti in range(30):
         spec = getProgram()
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
+        saveMatrixAsImage(spec.highresolution(128), f"data/test/{ti}.png")
         for n, solver in enumerate(solvers):
             print(f"Running solver {solver}")
             solver.maximumLength = len(ProgramGraph.fromRoot(spec).nodes) + 1
@@ -647,6 +650,10 @@ def testCSG(m, getProgram, timeout, export):
                 print(f"After time {result.time}, achieved loss {result.loss} w/")
                 print(result.program.prettyPrint())
                 print()
+            if len(testSequence) > 0:
+                saveMatrixAsImage(testSequence[-1].program.highresolution(128),
+                                  f"data/test/{ti}_{n}.png")
+                
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
