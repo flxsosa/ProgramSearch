@@ -651,7 +651,9 @@ def testCSG(m, getProgram, timeout, export):
                 print(result.program.prettyPrint())
                 print()
             if len(testSequence) > 0:
-                saveMatrixAsImage(testSequence[-1].program.highresolution(128),
+                bestProgram = max(testSequence[-1].program.objects(),
+                                  key=lambda bp: bp.IoU(spec))
+                saveMatrixAsImage(bestProgram.highresolution(128),
                                   f"data/test/{ti}_{n}.png")
                 
 
