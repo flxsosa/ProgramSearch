@@ -55,6 +55,12 @@ class P:
     def str_execute(self, input_str):
         return "".join(e.str_execute(input_str) for e in self.exprs)
 
+    def flatten(self):
+        buttons = []
+        for e in self.exprs:
+            buttons.extend( e.flatten() + [Commit()] )
+        return buttons
+
 class E:
     """
     an expression :D
@@ -78,6 +84,9 @@ class E:
     def str_execute(self, input_str):
         return self.ee.str_execute(input_str)
 
+    def flatten(self):
+        return self.ee.flatten()
+
 class Compose:
     """
     chain 2 things together :3
@@ -89,6 +98,9 @@ class Compose:
 
     def str_execute(self, input_str):
         return self.f1.str_execute(self.f2.str_execute(input_str))
+
+    def flatten(self):
+        return self.f2.flatten() + self.f1.flatten()
 
 class F:
     """
@@ -109,6 +121,9 @@ class F:
     def str_execute(self, input_str):
         return self.ee.str_execute(input_str)
 
+    def flatten(self):
+        return self.ee.flatten()
+
 class SubString:
     """
     take substring from position k1 to k2
@@ -128,6 +143,10 @@ class SubString:
 
     def str_execute(self, input_str):
         return input_str[self.k1:self.k2]
+
+    def flatten(self):
+        return [SubStr1(self.k1), SubStr2(self.k2)]
+
 
 class GetSpan:
     @staticmethod
@@ -159,6 +178,10 @@ class GetSpan:
         """
         return input_str[[m.end() for m in re.finditer(self.r1[0], input_str)][self.i1] if self.b1 == "End" else [m.start() for m in re.finditer(self.r1[0], input_str)][self.i1] : [m.end() for m in re.finditer(self.r2[0], input_str)][self.i2] if self.b2 == "End" else [m.start() for m in re.finditer(self.r2[0], input_str)][self.i2]]
 
+
+    def flatten(self):
+        return [ ] #todo
+
 class N:
     @staticmethod
     def generate():
@@ -187,23 +210,25 @@ class GetToken:
     def str_execute(self, input_str):
         return re.findall(self.t[0], input_str)[self.i]
 
+    def flatten(self):
+        return [ROB_BUT.GetToken(self.t.name, self.t, self.i)] 
+
 class ToCase:
+
+    candidates = [
+        lambda x : x.title(),
+        lambda x: x.upper(),
+        lambda x: x.lower(),
+        ]
     @staticmethod
     def generate():
-        candidates = [
-                lambda x : x.title(),
-                lambda x: x.upper(),
-                lambda x: x.lower(),
-                ]
-        return ToCase(random.choice(
+        return ToCase(random.choice(candidates))
     def __init__(self, s):
+        self.s = s
 
 
 class R:
-
-    @staticmethod
-    def generate_type():
-        possible_types = {
+    possible_types = {
             "Number" :   (r'\d+', pre.create('\\d+')),
             "Word" :     (r'\w+', pre.create('\\w+')),
             "Alphanum" : (r'\w', pre.create('\\w')),
@@ -213,19 +238,26 @@ class R:
             "Digit" :    (r'\d', pre.create('\\d')),
             "Char" :     (r'.', pre.create('.')),
             }
+
+    possible_delims = {}
+            for i in _DELIMITER:
+                j = i
+                if j in ['(', ')', '.']: 
+                    j = re.escape(j)
+                     possible_delims[i] = (re.escape(i), pre.create(j))
+
+    possible_r = {**possible_types, **possible_delims}
+
+    @staticmethod
+    def generate_type():
         type_choice = random.choice(list(possible_types.keys()))
-        return R(possible_types[type_choice])
+        return R(type_choice, possible_types[type_choice])
 
     @staticmethod
     def generate_delim():
-        possible_delims = {}
-        for i in _DELIMITER:
-            j = i
-            if j in ['(', ')', '.']: 
-                j = re.escape(j)
-            possible_delims[i] = (re.escape(i), pre.create(j))
+        
         delim_choice = random.choice(list(possible_delims.keys()))
-        return R(possible_delims[delim_choice])
+        return R(delim_choice, possible_delims[delim_choice])
 
 
     @staticmethod
@@ -235,7 +267,8 @@ class R:
         else:
             return R.generate_delim()
 
-    def __init__(self, regex):
+    def __init__(self, name, regex):
+        self.name = name
         self.ree, self.pre = regex
 
     def __getitem__(self, key):
@@ -246,7 +279,7 @@ class R:
         assert 0, "you ve gone too far"
 
     def __str__(self):
-        return str((self.ree, self.pre))
+        return str(self.name)
 
     def __repr__(self):
         return self.__str__()
