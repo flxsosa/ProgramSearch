@@ -11,6 +11,9 @@ class ForwardSample(ExitSolver):
         self.maximumLength = maximumLength
         self.model = model
 
+    @property
+    def name(self): return "fs"
+    
     def _infer(self, spec, loss, timeout):
         t0 = time.time()
         specEncoding = self.model.specEncoder(spec.execute())

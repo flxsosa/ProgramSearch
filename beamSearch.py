@@ -8,6 +8,9 @@ class BeamSearch(ExitSolver):
         self.maximumLength = maximumLength
         self.model = model
 
+    @property
+    def name(self): return "bm"
+
     def _infer(self, spec, loss, timeout):
 
         specEncoding = self.model.specEncoder(spec.execute())

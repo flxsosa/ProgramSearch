@@ -622,6 +622,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 
 def testCSG(m, getProgram, timeout, export):
+    random.seed(0)
     oneParent = m.oneParent
     print(f"One parent restriction?  {oneParent}")
     solvers = [# RandomSolver(dsl),
@@ -640,7 +641,7 @@ def testCSG(m, getProgram, timeout, export):
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
-        saveMatrixAsImage(spec.highresolution(128), f"data/test/{ti}.png")
+        saveMatrixAsImage(spec.highresolution(256), "data/test/%03d.png"%ti)
         for n, solver in enumerate(solvers):
             print(f"Running solver {solver}")
             solver.maximumLength = len(ProgramGraph.fromRoot(spec).nodes) + 1
@@ -653,8 +654,8 @@ def testCSG(m, getProgram, timeout, export):
             if len(testSequence) > 0:
                 bestProgram = max(testSequence[-1].program.objects(),
                                   key=lambda bp: bp.IoU(spec))
-                saveMatrixAsImage(bestProgram.highresolution(128),
-                                  f"data/test/{ti}_{n}.png")
+                saveMatrixAsImage(bestProgram.highresolution(256),
+                                  "data/test/%03d_%s.png"%(ti,solver.name))
                 
 
     plotTestResults(testResults, timeout,
