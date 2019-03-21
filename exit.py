@@ -5,6 +5,7 @@ https://davidbarber.github.io/blog/2017/11/07/Learning-From-Scratch-by-Thinking-
 
 import pickle
 
+from programGraph import *
 from API import *
 
 class ExitSolver(Solver):
@@ -40,14 +41,16 @@ class ExitSolver(Solver):
             for _ in range(trainingSetSize):
                 n_attempts += 1
                 spec = getSpec()
+                print(spec)
+                self.maximumLength = len(ProgramGraph.fromRoot(spec).nodes)
                 trajectory = self.sampleTrainingTrajectory(spec, loss, timeout)
 
                 print("For the spec:")
                 print(spec)
                 print("We get the training trajectory:")
                 print(trajectory)
-                if len(self.reportedSolutions) > 0 and self.reportedSolutions[-1].loss < 0.01 and \
-                   (policyOracle is None or len(policyOracle(spec)) == len(trajectory)):
+                if len(self.reportedSolutions) > 0 and self.reportedSolutions[-1].loss < 0.1:#  and \
+                   # (policyOracle is None or len(policyOracle(spec)) == len(trajectory)):
                     trainingData.append((spec, trajectory))
                     print(trajectory[-1])
                     print("SOLVED")
@@ -55,6 +58,8 @@ class ExitSolver(Solver):
                     n_successes += 1
                 else:
                     print("Did not solve! Or the solution wasn't short enough according to the oracle")
+                    if len(self.reportedSolutions) > 0:
+                        print(f"Best loss: {self.reportedSolutions[-1].loss}")
                     if policyOracle is not None:
                         print("Asking the Oracle for solution!")
                         trajectory = policyOracle(spec)

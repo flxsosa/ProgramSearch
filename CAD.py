@@ -826,9 +826,10 @@ if __name__ == "__main__":
             m = pickle.load(handle)
         searchAlgorithm = BeamSearch(m, maximumLength=arguments.maxShapes*3 + 1)
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
-        searchAlgorithm.train(lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
-                                                  disjointUnion=arguments.disjointUnion,
-                                                  translate=arguments.translate),
+        searchAlgorithm.train(getTrainingData('CSG_data.p'),
+                              # lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
+                              #                     disjointUnion=arguments.disjointUnion,
+                              #                     translate=arguments.translate),
                               loss=loss,
                               policyOracle=lambda spec: spec.toTrace(),
                               timeout=1,

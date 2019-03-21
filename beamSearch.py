@@ -17,7 +17,8 @@ class BeamSearch(ExitSolver):
         B = 20
 
         class Particle():
-            def __init__(self, graph, ll, trajectory, finished=False):
+            def __init__(self, graph, ll, trajectory, finished=False, newObject=None):
+                self.newObject = newObject
                 self.trajectory = trajectory
                 self.graph = graph
                 self.ll = ll
@@ -27,6 +28,7 @@ class BeamSearch(ExitSolver):
                 return f"Particle(ll={self.ll}, finished={self.finished}, graph=\n{self.graph.prettyPrint()}\n)"
 
         population = [Particle(ProgramGraph([]), 0., [])]
+        allObjects = set()
 
         while any( not p.finished for p in population ):
             children = []
@@ -39,17 +41,22 @@ class BeamSearch(ExitSolver):
                     if o is None:
                         children.append(Particle(p.graph, p.ll + l, p.trajectory, finished=True))
                     else:
-                        children.append(Particle(p.graph.extend(o), p.ll + l, p.trajectory + [o]))
+                        children.append(Particle(p.graph.extend(o), p.ll + l, p.trajectory + [o], newObject=o))
 
             children.sort(key=lambda p: -p.ll)
             population = children[:B]
-
+            
+            newObjects = {p.newObject for p in population
+                          if p.newObject is not None and p.newObject not in allObjects }
+            for o in newObjects: allObjects.add(o)
+            objectEncodings.registerObjects([(o,spec) for o in newObjects])
+            
             if False:
                 print("Population:")
                 for p in population:
                     print(p)
-
-            for p in children:
+                    
+            for p in population:
                 if p.finished and not p.reported:
                     self._report(p.graph, p.trajectory)
                     p.reported = True
