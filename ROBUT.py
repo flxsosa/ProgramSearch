@@ -14,7 +14,7 @@ class RobState:
     @staticmethod
     def new(inputs, outputs):
         assert len(inputs) == len(outputs)
-        committed = ["" for _ in range(N_IO)]
+        committed = ["" for _ in range(inputs)]
         scratch = [x for x in inputs]
         past_buttons = []
         return RobState(inputs, scratch, committed, outputs, past_buttons)
@@ -526,8 +526,6 @@ def test2():
             ]
     print (apply_fs(pstate, ts))
 
-    assert 0
-
     vs = [
             GetAll("Word"),
             Commit(),
@@ -556,5 +554,7 @@ def test3():
     print (apply_fs(pstate, fs))
 
 if __name__ == '__main__':
+    test1()
+    test2()
     test3()
 
