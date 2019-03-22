@@ -202,7 +202,7 @@ class GetSpan:
 class ConstStr:
     @staticmethod
     def generate():
-        c = pre.create(".+").sample()
+        c = pre.create(".").sample()
         return ConstStr(c)
 
     def __init__(self, c):
