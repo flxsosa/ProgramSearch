@@ -61,6 +61,9 @@ class P:
             buttons.extend( e.flatten() + [Commit()] )
         return buttons
 
+    def __str__(self):
+        return " | ".join( str(e) for e in self.exprs )
+
 class E:
     """
     an expression :D
@@ -80,6 +83,9 @@ class E:
     def __init__(self, ee):
         self.ee = ee
         self.constr = ee.constr
+
+    def __str__(self):
+        return str(self.ee)
 
     def str_execute(self, input_str):
         return self.ee.str_execute(input_str)
@@ -102,6 +108,10 @@ class Compose:
     def flatten(self):
         return self.f2.flatten() + self.f1.flatten()
 
+    def __str__(self):
+        return f"{str(self.f1)}( {str(self.f2)} )"
+
+
 class F:
     """
     SubString | GetSpan
@@ -112,7 +122,7 @@ class F:
         lambda: SubString.generate(),
         lambda: GetSpan.generate(),
         ]
-        return E(random.choice(ee_choices)())
+        return F(random.choice(ee_choices)())
 
     def __init__(self, ee):
         self.ee = ee
@@ -123,6 +133,9 @@ class F:
 
     def flatten(self):
         return self.ee.flatten()
+
+    def __str__(self):
+        return str(self.ee)
 
 class SubString:
     """
@@ -147,6 +160,9 @@ class SubString:
     def flatten(self):
         return [SubStr1(self.k1), SubStr2(self.k2)]
 
+    def __str__(self):
+        return "SubStr" + str((self.k1, self.k2))
+
 
 class GetSpan:
     @staticmethod
@@ -169,7 +185,7 @@ class GetSpan:
         self.constr = dic, 0
 
     def __str__(self):
-        return str((self.r1, self.i1, self.b1, self.r2, self.i2, self.b2))
+        return "GetSpan"+str((self.r1, self.i1, self.b1, self.r2, self.i2, self.b2))
 
     def str_execute(self, input_str):
         """
@@ -180,17 +196,45 @@ class GetSpan:
 
 
     def flatten(self):
-        return [ ] #todo
+        raise NotImplementedError
+
+
+class ConstStr:
+    @staticmethod
+    def generate():
+        c = pre.create(".+").sample()
+        return ConstStr(c)
+
+    def __init__(self, c):
+        self.c = c
+        self.constr = {}, 0
+
+    def str_execute(self, input_str):
+        raise NotImplementedError
+
+    def flatten(self):
+        raise NotImplementedError
+
+    def __str__(self):
+        return "ConstStr "+str((self.c))
 
 class N:
     @staticmethod
     def generate():
-        possible_nesting = {
-            1:2
-                }
+        choices = [
+            GetToken,
+            ToCase,
+            Replace,
+            GetUpTo,
+            GetFrom,
+            GetFirst,
+            GetAll ]
+        return random.choice(choices).generate()
+
+    #def __init__(self, name):
+    # TODO
 
 class GetToken:
-
     @staticmethod
     def generate():
         t = R.generate_type()
@@ -205,7 +249,7 @@ class GetToken:
         self.constr = dic, 0
 
     def __str__(self):
-        return str((self.t, self.i))
+        return "GetToken" + str((self.t, self.i))
 
     def str_execute(self, input_str):
         return re.findall(self.t[0], input_str)[self.i]
@@ -216,15 +260,146 @@ class GetToken:
 class ToCase:
 
     candidates = [
-        lambda x : x.title(),
-        lambda x: x.upper(),
-        lambda x: x.lower(),
+        ("Proper", lambda x : x.title()),
+        ("Caps", lambda x: x.upper()),
+        ("Lower", lambda x: x.lower()),
         ]
     @staticmethod
     def generate():
-        return ToCase(random.choice(candidates))
-    def __init__(self, s):
-        self.s = s
+        return ToCase(random.choice(ToCase.candidates))
+    def __init__(self, ss):
+        self.name, self.s = ss
+        dic = { R("Alphanum"): 1 }
+        self.constr = dic, 0
+        #todo
+
+    def flatten(self):
+        raise NotImplementedError
+
+    def str_execute(self, input_str):
+        raise NotImplementedError
+
+    def __str__(self):
+        return "ToCase"+self.name
+
+class Replace:
+
+    @staticmethod
+    def generate():
+        d1 = random.choice(_DELIMITER)
+        d2 = random.choice([d for d in _DELIMITER if d != d1])
+        return Replace(d1, d2)
+
+    def __init__(self, d1, d2):
+        self.d1 = d1
+        self.d2 = d2
+        dic = {R(d1): 1}
+        self.constr = dic, 0
+
+    def __str__(self):
+        return "Replace"+str((self.d1, self.d2))
+
+    def flatten(self):
+        raise NotImplementedError
+
+    def str_execute(self, input_str):
+        raise NotImplementedError
+
+class Trim:
+    pass
+
+class GetUpTo:
+    @staticmethod
+    def generate():
+        r = R.generate()
+        i = random.choice(_INDEX)
+        return GetUpTo(r, i)
+
+    def __init__(self, r, i):
+        self.r, self.i = r, i
+
+        dic = {r : 1, 
+              }
+        self.constr = dic, 0
+
+    def __str__(self):
+        return "GetUpTo" + str((self.r, self.i))
+
+    def str_execute(self, input_str):
+        raise NotImplementedError
+
+    def flatten(self):
+        raise NotImplementedError
+
+
+class GetFrom:
+    @staticmethod
+    def generate():
+        r = R.generate()
+        i = random.choice(_INDEX)
+        return GetFrom(r, i)
+
+    def __init__(self, r, i):
+        self.r, self.i = r, i
+
+        dic = {r : 1, 
+              }
+        self.constr = dic, 0
+
+    def __str__(self):
+        return "GetFrom" + str((self.r, self.i))
+
+    def str_execute(self, input_str):
+        raise NotImplementedError
+
+    def flatten(self):
+        raise NotImplementedError
+
+class GetFirst:
+    @staticmethod
+    def generate():
+        t = R.generate_type()
+        i = random.choice(_INDEX)
+        return GetFirst(t, i)
+
+    def __init__(self, t, i):
+        self.t, self.i = t, i
+
+        dic = {t : stepped_abs(i), 
+              }
+        self.constr = dic, 0
+
+    def __str__(self):
+        return "GetFirst" + str((self.t, self.i))
+
+    def str_execute(self, input_str):
+        raise NotImplementedError
+
+    def flatten(self):
+        raise NotImplementedError
+
+class GetAll:
+    @staticmethod
+    def generate():
+        t = R.generate_type()
+        i = random.choice(_INDEX)
+        return GetFrom(t, i)
+
+    def __init__(self, t, i):
+        self.t, self.i = t, i
+
+        dic = {t : 1, 
+              }
+        self.constr = dic, 0
+
+    def __str__(self):
+        return "GetAll" + str((self.t, self.i))
+
+    def str_execute(self, input_str):
+        raise NotImplementedError
+
+    def flatten(self):
+        raise NotImplementedError
 
 
 class R:
@@ -240,24 +415,24 @@ class R:
             }
 
     possible_delims = {}
-            for i in _DELIMITER:
-                j = i
-                if j in ['(', ')', '.']: 
-                    j = re.escape(j)
-                     possible_delims[i] = (re.escape(i), pre.create(j))
+    for i in _DELIMITER:
+        j = i
+        if j in ['(', ')', '.']: 
+            j = re.escape(j)
+        possible_delims[i] = (re.escape(i), pre.create(j))
 
     possible_r = {**possible_types, **possible_delims}
 
     @staticmethod
     def generate_type():
-        type_choice = random.choice(list(possible_types.keys()))
-        return R(type_choice, possible_types[type_choice])
+        type_choice = random.choice(list(R.possible_types.keys()))
+        return R(type_choice)
 
     @staticmethod
     def generate_delim():
         
-        delim_choice = random.choice(list(possible_delims.keys()))
-        return R(delim_choice, possible_delims[delim_choice])
+        delim_choice = random.choice(list(R.possible_delims.keys()))
+        return R(delim_choice)
 
 
     @staticmethod
@@ -267,8 +442,9 @@ class R:
         else:
             return R.generate_delim()
 
-    def __init__(self, name, regex):
+    def __init__(self, name):
         self.name = name
+        regex = R.possible_r[name]
         self.ree, self.pre = regex
 
     def __getitem__(self, key):
@@ -321,9 +497,9 @@ def add_constr(c1, c2=None):
     d1, m1 = c1
     d2, m2 = c2
     min_size = max(m1, m2)
-    d = defaultdict(int)
+    d = {}
     for item in set(d1.keys()) | set(d2.keys()):
-        d[item] = max(d1[item], d2[item])
+        d[item] = max(d1.get(item, 0), d2.get(item,0))
     return d, min_size
 
 def stepped_abs(x):
@@ -332,19 +508,27 @@ def stepped_abs(x):
 if __name__ == '__main__':
     print ("hi i live")
 
-    yo = GetSpan.generate()
-    print (yo)
+    # yo = GetSpan.generate()
+    # print (yo)
 
-    print (yo.constr)
-    input_str = generate_string(yo.constr)
-    print (input_str)
-    print (yo.str_execute(input_str))
+    # print (yo.constr)
+    # input_str = generate_string(yo.constr)
+    # print (input_str)
+    # print (yo.str_execute(input_str))
 
-    print ("get token ")
-    get_tk = GetToken.generate()
-    print (get_tk)
-    input_str = generate_string(get_tk.constr)
-    print (input_str)
-    print (get_tk.str_execute(input_str))
+    # print ("get token ")
+    # get_tk = GetToken.generate()
+    # print (get_tk)
+    # input_str = generate_string(get_tk.constr)
+    # print (input_str)
+    # print (get_tk.str_execute(input_str))
+    for i in range(1000):
+        prog = P.generate()
+        print(prog)
+        input_str = generate_string(prog.constr)
+        print(input_str)
+
+
+
 
 
