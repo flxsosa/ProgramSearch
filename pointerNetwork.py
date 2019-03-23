@@ -1,5 +1,6 @@
 from utilities import *
 
+import pdb
 import random
 import math
 import torch.nn as nn
@@ -136,6 +137,33 @@ class LineDecoder(Module):
 
     def logLikelihood(self, initialState, target, encodedInputs):
         return self.logLikelihood_hidden(initialState, target, encodedInputs)[0]
+
+    def batchedSample(self, initialStates, encodedInputs, numberOfInputs):
+        B = initialStates.shape[0]
+        assert encodedInputs.size(0) == B
+        assert len(numberOfInputs) == B
+        
+        sequences = [ ["STARTING"] for _ in range(B) ]
+
+        hs = initialStates
+
+        while True:
+            lastWords = [sequence[-1] for sequence in sequences]
+            latestPointers = [ encodedInputs[b,lastWord.i] if isinstance(lastWord, Pointer) else \
+                               self.device(torch.zeros(self.encoderDimensionality))
+                               for b, lastWord in enumerate(lastWords) ]
+            lastWords = ["POINTER" if isinstance(lastWord, Pointer) else lastWord
+                         for lastWord in lastWords ]
+            i = self.embedding(self.tensor([self.wordToIndex[lastWord]
+                                            for lastWord in lastWords ]))
+            i = torch.cat([i, latestPointer])
+            o,h = self.model(i.unsqueeze(0), hs.unsqueeze(0))
+            o = o.squeeze(0)
+            h = h.squeeze(0)
+
+            distribution = self.output(o)
+            pdb.set_trace()
+        
 
     def sample(self, initialState, encodedInputs):
         sequence = ["STARTING"]
@@ -418,8 +446,6 @@ class ProgramPointerNetwork(Module):
         
         self.finalize()
 
-    @property
-    def value(self): return self._distance
 
     def initialHidden(self, objectEncodings, specEncoding):
         if objectEncodings is None:
@@ -499,7 +525,7 @@ class ProgramPointerNetwork(Module):
 
     def sample(self, spec, maxMoves=None):
         specEncoding = self.specEncoder(spec.execute())
-        objectEncodings = ScopeEncoding(self) 
+        objectEncodings = ScopeEncoding(self)
 
         graph = ProgramGraph([])
 
@@ -520,6 +546,27 @@ class ProgramPointerNetwork(Module):
             if nextObject is None: return None
 
             graph = graph.extend(nextObject)
+
+    def batchedSample(self, specs, specEncodings, graphs):
+        objectsInScope = [list(graph.objects(oneParent=self.oneParent))
+                          for graph in graphs ]
+        oes = [objectEncodings.encoding(spec, objects)
+               for spec, objects in zip(specs, objectsInScope)]
+        numberOfObjects = [len(os) for os in objectsInScope]
+        maxObjects = max(numberOfObjects)
+
+        # initial hit state
+        hs = torch.stack([self.initialHidden(oe, specEncoding)
+                          for oe, specEncoding in zip(oe, specEncodings)])
+        # padding w/ zeros
+        # oes: [B,maxObjects,object dimensionality]
+        oes = torch.stack([torch.cat( (oe, self.device(torch.zeros(maxObjects - oe.size(0), oe.size(1)))))
+                           for oe in oes ])
+
+        return self.model.batchedSample(hs, oes, numberOfObjects)
+        
+        
+        assert False
 
     def repeatedlySample(self, spec, specEncoding, graph, objectEncodings, n_samples):
         """Repeatedly samples a single line of code.
