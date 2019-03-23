@@ -159,4 +159,16 @@ class integer(Type):
     def instance(self, x):
         return isinstance(x, int) and x >= self.lower and x <= self.upper
 
+class coordinate(Type):
+    def __init__(self,resolution):
+        assert type(resolution) is int
+        self.resolution = resolution
+
+    def __str__(self):
+        return f"res({self.resolution})"
     
+    @property
+    def isInteger(self): return False
+
+    def instance(self, x):
+        return isinstance(x, tuple) and len(x) == 2 and x[0] >= 0 and x < self.resolution

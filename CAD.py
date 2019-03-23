@@ -127,6 +127,8 @@ class TRectangle(CSG):
     
     def __init__(self, x0, y0, x1, y1):
         super(TRectangle, self).__init__()
+        assert x1 > x0
+        assert y1 > y0
         self.x0 = x0
         self.y0 = y0
         self.x1 = x1
@@ -157,6 +159,44 @@ class TRectangle(CSG):
     def __contains__(self, p):
         return p[0] >= self.x0 and p[1] >= self.y0 and \
             p[0] < self.x1 and p[1] < self.y1
+
+    def flipX(self):
+        return TRectangle(RESOLUTION - self.x1, self.y0,
+                          RESOLUTION - self.x0, self.y1)
+
+    def flipY(self):
+        return TRectangle(self.x0, RESOLUTION - self.y1,
+                          self.x1, RESOLUTION - self.y0)
+
+class MRectangle(CSG):
+    token = 'mr'
+    type = arrow(coordinate(RESOLUTION), coordinate(RESOLUTION), 
+                 tCSG)
+    
+    def __init__(self, p0, p1):
+        super(MRectangle, self).__init__()
+        self.p0 = p0
+        self.p1 = p1
+        
+    def toTrace(self): return [self]
+
+    def __str__(self):
+        return f"(mr {self.p0[0]} {self.p0[1]} {self.p1[0]} {self.p1[1]})"
+
+    def children(self): return []
+
+    def __eq__(self, o):
+        return isinstance(o, MRectangle) and self.serialize() == o.serialize()
+
+    def __hash__(self):
+        return hash(self.serialize())
+
+    def serialize(self):
+        return (self.__class__.token, self.p0[0], self.p0[1], self.p1[0], self.p1[1])
+
+    def __contains__(self, p):
+        return p[0] >= self.p0[0] and p[1] >= self.p0[1] and \
+            p[0] < self.p1[0] and p[1] < self.p1[1]
 
 class Circle(CSG):
     token = 'c'
@@ -221,6 +261,41 @@ class TCircle(CSG):
 
     def __contains__(self, p):
         return (p[0]-self.x)*(p[0]-self.x) + (p[1] - self.y)*(p[1] - self.y) <= self.r*self.r
+
+    def flipX(self):
+        return TCircle(RESOLUTION - self.x, self.y, self.r)
+
+    def flipY(self):
+        return TCircle(self.x, RESOLUTION - self.y, self.r)
+
+class MCircle(CSG):
+    token = 'mc'
+    type = arrow(coordinate(RESOLUTION),
+                 integer(0, RESOLUTION - 1),
+                 tCSG)
+    
+    def __init__(self, p,r):
+        super(MCircle, self).__init__()
+        self.p = p
+        self.r = r
+
+    def toTrace(self): return [self]
+
+    def __str__(self):
+        return f"(mc {self.p} {self.r})"
+
+    def children(self): return []
+
+    def __eq__(self, o):
+        return isinstance(o, MCircle) and self.serialize() == o.serialize()
+    def __hash__(self):
+        return hash(self.serialize())
+
+    def serialize(self):
+        return (self.__class__.token, self.p,self.r)
+
+    def __contains__(self, p):
+        return (p[0]-self.p[0])*(p[0]-self.p[0]) + (p[1] - self.p[1])*(p[1] - self.p[1]) <= self.r*self.r
 
 class Translation(CSG):
     token = 't'
@@ -306,6 +381,11 @@ class Union(CSG):
         if np.all(me == l): return a
         if np.all(me == r): return b
         return self
+
+    def flipX(self): return Union(self.elements[0].flipX(),
+                                  self.elements[1].flipX())
+    def flipY(self): return Union(self.elements[0].flipY(),
+                                  self.elements[1].flipY())
         
 
 class Difference(CSG):
@@ -350,6 +430,11 @@ class Difference(CSG):
         if np.all(me == r): return b
         return self
 
+    def flipY(self): return Difference(self.a.flipY(),
+                                       self.b.flipY())
+    def flipX(self): return Difference(self.a.flipX(),
+                                       self.b.flipX())
+
 class Repeat(CSG):
     token = 'repeat'
     type = arrow(tCSG,
@@ -385,7 +470,7 @@ class Repeat(CSG):
                  p[1] - self.dy)
         return False
 
-dsl = DSL([Rectangle, Circle, Translation, Union, Difference, Repeat, TRectangle, TCircle],
+dsl = DSL([Union, Difference, TRectangle, TCircle],
           lexicon=CSG.lexicon)
 
 """Neural networks"""
@@ -762,7 +847,19 @@ def getTrainingData(path):
     def getData():
         programs = random.choice(data)
         # make a deep copy because we are caching the renders, and we want these to be garbage collected
-        return copy.deepcopy(random.choice(programs))
+        p = copy.deepcopy(random.choice(programs))
+        if random.choice([True,False]):
+            # print("X flip")
+            # showMatrixAsImage(p.highresolution(128),
+            #                   p.flipX().highresolution(128))
+            p = p.flipX()
+        if random.choice([True,False]):
+            # print("Y flip")
+            # showMatrixAsImage(p.highresolution(128),
+            #                   p.flipY().highresolution(128))
+            p = p.flipY()
+            
+        return p
 
     return getData
         
@@ -787,7 +884,7 @@ if __name__ == "__main__":
                         help="Test time maximum timeout")
     parser.add_argument("--nudge", default=False, action='store_true')
     parser.add_argument("--oneParent", default=False, action='store_true')
-    parser.add_argument("--noTranslate", default=False, action='store_true')
+    parser.add_argument("--noTranslate", default=True, action='store_true')
     parser.add_argument("--disjointUnion", default=False, action='store_true')
     
     arguments = parser.parse_args()

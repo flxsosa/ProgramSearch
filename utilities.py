@@ -63,3 +63,14 @@ class PQ(object):
 def saveMatrixAsImage(m, fn):
     import scipy.misc
     scipy.misc.imsave(fn, m)
+
+def showMatrixAsImage(*m):
+    import matplotlib.pyplot as plot
+
+    n = len(m)
+    f,a = plot.subplots(n,1)
+
+    for i,_m in enumerate(m):
+        a[i].imshow(_m)
+
+    plot.show()

@@ -418,6 +418,9 @@ class ProgramPointerNetwork(Module):
         
         self.finalize()
 
+    @property
+    def value(self): return self._distance
+
     def initialHidden(self, objectEncodings, specEncoding):
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
