@@ -29,6 +29,7 @@ Overall Design Choice :
 """
 
 _INDEX = list(range(-5, 6))
+_POSITION_K = list(range(-100, 101))
 _CHARACTER = string.printable[:-4]
 _DELIMITER = "& , . ? ! @ ( ) [ ] % { } / : ; $ # \" '".split(' ')
 _BOUNDARY = ["Start", "End"]
@@ -143,7 +144,6 @@ class SubString:
     """
     @staticmethod
     def generate():
-        _POSITION_K = list(range(-100, 101))
         k1 = random.choice(_POSITION_K)
         k2 = random.choice(_POSITION_K)
         if k1 > k2:

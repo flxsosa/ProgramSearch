@@ -6,7 +6,7 @@ import string
 from string import printable
 import re
 import pregex as pre
-from ROB import R, _INDEX, _DELIMITER, _CHARACTER
+from ROB import R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
 
 N_IO = 5
 
@@ -32,6 +32,14 @@ class RobState:
 
     def __str__(self):
         return self.__repr__()
+
+    def str_to_np(self, list_of_str):
+        """
+        turn a list of string into a np representation
+        """
+        ret = np.zeros(shape = (len(list_of_str), max(_POSITION_K)))
+        return ret
+        
 
     def to_np(self):
         pass
@@ -553,8 +561,16 @@ def test3():
             ]
     print (apply_fs(pstate, fs))
 
+def test4():
+    print (ALL_BUTTS)
+    print (len(ALL_BUTTS))
+    pstate = RobState.new(["(hello)123", "(mister)123"],
+                          ["1234", "4"])
+    print(pstate.str_to_np(pstate.inputs))
+
 if __name__ == '__main__':
     test1()
     test2()
     test3()
+    test4()
 
