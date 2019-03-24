@@ -17,7 +17,7 @@ class BeamSearch(ExitSolver):
 
         objectEncodings = ScopeEncoding(self.model)
 
-        B = 20
+        B = 200
 
         class Particle():
             def __init__(self, graph, ll, trajectory, finished=False, newObject=None):

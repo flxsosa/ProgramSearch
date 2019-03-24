@@ -127,8 +127,8 @@ class TRectangle(CSG):
     
     def __init__(self, x0, y0, x1, y1):
         super(TRectangle, self).__init__()
-        assert x1 > x0
-        assert y1 > y0
+        if x1 <= x0: raise ParseFailure()
+        if y1 <= y0: raise ParseFailure()
         self.x0 = x0
         self.y0 = y0
         self.x1 = x1
@@ -713,7 +713,7 @@ def testCSG(m, getProgram, timeout, export):
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
                #SMC(m),
-        BeamSearch(m),
+#        BeamSearch(m),
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 

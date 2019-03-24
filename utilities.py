@@ -74,3 +74,5 @@ def showMatrixAsImage(*m):
         a[i].imshow(_m)
 
     plot.show()
+
+NEGATIVEINFINITY = float('-inf')
