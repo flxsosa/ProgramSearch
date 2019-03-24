@@ -14,7 +14,7 @@ class RobState:
     @staticmethod
     def new(inputs, outputs):
         assert len(inputs) == len(outputs)
-        committed = ["" for _ in range(inputs)]
+        committed = ["" for _ in range(len(inputs))]
         scratch = [x for x in inputs]
         past_buttons = []
         return RobState(inputs, scratch, committed, outputs, past_buttons)
