@@ -6,7 +6,8 @@ import string
 from string import printable
 import re
 import pregex as pre
-from ROB import R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
+# from ROB import R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
+from ROB import _POSSIBLE_TYPES, _POSSIBLE_DELIMS, _POSSIBLE_R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
 
 N_IO = 5
 
@@ -36,23 +37,56 @@ class RobState:
     def str_to_np(self, list_of_str):
         """
         turn a list of string into a np representation
+        can be made faster with a dict, i think ...
         """
         ret = np.zeros(shape = (len(list_of_str), max(_POSITION_K)))
+        for i, strr in enumerate(list_of_str):
+            for j, char in enumerate(strr):
+                ret[i][j] = _CHARACTER.index(char)
         return ret
         
 
     def to_np(self):
-        pass
+        last_butt = 0 if len(self.past_buttons) == 0 else ALL_BUTTS_TYPES.index(self.past_buttons[-1].__class__) + 1
+
+
+        if self.past_buttons == []:
+            masks = [Button.str_masks_to_np_default() for _ in range(len(self.inputs))]
+        else:
+            masks = [self.past_buttons[-1].str_masks_to_np(str1, self) for str1 in self.scratch]
+
+        return (self.str_to_np(self.inputs),
+                self.str_to_np(self.scratch),
+                self.str_to_np(self.committed),
+                self.str_to_np(self.outputs),
+                masks,
+                last_butt,
+                )
 
 # ===================== BUTTONS ======================
 
 class Button:
+
+    @staticmethod
+    def str_masks_to_np_default():
+        """
+            len(_INDEX) number of regex masks
+            and
+            1 for replace
+            1 for substring
+        """
+        np_masks = np.zeros(shape = (max(_INDEX) + 2, max(_POSITION_K)))
+        return np_masks
 
     def __repr__(self):
         return self.name
 
     def __str__(self):
         return self.__repr__()
+
+    def str_masks_to_np(self, str1, pstate):
+        return Button.str_masks_to_np_default()
+
 
 class Commit(Button):
     @staticmethod
@@ -107,6 +141,13 @@ class Replace1(Button):
         self.name = f"Replace1({d1})"
         self.d1 = d1
 
+
+    def str_masks_to_np(self, str1, pstate):
+        str_masks = Button.str_masks_to_np_default()
+        idxs = [pos for pos, char in enumerate(str1) if char == self.d1]
+        str_masks[-2][idxs] = 1
+        return str_masks
+
     def __call__(self, pstate):
         ret =  RobState(pstate.inputs,
                         pstate.scratch,
@@ -147,6 +188,13 @@ class SubStr1(Button):
         self.name = f"SubStr1({k1})"
         self.k1 = k1
 
+
+    def str_masks_to_np(self, str1, pstate):
+        str_masks = Button.str_masks_to_np_default()
+        mask_sub = str_masks[-1]
+        mask_sub[self.k1:] = 1
+        return str_masks
+
     def __call__(self, pstate):
         ret =  RobState(pstate.inputs,
                         pstate.scratch,
@@ -181,12 +229,20 @@ class GetToken1(Button):
 
     @staticmethod
     def generate_buttons():
-        return [GetToken1(name) for name in R.possible_types.keys()] 
+        return [GetToken1(name) for name in _POSSIBLE_TYPES.keys()] 
 
     def __init__(self, rname):
         self.name = f"GetToken1({rname})"
         self.rname = rname
-        self.t = R.possible_types[rname]
+        self.t = _POSSIBLE_TYPES[rname]
+
+    def str_masks_to_np(self, str1, pstate):
+        str_masks = Button.str_masks_to_np_default()
+        # enumerate over all the regex masks
+        p = list(re.finditer(self.t[0], str1))
+        for i, m in enumerate(p[:max(_INDEX)]):
+            str_masks[i][m.start():m.end()] = 1
+        return str_masks
 
     def __call__(self, pstate):
         return  RobState(pstate.inputs,
@@ -204,7 +260,12 @@ class GetToken2(Button):
     def __init__(self, i):
         self.name = f"GetToken2({i})"
         self.i = i
-        self.f = lambda x, t: re.findall(t[0], x)[i]
+        def f(x, t):
+            print (t[0])
+            allz = re.finditer(t[0], x)
+            match = list(allz)[i]
+            return x[match.start():match.end()]
+        self.f = f
 
     def __call__(self, pstate):
         # get the type from GetToken1 button
@@ -221,12 +282,12 @@ class GetUpTo(Button):
     @staticmethod
     def generate_buttons():
         return [GetUpTo(name) \
-            for name in R.possible_r.keys()] 
+            for name in _POSSIBLE_R.keys()] 
 
     def __init__(self, rname):
         self.name = f"GetUpTo({rname})"
         self.rname = rname
-        self.r = R.possible_r[rname]
+        self.r = _POSSIBLE_R[rname]
         self.f = lambda string: string[:[m.end() \
                 for m in re.finditer(self.r[0], string)][0]]
 
@@ -243,12 +304,12 @@ class GetFrom(Button):
     @staticmethod
     def generate_buttons():
         return [GetFrom(name) \
-            for name in R.possible_r.keys()] 
+            for name in _POSSIBLE_R.keys()] 
 
     def __init__(self, rname):
         self.name = f"GetFrom({rname})"
         self.rname = rname
-        self.r = R.possible_r[rname] 
+        self.r = _POSSIBLE_R[rname] 
         self.f = lambda string: string[[m.end() \
                 for m in re.finditer(self.r[0], string)][-1]:]
 
@@ -264,12 +325,20 @@ class GetFirst1(Button):
 
     @staticmethod
     def generate_buttons():
-        return [GetFirst1(name) for name in R.possible_types.keys()]
+        return [GetFirst1(name) for name in _POSSIBLE_TYPES.keys()]
 
     def __init__(self, rname):
         self.name = f"GetFirst1({rname})"
         self.rname = rname
-        self.t = R.possible_types[rname]
+        self.t = _POSSIBLE_TYPES[rname]
+
+    def str_masks_to_np(self, str1, pstate):
+        str_masks = Button.str_masks_to_np_default()
+        # enumerate over all the regex masks
+        p = list(re.finditer(self.t[0], str1))
+        for i, m in enumerate(p[:max(_INDEX)]):
+            str_masks[i][m.start():m.end()] = 1
+        return str_masks
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -287,7 +356,10 @@ class GetFirst2(Button):
     def __init__(self, i):
         self.name = f"GetFirst2({i})"
         self.i = i
-        self.f = lambda string, t: ''.join(re.findall(t[0], string)[:self.i])
+        def f(string, t):
+            xx = [string[x.start():x.end()] for x in list(re.finditer(t[0], string))]
+            return "".join(xx[:(i+1)])
+        self.f = f
 
     def __call__(self, pstate):
         t = pstate.past_buttons[-1].t
@@ -303,13 +375,16 @@ class GetAll(Button):
     @staticmethod
     def generate_buttons():
         return [GetAll(name) \
-            for name in R.possible_types.keys()] 
+            for name in _POSSIBLE_TYPES.keys()] 
 
     def __init__(self, rname):
         self.name = f"GetAll({rname})"
         self.rname = rname
-        self.r = R.possible_types[rname]
-        self.f = lambda string: ''.join(re.findall(self.r[0], string))
+        self.r = _POSSIBLE_TYPES[rname]
+        def f(string):
+            xx = [string[x.start():x.end()] for x in list(re.finditer(self.r[0], string))]
+            return "".join(xx)
+        self.f = f
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
@@ -323,12 +398,20 @@ class GetSpan1(Button):
 
     @staticmethod
     def generate_buttons():
-        return [GetSpan1(name) for name in R.possible_r.keys()]
+        return [GetSpan1(name) for name in _POSSIBLE_R.keys()]
 
     def __init__(self, rname):
         self.name = f"GetSpan1({rname})"
         self.rname = rname
-        self.r1 = R.possible_r[rname]
+        self.r1 = _POSSIBLE_R[rname]
+
+    def str_masks_to_np(self, str1, pstate):
+        str_masks = Button.str_masks_to_np_default()
+        # enumerate over all the regex masks
+        p = list(re.finditer(self.r1[0], str1))
+        for i, m in enumerate(p[:max(_INDEX)]):
+            str_masks[i][m.start():] = 1
+        return str_masks
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -346,6 +429,14 @@ class GetSpan2(Button):
     def __init__(self, i1):
         self.name = f"GetSpan2({i1})"
         self.i1 = i1
+
+    def str_masks_to_np(self, str1, pstate):
+        ret_mask = Button.str_masks_to_np_default()
+        prev_masks = pstate.past_buttons[-2].str_masks_to_np(str1, pstate)
+        # the selected mask . . . 
+        mask_sel = prev_masks[self.i1]
+        ret_mask[-1] = mask_sel
+        return ret_mask
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -375,12 +466,12 @@ class GetSpan4(Button):
 
     @staticmethod
     def generate_buttons():
-        return [GetSpan4(name) for name in R.possible_r.keys()]
+        return [GetSpan4(name) for name in _POSSIBLE_R.keys()]
 
     def __init__(self, rname):
         self.name = f"GetSpan4({rname})"
         self.rname = rname
-        self.r2 = R.possible_r[rname]
+        self.r2 = _POSSIBLE_R[rname]
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -457,25 +548,29 @@ class Const(Button):
                         pstate.outputs,
                         pstate.past_buttons + [self])
 
-ALL_BUTTS = ToCase.generate_buttons() +\
-            Replace1.generate_buttons() +\
-            Replace2.generate_buttons() +\
-            SubStr1.generate_buttons() +\
-            SubStr2.generate_buttons() +\
-            GetToken1.generate_buttons() +\
-            GetToken2.generate_buttons() +\
-            GetUpTo.generate_buttons() +\
-            GetFrom.generate_buttons() +\
-            GetFirst1.generate_buttons() +\
-            GetFirst2.generate_buttons() +\
-            GetAll.generate_buttons() +\
-            GetSpan1.generate_buttons() +\
-            GetSpan2.generate_buttons() +\
-            GetSpan3.generate_buttons() +\
-            GetSpan4.generate_buttons() +\
-            GetSpan5.generate_buttons() +\
-            GetSpan6.generate_buttons() +\
-            Const.generate_buttons()
+ALL_BUTTS_TYPES = [ToCase,
+                  Replace1,
+                  Replace2,
+                  SubStr1,
+                  SubStr2,
+                  GetToken1,
+                  GetToken2,
+                  GetUpTo,
+                  GetFrom,
+                  GetFirst1,
+                  GetFirst2,
+                  GetAll,
+                  GetSpan1,
+                  GetSpan2,
+                  GetSpan3,
+                  GetSpan4,
+                  GetSpan5,
+                  GetSpan6,
+                  Const,
+                  ]
+
+ALL_BUTTS = [butt_type.generate_buttons() for butt_type in ALL_BUTTS_TYPES]
+
 
 
 # ===================== UTILS ======================
@@ -562,15 +657,47 @@ def test3():
     print (apply_fs(pstate, fs))
 
 def test4():
-    print (ALL_BUTTS)
-    print (len(ALL_BUTTS))
-    pstate = RobState.new(["(hello)123", "(mister)123"],
-                          ["1234", "4"])
-    print(pstate.str_to_np(pstate.inputs))
+    pstate = RobState.new(["(hello)1)23", "(mis)ter)123"],
+                          ["HELLO", "MISTER"])
+    fs = [
+            SubStr1(3),
+            SubStr2(10),
+            Replace1(")"),
+         ]
+    pstate_new = apply_fs(pstate, fs)
+    _, scratch, _, _, masks, _ = pstate_new.to_np()
+    print (scratch[0])
+    print (masks[1])
+
+def test5():
+    pstate = RobState.new(["123hello123goodbye1234hola123231"],
+                          ["dontreadthis"])
+    fs = [
+            GetToken1("Word"),
+         ]
+    pstate_new = apply_fs(pstate, fs)
+    print (pstate_new)
+    _, scratch, _, _, masks, _ = pstate_new.to_np()
+    print (scratch[0])
+    print (masks[0])
+
+def test6():
+    pstate = RobState.new(["123hello123goodbye1234hola123231"],
+                          ["dontreadthis"])
+    fs = [
+            GetSpan1("Word"),
+            GetSpan2(1),
+         ]
+    pstate_new = apply_fs(pstate, fs)
+    print (pstate_new)
+    _, scratch, _, _, masks, _ = pstate_new.to_np()
+    print (scratch[0])
+    print (masks[0])
 
 if __name__ == '__main__':
-    test1()
-    test2()
-    test3()
-    test4()
-
+    #test1()
+    #test2()
+    #test3()
+    #test4()
+    #test5()
+    test6()

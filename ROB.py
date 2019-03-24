@@ -11,7 +11,6 @@ from string import printable
 import re
 import pregex as pre
 
-import ROBUT as BUTT #Hehe
 
 """
 IMPLEMENTATION OF THE LANGUAGE OF THE ROBUST FILL THING
@@ -37,6 +36,28 @@ _DELIMITER = "& , . ? ! @ ( ) [ ] % { } / : ; $ # \" '".split(' ')
 _BOUNDARY = ["Start", "End"]
 
 N_EXPRS = 6
+
+_POSSIBLE_TYPES = {
+        "Number" :   (r'[0-9]+', pre.create('\\d+')),
+        "Word" :     (r'([A-z])+', pre.create('\\w+')),
+        "Alphanum" : (r'[A-z]', pre.create('\\w')),
+        "PropCase" : (r'[A-Z][a-z]+', pre.create('\\u\\l+')),
+        "AllCaps" :  (r'[A-Z]', pre.create('\\u')),
+        "Lower" :    (r'[a-z]', pre.create('\\l')),
+        "Digit" :    (r'[0-9]', pre.create('\\d')),
+        "Char" :     (r'.', pre.create('.')),
+        }
+
+_POSSIBLE_DELIMS = {}
+for i in _DELIMITER:
+    j = i
+    if j in ['(', ')', '.']: 
+        j = re.escape(j)
+    _POSSIBLE_DELIMS[i] = (re.escape(i), pre.create(j))
+
+_POSSIBLE_R = {**_POSSIBLE_TYPES, **_POSSIBLE_DELIMS}
+
+import ROBUT as BUTT #Hehe
 
 class P:
     
@@ -405,35 +426,16 @@ class GetAll:
         return [ BUTT.GetAll(self.t.name)]
 
 class R:
-    possible_types = {
-            "Number" :   (r'\d+', pre.create('\\d+')),
-            "Word" :     (r'\w+', pre.create('\\w+')),
-            "Alphanum" : (r'\w', pre.create('\\w')),
-            "PropCase" : (r'[A-Z][a-z]+', pre.create('\\u\\l+')),
-            "AllCaps" :  (r'[A-Z]', pre.create('\\u')),
-            "Lower" :    (r'[a-z]', pre.create('\\l')),
-            "Digit" :    (r'\d', pre.create('\\d')),
-            "Char" :     (r'.', pre.create('.')),
-            }
-
-    possible_delims = {}
-    for i in _DELIMITER:
-        j = i
-        if j in ['(', ')', '.']: 
-            j = re.escape(j)
-        possible_delims[i] = (re.escape(i), pre.create(j))
-
-    possible_r = {**possible_types, **possible_delims}
 
     @staticmethod
     def generate_type():
-        type_choice = random.choice(list(R.possible_types.keys()))
+        type_choice = random.choice(list(_POSSIBLE_TYPES.keys()))
         return R(type_choice)
 
     @staticmethod
     def generate_delim():
         
-        delim_choice = random.choice(list(R.possible_delims.keys()))
+        delim_choice = random.choice(list(_POSSIBLE_DELIMS.keys()))
         return R(delim_choice)
 
 
@@ -446,7 +448,7 @@ class R:
 
     def __init__(self, name):
         self.name = name
-        regex = R.possible_r[name]
+        regex = _POSSIBLE_R[name]
         self.ree, self.pre = regex
 
     def __getitem__(self, key):
