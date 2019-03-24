@@ -11,6 +11,8 @@ from string import printable
 import re
 import pregex as pre
 
+import ROBUT as BUTT #Hehe
+
 """
 IMPLEMENTATION OF THE LANGUAGE OF THE ROBUST FILL THING
 ALSO INPUT / OUTPUT GENERATION
@@ -58,7 +60,7 @@ class P:
     def flatten(self):
         buttons = []
         for e in self.exprs:
-            buttons.extend( e.flatten() + [Commit()] )
+            buttons.extend( e.flatten() + [BUTT.Commit()] )
         return buttons
 
     def __str__(self):
@@ -158,7 +160,7 @@ class SubString:
         return input_str[self.k1:self.k2]
 
     def flatten(self):
-        return [SubStr1(self.k1), SubStr2(self.k2)]
+        return [BUTT.SubStr1(self.k1), BUTT.SubStr2(self.k2)]
 
     def __str__(self):
         return "SubStr" + str((self.k1, self.k2))
@@ -196,7 +198,8 @@ class GetSpan:
 
 
     def flatten(self):
-        raise NotImplementedError
+        return [BUTT.GetSpan1(self.r1.name), BUTT.GetSpan2(self.i1), BUTT.GetSpan3(self.b1),
+                BUTT.GetSpan4(self.r2.name), BUTT.GetSpan5(self.i2), BUTT.GetSpan6(self.b2)] 
 
 
 class ConstStr:
@@ -213,7 +216,7 @@ class ConstStr:
         raise NotImplementedError
 
     def flatten(self):
-        raise NotImplementedError
+        return [BUTT.Const(self.c)]
 
     def __str__(self):
         return "ConstStr "+str((self.c))
@@ -255,13 +258,13 @@ class GetToken:
         return re.findall(self.t[0], input_str)[self.i]
 
     def flatten(self):
-        return [ROB_BUT.GetToken(self.t.name, self.t, self.i)] 
+        return [BUTT.GetToken1(self.t.name), BUTT.GetToken2(self.i)] 
 
 class ToCase:
 
     candidates = [
         ("Proper", lambda x : x.title()),
-        ("Caps", lambda x: x.upper()),
+        ("AllCaps", lambda x: x.upper()),
         ("Lower", lambda x: x.lower()),
         ]
     @staticmethod
@@ -274,7 +277,7 @@ class ToCase:
         #todo
 
     def flatten(self):
-        raise NotImplementedError
+        return [ BUTT.ToCase(self.name) ]
 
     def str_execute(self, input_str):
         raise NotImplementedError
@@ -300,7 +303,7 @@ class Replace:
         return "Replace"+str((self.d1, self.d2))
 
     def flatten(self):
-        raise NotImplementedError
+        return [ BUTT.Replace1(self.d1), BUTT.Replace2(self.d2) ] 
 
     def str_execute(self, input_str):
         raise NotImplementedError
@@ -329,7 +332,7 @@ class GetUpTo:
         raise NotImplementedError
 
     def flatten(self):
-        raise NotImplementedError
+        return [ BUTT.GetUpTo(self.r.name) ]
 
 
 class GetFrom:
@@ -353,7 +356,7 @@ class GetFrom:
         raise NotImplementedError
 
     def flatten(self):
-        raise NotImplementedError
+        return [ BUTT.GetFrom(self.r.name)] 
 
 class GetFirst:
     @staticmethod
@@ -376,7 +379,7 @@ class GetFirst:
         raise NotImplementedError
 
     def flatten(self):
-        raise NotImplementedError
+        return [ BUTT.GetFirst1(self.t.name), BUTT.GetFirst2( self.i ) ]
 
 class GetAll:
     @staticmethod
@@ -385,22 +388,21 @@ class GetAll:
         i = random.choice(_INDEX)
         return GetFrom(t, i)
 
-    def __init__(self, t, i):
-        self.t, self.i = t, i
+    def __init__(self, t):
+        self.t = t
 
         dic = {t : 1, 
               }
         self.constr = dic, 0
 
     def __str__(self):
-        return "GetAll" + str((self.t, self.i))
+        return "GetAll" + str((self.t))
 
     def str_execute(self, input_str):
         raise NotImplementedError
 
     def flatten(self):
-        raise NotImplementedError
-
+        return [ BUTT.GetAll(self.t.name)]
 
 class R:
     possible_types = {
@@ -522,12 +524,20 @@ if __name__ == '__main__':
     # input_str = generate_string(get_tk.constr)
     # print (input_str)
     # print (get_tk.str_execute(input_str))
-    for i in range(1000):
-        prog = P.generate()
-        print(prog)
-        input_str = generate_string(prog.constr)
-        print(input_str)
+    prog = P.generate()
+    print(prog)
+    input_str = generate_string(prog.constr)
+    print(input_str)
 
+    butts = prog.flatten()
+
+
+    print(butts)
+
+    instate = BUTT.RobState.new([input_str], [""])
+    outstate = BUTT.apply_fs( instate, butts )
+
+    print("output state:", outstate)
 
 
 
