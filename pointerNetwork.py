@@ -200,7 +200,7 @@ class LineDecoder(Module):
             distribution = self.output(o).exp().cpu()
             for b,ni in enumerate(numberOfInputs):
                 if ni == 0: distribution[b,self.wordToIndex["POINTER"]] = 0
-            
+
             next_symbols = torch.multinomial(distribution, 1).cpu().numpy()[:,0]
             next_symbols = [self.lexicon[n] for n in next_symbols]
 
@@ -212,6 +212,8 @@ class LineDecoder(Module):
                 pointerAttention = None
 
             for b, next_symbol in enumerate(next_symbols):
+                if finished[b]: continue
+                
                 if next_symbol == "POINTER":
                     assert pointerAttention is not None
                     i = torch.multinomial(pointerAttention[b].exp(),1)[0].data.item()
@@ -397,39 +399,40 @@ class LineDecoder(Module):
                 else:
                     addToFrontier(State(h, best.ll + ll, best.sequence + [w]))            
                        
-class PointerNetwork(Module):
-    def __init__(self, encoder, lexicon, H=256):
-        super(PointerNetwork, self).__init__()
-        self.encoder = encoder
-        self.decoder = LineDecoder(lexicon, H=H)
+# class PointerNetwork(Module):
+#     def __init__(self, encoder, lexicon, H=256):
+#         super(PointerNetwork, self).__init__()
+#         self.encoder = encoder
+#         self.decoder = LineDecoder(lexicon, H=H)
 
-        self.finalize()
+#         self.finalize()
 
-    def gradientStep(self, optimizer, inputObjects, outputSequence,
-                     verbose=False):
-        self.zero_grad()
-        l = -self.decoder.logLikelihood(None, outputSequence,
-                                        self.encoder(inputObjects) if inputObjects else None)
-        l.backward()
-        optimizer.step()
-        if verbose:
-            print("loss",l.data.item())
+#     def gradientStep(self, optimizer, inputObjects, outputSequence,
+#                      verbose=False):
+#         self.zero_grad()
+#         l = -self.decoder.logLikelihood(None, outputSequence,
+#                                         self.encoder(inputObjects) if inputObjects else None)
+#         l.backward()
+#         optimizer.step()
+#         if verbose:
+#             print("loss",l.data.item())
 
-    def sample(self, inputObjects):
-        return [ inputObjects[s.i] if isinstance(s,Pointer) else s
-                 for s in self.decoder.sample(None,
-                                              self.encoder(inputObjects))         ]
+#     def sample(self, inputObjects):
+#         return [ inputObjects[s.i] if isinstance(s,Pointer) else s
+#                  for s in self.decoder.sample(None,
+#                                               self.encoder(inputObjects))         ]
 
-    def beam(self, inputObjects, B, maximumLength=10):
-        return [ (ll, [ inputObjects[s.i] if isinstance(s,Pointer) else s
-                        for s in sequence ])
-                 for ll, sequence in self.decoder.beam(None, self.encoder(inputObjects), B,
-                                                       maximumLength=maximumLength)]
+#     def beam(self, inputObjects, B, maximumLength=10):
+#         return [ (ll, [ inputObjects[s.i] if isinstance(s,Pointer) else s
+#                         for s in sequence ])
+#                  for ll, sequence in self.decoder.beam(None, self.encoder(inputObjects), B,
+#                                                        maximumLength=maximumLength)]
 
-    def bestFirstEnumeration(self, inputObjects):
-        for ll, sequence in self.decoder.bestFirstEnumeration(None, self.encoder(inputObjects)):
-            yield ll, [inputObjects[p.i] if isinstance(p, Pointer) else p
-                       for p in sequence] 
+#     def bestFirstEnumeration(self, inputObjects):
+#         for ll, sequence in self.decoder.bestFirstEnumeration(None, self.encoder(inputObjects)):
+#             yield ll, [inputObjects[p.i] if isinstance(p, Pointer) else p
+#                        for p in sequence]
+            
         
 class ScopeEncoding():
     """A cache of the encodings of objects in scope"""
@@ -517,7 +520,6 @@ class ProgramPointerNetwork(Module):
         return self._initialHidden(torch.cat([specEncoding, objectEncodings]))
 
     def distance(self, objectEncodings, specEncoding):
-        """Returns a 1-dimensional tensor which should be the sum of (# objects to create) + (# spurious objects created)"""
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.H))
         else:

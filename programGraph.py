@@ -55,6 +55,6 @@ class ProgramGraph:
     def extend(self, newNode):
         return ProgramGraph([newNode] + list(self.nodes))
 
-    def objects(self, oneParent=False):
+    def objects(self, oneParent=True):
         return [o for o in self.nodes
                 if not oneParent or not any( any( c is o for c in op.children() ) for op in self.nodes )]

@@ -4,6 +4,7 @@ import numpy as np
 
 from API import *
 
+from a2c import *
 from randomSolver import *
 from pointerNetwork import *
 from programGraph import *
@@ -745,8 +746,7 @@ def testCSG(m, getProgram, timeout, export):
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=["BM",
-                           "FS"],
+                    names=["FS"],
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
@@ -868,7 +868,8 @@ def getTrainingData(path):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
-    parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData","heatMap"])
+    parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData","heatMap",
+                                         "critic"])
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
@@ -915,6 +916,19 @@ if __name__ == "__main__":
         trainCSG(m, getTrainingData('CSG_data.p'),
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
+    elif arguments.mode == "critic":
+        with open("checkpoints/imitation.pickle","rb") as handle:
+            m = pickle.load(handle)
+        critic = A2C(m)
+        def R(spec, program):
+            if len(program) == 0: return False
+            for o in program.objects():
+                if o.IoU(spec) > 0.99: return True
+            return False
+        critic.train(
+            lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate, disjointUnion=arguments.disjointUnion), 
+            R)
+        
     elif arguments.mode == "heatMap":
         learnHeatMap()
     elif arguments.mode == "makeData":
