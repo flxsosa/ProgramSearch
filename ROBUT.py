@@ -466,6 +466,10 @@ class GetSpan4(Button):
         self.rname = rname
         self.r2 = _POSSIBLE_R[rname]
 
+
+    def str_masks_to_np(self, str1, pstate):
+        return get_span_mask_render(str1, pstate.past_buttons[-4:])
+
     def __call__(self, pstate):
         return RobState(pstate.inputs,
                         pstate.scratch,
@@ -482,6 +486,9 @@ class GetSpan5(Button):
     def __init__(self, i2):
         self.name = f"GetSpan5({i2})"
         self.i2 = i2
+
+    def str_masks_to_np(self, str1, pstate):
+        return get_span_mask_render(str1, pstate.past_buttons[-5:])
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -594,7 +601,7 @@ def get_span_mask_render(str1, span_btns):
         def render(past_mask):
             span1_btn = span_btns[0]
             span2_btn = span_btns[1]
-# MAX UR IN CHARGE I GO GET KOFE
+            # MAX UR IN CHARGE I GO GET KOFE
             r1 = span1_btn.r1
             i1 = span2_btn.i1
 
@@ -605,7 +612,26 @@ def get_span_mask_render(str1, span_btns):
             return past_mask
         return render
 
-    all_renders = [render_span1, render_span2, render_span3]
+    def render_span4(span4_btn):
+        def render(past_mask):
+            #str_masks = Button.str_masks_to_np_default()
+            # enumerate over all the regex masks
+            p = list(re.finditer(span4_btn.r2[0], str1))
+            for i, m in enumerate(p[:max(_INDEX)]):
+                past_mask[i][:m.end()] = 1
+            return past_mask
+        return render
+
+    def render_span5(span5_btn):
+        def render(past_mask):
+            ret_mask = Button.str_masks_to_np_default()
+            # the selected mask . . . 
+            mask_sel = past_mask[span5_btn.i2]
+            ret_mask[-1] = past_mask[-1]*mask_sel
+            return ret_mask
+        return render
+
+    all_renders = [render_span1, render_span2, render_span3, render_span4, render_span5]
     all_renders = [factory(btn) for factory, btn in zip(all_renders, span_btns)]
     
     ret = None
@@ -731,7 +757,9 @@ def test6():
     fs = [
             GetSpan1("Word"),
             GetSpan2(1),
-            GetSpan3("End")
+            GetSpan3("End"),
+            GetSpan4("Number"),
+            GetSpan5(3),
          ]
     pstate_new = apply_fs(pstate, fs)
     _, scratch, _, _, masks, _ = pstate_new.to_np()
