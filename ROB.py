@@ -490,6 +490,28 @@ def generate_string(constraint, max_string_size=100):
     if len(string) > max_string_size: return string[:max_string_size] 
     return string
 
+def generate_FIO(n_ios):
+    """
+        generate a function, inputs, outputs triple
+    """
+    prog = P.generate()
+    inputs = []
+    outputs = []
+    for _ in range(20):
+        if len(inputs) == n_ios:
+            return prog, inputs, outputs
+        try:
+            inp = generate_string(prog.constr)
+            out = BUTT.apply_fs(BUTT.RobState.new([inp], [""]), prog.flatten()).committed[0]
+            if len(out) > max(_POSITION_K):
+                continue
+            inputs.append(inp)
+            outputs.append(out)
+        except:
+            pass
+
+    print ("gneration failed retrying")
+    return generate_FIO(n_ios)
 
 
 ################################### UTILS #################################

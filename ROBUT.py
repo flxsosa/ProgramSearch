@@ -7,7 +7,7 @@ from string import printable
 import re
 import pregex as pre
 # from ROB import R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
-from ROB import _POSSIBLE_TYPES, _POSSIBLE_DELIMS, _POSSIBLE_R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
+from ROB import _POSSIBLE_TYPES, _POSSIBLE_DELIMS, _POSSIBLE_R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K, N_EXPRS
 
 N_IO = 5
 
@@ -55,6 +55,8 @@ class RobState:
         else:
             masks = [self.past_buttons[-1].str_masks_to_np(str1, self) for str1 in self.scratch]
 
+        masks = np.array(masks)
+        last_butt = np.array([last_butt])
         return (self.str_to_np(self.inputs),
                 self.str_to_np(self.scratch),
                 self.str_to_np(self.committed),
@@ -91,7 +93,7 @@ class Button:
 class Commit(Button):
     @staticmethod
     def generate_buttons():
-        return Commit()
+        return [Commit()]
 
     def __init__(self):
         self.name = f"Commit"
@@ -261,7 +263,7 @@ class GetToken2(Button):
         self.name = f"GetToken2({i})"
         self.i = i
         def f(x, t):
-            print (t[0])
+            # print (t[0])
             allz = re.finditer(t[0], x)
             match = list(allz)[i]
             return x[match.start():match.end()]
@@ -567,11 +569,64 @@ ALL_BUTTS_TYPES = [ToCase,
                   GetSpan5,
                   GetSpan6,
                   Const,
+                  Commit,
                   ]
 
-ALL_BUTTS = [butt_type.generate_buttons() for butt_type in ALL_BUTTS_TYPES]
+ALL_BUTTS = [x for butt_type in ALL_BUTTS_TYPES for x in butt_type.generate_buttons()]
 
+class ROBENV:
 
+    def __init__(self, inputs, outputs):
+        self.inputs, self.outputs = inputs, outputs
+
+    def reset(self):
+        self.pstate = RobState.new(self.inputs, self.outputs)
+        return self.pstate.to_np()
+
+    def step(self, btn_action):
+        self.pstate = btn_action(self.pstate)
+        reward = 0.0 if self.pstate.committed != self.pstate.outputs else 1.0
+        done = False if reward == 0.0 else True
+
+        n_commits = len([x for x in self.pstate.past_buttons if x.name == "Commit"])
+
+        if n_commits == N_EXPRS:
+            done = True
+        return self.pstate.to_np(), reward, done
+
+class RepeatAgent:
+
+    def __init__(self, btns):
+        self.btns = btns
+        self.idx = -1
+
+    def act(self, state):
+        self.idx += 1
+        return self.btns[self.idx]
+
+def get_rollout(env, agent, max_iter):
+    trace = []
+    s = env.reset()
+    for i in range(max_iter):
+        a = agent.act(s)
+        ss, r, done = env.step(a)
+        trace.append((s, a, r, ss))
+        s = ss
+        if done:
+            break
+    return trace
+
+def get_supervised_sample(n_ios=5):
+    from ROB import generate_FIO
+
+    prog, inputs, outputs = generate_FIO(n_ios)
+    env = ROBENV(inputs, outputs)
+    repeat_agent = RepeatAgent(prog.flatten())
+    trace = get_rollout(env, repeat_agent, 30)
+
+    states = [x[0] for x in trace]
+    actions = [x[1] for x in trace]
+    return states, actions
 
 # ===================== UTILS ======================
 def get_span_mask_render(str1, span_btns):
@@ -638,11 +693,7 @@ def get_span_mask_render(str1, span_btns):
     for render in all_renders:
         ret = render(ret)
 
-    print (ret)
-    assert 0
-
-
-    
+    return ret
 
 def apply_fs(pstate, funcs):
     if funcs == []:
@@ -766,10 +817,55 @@ def test6():
     print (scratch[0])
     print (masks[0])
 
+def test7():
+
+    from ROB import generate_FIO
+
+    prog, inputs, outputs = generate_FIO(5)
+    env = ROBENV(inputs, outputs)
+    repeat_agent = RepeatAgent(prog.flatten())
+    trace = get_rollout(env, repeat_agent, 30)
+    print ([(x[1],x[2]) for x in trace])
+
+def test8():
+    S, A = get_supervised_sample()
+    print ("generated these number of states", len(S))
+    print ("generated these number of actions", len(A))
+
+    print ("============ first state")
+    inputs, scratch, committed, outputs, masks, last_butt = S[0]
+    print ("shapes of inputs, scratch, committed, outputs")
+    print (inputs.shape)
+    print (scratch.shape)
+    print (committed.shape)
+    print (outputs.shape)
+    print ("shape of mask")
+    print (masks.shape)
+    print ("last_butt is just a number")
+    print (last_butt)
+    print ("first action")
+    print (A[0])
+
+    print ("============ second state")
+    inputs, scratch, committed, outputs, masks, last_butt = S[1]
+    print ("shapes of inputs, scratch, committed, outputs")
+    print (inputs.shape)
+    print (scratch.shape)
+    print (committed.shape)
+    print (outputs.shape)
+    print ("shape of mask")
+    print (masks.shape)
+    print ("last_butt is just a number")
+    print (last_butt)
+    print ("second action")
+    print (A[1])
+
 if __name__ == '__main__':
     #test1()
     #test2()
     #test3()
     #test4()
     #test5()
-    test6()
+    #test6()
+    #test7()
+    test8()
