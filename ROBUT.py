@@ -860,6 +860,31 @@ def test8():
     print ("second action")
     print (A[1])
 
+def test9():
+    S, A = get_supervised_sample()
+    print ("generated these number of states", len(S))
+    inputs, scratch, committed, outputs, masks, last_butt = S[0]
+    print ("shapes of inputs, scratch, committed, outputs")
+    print (inputs.shape)
+    print (scratch.shape)
+    print (committed.shape)
+    print (outputs.shape)
+    print ("shape of mask")
+    print (masks.shape)
+    print ("last_butt is just a number")
+    print (last_butt)
+    from robut_net import states_to_tensors
+    chars, masks, last_butts = states_to_tensors(S)
+    print("chars shape")
+    print(chars.shape)
+    print("masks shape")
+    print(masks.shape)
+    print("last_butts shape")
+    print(last_butts.shape)
+
+
+
+
 if __name__ == '__main__':
     #test1()
     #test2()
@@ -868,4 +893,5 @@ if __name__ == '__main__':
     #test5()
     #test6()
     #test7()
-    test8()
+    #test8()
+    test9()
