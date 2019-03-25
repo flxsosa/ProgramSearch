@@ -406,12 +406,7 @@ class GetSpan1(Button):
         self.r1 = _POSSIBLE_R[rname]
 
     def str_masks_to_np(self, str1, pstate):
-        str_masks = Button.str_masks_to_np_default()
-        # enumerate over all the regex masks
-        p = list(re.finditer(self.r1[0], str1))
-        for i, m in enumerate(p[:max(_INDEX)]):
-            str_masks[i][m.start():] = 1
-        return str_masks
+        return get_span_mask_render(str1, pstate.past_buttons[-1:])
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -431,12 +426,7 @@ class GetSpan2(Button):
         self.i1 = i1
 
     def str_masks_to_np(self, str1, pstate):
-        ret_mask = Button.str_masks_to_np_default()
-        prev_masks = pstate.past_buttons[-2].str_masks_to_np(str1, pstate)
-        # the selected mask . . . 
-        mask_sel = prev_masks[self.i1]
-        ret_mask[-1] = mask_sel
-        return ret_mask
+        return get_span_mask_render(str1, pstate.past_buttons[-2:])
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -454,6 +444,9 @@ class GetSpan3(Button):
     def __init__(self, b1):
         self.name = f"GetSpan3({b1})"
         self.b1 = b1
+
+    def str_masks_to_np(self, str1, pstate):
+        return get_span_mask_render(str1, pstate.past_buttons[-3:])
 
     def __call__(self, pstate):
         return RobState(pstate.inputs,
@@ -574,6 +567,57 @@ ALL_BUTTS = [butt_type.generate_buttons() for butt_type in ALL_BUTTS_TYPES]
 
 
 # ===================== UTILS ======================
+def get_span_mask_render(str1, span_btns):
+    """
+    span buttons starts from GetSpan1 until wherever
+    """
+    def render_span1(span1_btn):
+        def render(past_mask):
+            str_masks = Button.str_masks_to_np_default()
+            # enumerate over all the regex masks
+            p = list(re.finditer(span1_btn.r1[0], str1))
+            for i, m in enumerate(p[:max(_INDEX)]):
+                str_masks[i][m.start():] = 1
+            return str_masks
+        return render
+
+    def render_span2(span2_btn):
+        def render(past_mask):
+            ret_mask = Button.str_masks_to_np_default()
+            # the selected mask . . . 
+            mask_sel = past_mask[span2_btn.i1]
+            ret_mask[-1] = mask_sel
+            return ret_mask
+        return render
+
+    def render_span3(span3_btn):
+        def render(past_mask):
+            span1_btn = span_btns[0]
+            span2_btn = span_btns[1]
+# MAX UR IN CHARGE I GO GET KOFE
+            r1 = span1_btn.r1
+            i1 = span2_btn.i1
+
+            m = list(re.finditer(r1[0], str1))[i1]
+
+            if span3_btn.b1 == "End":
+                past_mask[-1][m.start():m.end()] = 0
+            return past_mask
+        return render
+
+    all_renders = [render_span1, render_span2, render_span3]
+    all_renders = [factory(btn) for factory, btn in zip(all_renders, span_btns)]
+    
+    ret = None
+    for render in all_renders:
+        ret = render(ret)
+
+    print (ret)
+    assert 0
+
+
+    
+
 def apply_fs(pstate, funcs):
     if funcs == []:
         return pstate
@@ -687,9 +731,9 @@ def test6():
     fs = [
             GetSpan1("Word"),
             GetSpan2(1),
+            GetSpan3("End")
          ]
     pstate_new = apply_fs(pstate, fs)
-    print (pstate_new)
     _, scratch, _, _, masks, _ = pstate_new.to_np()
     print (scratch[0])
     print (masks[0])
