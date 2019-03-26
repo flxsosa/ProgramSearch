@@ -873,14 +873,31 @@ def test9():
     print (masks.shape)
     print ("last_butt is just a number")
     print (last_butt)
-    from robut_net import states_to_tensors
-    chars, masks, last_butts = states_to_tensors(S)
+    from robut_net import Agent
+    agent = Agent(ALL_BUTTS)
+    chars, masks, last_butts = agent.states_to_tensors(S)
     print("chars shape")
     print(chars.shape)
     print("masks shape")
     print(masks.shape)
     print("last_butts shape")
     print(last_butts.shape)
+    print(last_butts)
+
+    for i in range(200):
+        loss = agent.learn_supervised(S,A)
+        if i%10 == 0: print(i, loss)
+    j = 4
+    char, mask, last_butt = agent.states_to_tensors([S[j]])
+    dist = agent.nn.forward(char, mask, last_butt)
+    _, argmax = dist.max('actions')
+
+    print("real action", agent.idx[A[j].name])
+    print("selected_action", argmax)
+
+
+
+    #x = agent.nn.forward(chars, masks, last_butts)
 
 
 
