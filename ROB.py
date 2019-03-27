@@ -503,7 +503,10 @@ def generate_FIO(n_ios, verbose=False):
         try:
             inp = generate_string(prog.constr)
             out = BUTT.apply_fs(BUTT.RobState.new([inp], [""]), prog.flatten()).committed[0]
+            # make sure the outputs are well conditioned
             if len(out) > max(_POSITION_K):
+                continue
+            if len(out) == 0:
                 continue
             inputs.append(inp)
             outputs.append(out)
