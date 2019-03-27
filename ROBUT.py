@@ -12,6 +12,11 @@ from ROB import _POSSIBLE_TYPES, _POSSIBLE_DELIMS, _POSSIBLE_R, _INDEX, _DELIMIT
 N_IO = 5
 
 class RobState:
+
+    @staticmethod
+    def crash_state_np():
+        return RobState.new(["" for _ in range(N_IO)], ["" for _ in range(N_IO)]).to_np()
+
     @staticmethod
     def new(inputs, outputs):
         assert len(inputs) == len(outputs)
@@ -584,7 +589,11 @@ class ROBENV:
         return self.pstate.to_np()
 
     def step(self, btn_action):
-        self.pstate = btn_action(self.pstate)
+        try:
+            self.pstate = btn_action(self.pstate)
+        except IndexError:
+            return RobState.crash_state_np(), -1.0, True 
+
         reward = 0.0 if self.pstate.committed != self.pstate.outputs else 1.0
         done = False if reward == 0.0 else True
 
@@ -610,7 +619,7 @@ def get_rollout(env, agent, max_iter):
     for i in range(max_iter):
         a = agent.act(s)
         ss, r, done = env.step(a)
-        trace.append((s, a, r, ss))
+        trace.append((s, a, r, ss, str(env.pstate)))
         s = ss
         if done:
             break
@@ -884,21 +893,33 @@ def test9():
     print(last_butts.shape)
     print(last_butts)
 
+    num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
+    print("num params:", num_params)
+
     for i in range(200):
         loss = agent.learn_supervised(S,A)
         if i%10 == 0: print(i, loss)
     j = 4
-    char, mask, last_butt = agent.states_to_tensors([S[j]])
+    char, mask, last_butt = agent.states_to_tensors(S)#[S[j]])
     dist = agent.nn.forward(char, mask, last_butt)
     _, argmax = dist.max('actions')
 
     print("real action", agent.idx[A[j].name])
     print("selected_action", argmax)
 
-
-
-    #x = agent.nn.forward(chars, masks, last_butts)
-
+def test10():
+    S, A = get_supervised_sample()
+    print ("generated these number of states", len(S))
+    from robut_net import Agent
+    agent = Agent(ALL_BUTTS)
+    for i in range(400):
+        loss = agent.learn_supervised(S,A)
+        if i%10 == 0: print(f"iteration {i}, loss: {loss.item()}")
+    actions = agent.best_actions(S)
+    print("real actions:")
+    print(A)
+    print("model actions:")
+    print(actions)
 
 
 
@@ -911,4 +932,5 @@ if __name__ == '__main__':
     #test6()
     #test7()
     #test8()
-    test9()
+    #test9()
+    test10()

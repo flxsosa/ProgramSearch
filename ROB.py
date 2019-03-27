@@ -490,7 +490,7 @@ def generate_string(constraint, max_string_size=100):
     if len(string) > max_string_size: return string[:max_string_size] 
     return string
 
-def generate_FIO(n_ios):
+def generate_FIO(n_ios, verbose=False):
     """
         generate a function, inputs, outputs triple
     """
@@ -510,7 +510,7 @@ def generate_FIO(n_ios):
         except:
             pass
 
-    print ("gneration failed retrying")
+    if verbose: print ("gneration failed retrying")
     return generate_FIO(n_ios)
 
 

@@ -59,7 +59,7 @@ class Encoder(nn.Module):
 
 		if args.encoder == 'dense':
 
-			self.MLP = DenseBlock(5, 56, args.column_encoding_dim*args.strLen, args.h_out) #maybe attention, maybe a dense block, whatever
+			self.MLP = DenseBlock(args.num_dense_layers, args.growth_rate, args.column_encoding_dim*args.strLen, args.h_out) #maybe attention, maybe a dense block, whatever
 
 		elif args.encoder == 'transformer':
 			assert 0, "didnt write yet"
@@ -72,6 +72,9 @@ class Encoder(nn.Module):
 
 		x = ntorch.cat([charEmb, masks], "inFeatures")
 		e = self.column_encoding(x)
+		#TODO: incorporate last_button here, using a repeat function, possibly ...
+		#e = ntorch.cat([e, last_butt], "batch")
+
 		if args.encoder =='dense':
 			e = e.stack( ('strLen', 'E'), 'h')
 			#incorporate last_butt?
@@ -85,6 +88,10 @@ class Model(nn.Module):
 		super(Model, self).__init__()
 		self.encoder = Encoder()
 
+		self.button_embedding = ntorch.nn.Embedding(
+								num_actions+1, args.button_embed_dim
+									).spec("batch", "h")
+		self.fc = ntorch.nn.Linear(args.h_out+args.button_embed_dim, args.h_out)
 		#pooling:
 		if args.pooling == "max":
 			self.pooling = lambda x: x.max("Examples")
@@ -102,6 +109,10 @@ class Model(nn.Module):
 	def forward(self, chars, masks, last_butts): 
 		x = self.encoder(chars, masks, last_butts)
 		x = self.pooling(x)
+
+		lb_emb = self.button_embedding(last_butts)
+		x = ntorch.cat([x, lb_emb], "h")
+		x = self.fc(x).relu()
 		x = self.action_decoder(x) #TODO, this may not exactly be enough?
 		# x = x._new(
 		#  F.log_softmax(x._tensor, dim=x._schema.get("actions"))
@@ -129,11 +140,16 @@ class Model(nn.Module):
 		self.load_state_dict(torch.load(loc))
 
 class Agent:
-	def __init__(self, actions):
+	def __init__(self, actions, use_cuda=None):
 		self.actions = actions
 		self.idx = {x.name: i for i, x in enumerate(actions)}
+		self.name_to_action = {x.name: x for x in actions}
+		self.idx_to_action = {self.idx[x.name]: self.name_to_action[x.name] for x in actions} 
 
-		if torch.cuda.is_available():
+		self.use_cuda = use_cuda
+		if use_cuda == None: self.use_cuda = torch.cuda.is_available()
+
+		if self.use_cuda:
 			self.nn = Model(len(actions)).cuda() #TODO args
 		else:
 			self.nn = Model(len(actions))
@@ -171,17 +187,48 @@ class Agent:
 		last_butts = np.stack(last_butts)
 		last_butts = ntorch.tensor(last_butts, ("batch", "extra")).sum("extra").long()
 
-		return chars, masks, last_butts
+		if self.use_cuda:
+			return chars.cuda(), masks.cuda(), last_butts.cuda()
+		else:
+			return chars, masks, last_butts
 
 	def actions_to_target(self, actions):
 		indices = [self.idx[a.name] for a in actions] 
 		target = ntorch.tensor( indices, ("batch",) ).long()
-		return target
+		return target.cuda() if self.use_cuda else target
+
+	def sample_actions(self, states):
+		#assumes list of states, returns corresponding list of actions
+		chars, masks, last_butts = self.states_to_tensors(states)
+		
+		logits = self.nn.forward(chars, masks, last_butts)
+		dist = ntorch.distributions.Categorical(logits=logits, dim_logit="actions")
+		sample = dist.sample()
+		action_list = [self.idx_to_action[sample[{"batch":i}].item()] for i in range(sample.shape["batch"])]
+		return action_list
 
 	def act(self, state):
-		chars, masks, last_butts = self.states_to_tensors(states)
+		a_list = self.sample_actions([state])
+		assert len(a_list) == 1
+		return a_list[0]
 
-		return self.nn.sample_action(state)
+	def best_actions(self, states):
+		#assumes list of states, returns corresponding list of actions
+		#TODO for top k actions, use _, argmax = logits.topk("actions", k)
+		chars, masks, last_butts = self.states_to_tensors(states)
+		logits = self.nn.forward(chars, masks, last_butts)
+		_, argmax = logits.max('actions')
+		action_list = [self.idx_to_action[argmax[{"batch":i}].item()] for i in range(argmax.shape["batch"])]
+		return action_list
+
+	def topk_actions(self, states, k):
+		#assumes list of states, returns list of lists of k actions
+		#TODO for top k actions, use _, argmax = logits.topk("actions", k)
+		chars, masks, last_butts = self.states_to_tensors(states)
+		logits = self.nn.forward(chars, masks, last_butts)
+		_, argmax = logits.topk('actions', k)
+		action_list = [ [self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()] for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
+		return action_list
 
 	# not a symbolic state here
 	# actions are 2, 3 instead of 0,1 index here
