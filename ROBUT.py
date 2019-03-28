@@ -9,6 +9,10 @@ import pregex as pre
 # from ROB import R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
 from ROB import _POSSIBLE_TYPES, _POSSIBLE_DELIMS, _POSSIBLE_R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K, N_EXPRS
 
+import traceback
+
+
+
 N_IO = 5
 
 class RobState:
@@ -174,6 +178,8 @@ class Replace2(Button):
         self.d2 = d2
 
     def __call__(self, pstate):
+        if "Replace1" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         d1 = pstate.replace1
         scratch_new = [x.replace(d1, self.d2) for x in pstate.scratch]
         return RobState(pstate.inputs,
@@ -223,6 +229,8 @@ class SubStr2(Button):
         self.k2 = k2
 
     def __call__(self, pstate):
+        if "SubStr1" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         # get the k1 from the previous button
         k1 = pstate.past_buttons[-1].k1
         scratch_new = [x[k1:self.k2] for x in pstate.scratch]
@@ -275,6 +283,8 @@ class GetToken2(Button):
         self.f = f
 
     def __call__(self, pstate):
+        if "GetToken1" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         # get the type from GetToken1 button
         t = pstate.past_buttons[-1].t
         scratch_new = [self.f(x, t) for x in pstate.scratch]
@@ -369,6 +379,8 @@ class GetFirst2(Button):
         self.f = f
 
     def __call__(self, pstate):
+        if "GetFirst1" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         t = pstate.past_buttons[-1].t
         scratch_new = [self.f(x, t) for x in pstate.scratch]
         return RobState(pstate.inputs,
@@ -436,6 +448,8 @@ class GetSpan2(Button):
         return get_span_mask_render(str1, pstate.past_buttons[-2:])
 
     def __call__(self, pstate):
+        if "GetSpan1" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         return RobState(pstate.inputs,
                         pstate.scratch,
                         pstate.committed,
@@ -456,6 +470,8 @@ class GetSpan3(Button):
         return get_span_mask_render(str1, pstate.past_buttons[-3:])
 
     def __call__(self, pstate):
+        if "GetSpan2" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         return RobState(pstate.inputs,
                         pstate.scratch,
                         pstate.committed,
@@ -478,6 +494,8 @@ class GetSpan4(Button):
         return get_span_mask_render(str1, pstate.past_buttons[-4:])
 
     def __call__(self, pstate):
+        if "GetSpan3" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         return RobState(pstate.inputs,
                         pstate.scratch,
                         pstate.committed,
@@ -498,6 +516,8 @@ class GetSpan5(Button):
         return get_span_mask_render(str1, pstate.past_buttons[-5:])
 
     def __call__(self, pstate):
+        if "GetSpan4" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         return RobState(pstate.inputs,
                         pstate.scratch,
                         pstate.committed,
@@ -524,6 +544,8 @@ class GetSpan6(Button):
         self.f = f
 
     def __call__(self, pstate):
+        if "GetSpan5" not in pstate.past_buttons[-1].name:
+            raise ButtonSeqError
         r1 = pstate.past_buttons[-5].r1
         i1 = pstate.past_buttons[-4].i1
         b1 = pstate.past_buttons[-3].b1
@@ -591,7 +613,10 @@ class ROBENV:
     def step(self, btn_action):
         try:
             self.pstate = btn_action(self.pstate)
-        except IndexError:
+            state_ob = self.pstate.to_np()
+        except (IndexError, ButtonSeqError) as e:
+            print ("error ", e)
+            print(traceback.format_exc())
             return RobState.crash_state_np(), -1.0, True 
 
         reward = 0.0 if self.pstate.committed != self.pstate.outputs else 1.0
@@ -601,7 +626,8 @@ class ROBENV:
 
         if n_commits == N_EXPRS:
             done = True
-        return self.pstate.to_np(), reward, done
+
+        return state_ob, reward, done
 
 class RepeatAgent:
 
@@ -619,7 +645,7 @@ def get_rollout(env, agent, max_iter):
     for i in range(max_iter):
         a = agent.act(s)
         ss, r, done = env.step(a)
-        trace.append((s, a, r, ss, str(env.pstate)))
+        trace.append((s, a, r, ss, str(env.pstate.scratch[0])))
         s = ss
         if done:
             break
@@ -638,6 +664,10 @@ def get_supervised_sample(n_ios=5):
     return states, actions
 
 # ===================== UTILS ======================
+class ButtonSeqError(Exception):
+   """placeholder for button sequence error"""
+   pass
+
 def get_span_mask_render(str1, span_btns):
     """
     span buttons starts from GetSpan1 until wherever
