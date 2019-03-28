@@ -280,14 +280,13 @@ class Agent:
 					prev_s = s
 				else:
 					prev_s = traces[j][-1][3] #prev ss
-					xx = next(active_states_iter)
-					assert np.all(xx[0] == prev_s[0])
-					assert np.all(xx[1] == prev_s[1])
-					assert np.all(xx[2] == prev_s[2])
-					assert np.all(xx[3] == prev_s[3])
-					assert np.all(xx[4] == prev_s[4])
-					assert xx[5] == prev_s[5]
-
+					# xx = next(active_states_iter)
+					# assert np.all(xx[0] == prev_s[0])
+					# assert np.all(xx[1] == prev_s[1])
+					# assert np.all(xx[2] == prev_s[2])
+					# assert np.all(xx[3] == prev_s[3])
+					# assert np.all(xx[4] == prev_s[4])
+					# assert xx[5] == prev_s[5]
 				traces[j].append( (prev_s, a, r, ss, done) )
 
 		return traces

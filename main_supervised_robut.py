@@ -16,7 +16,9 @@ todo:
 - [X] conv column_encoding
 
 - [ ] value fun
-- [ ] batched rollout
+- [X] batched rollout
+- [ ] refactor batched rollout
+- [ ] namedtuple for trace element
 - [ ] nn modifications
 - [ ] beam search
 
