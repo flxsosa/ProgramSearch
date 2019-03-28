@@ -111,9 +111,9 @@ class Commit(Button):
         scratch_new = pstate.inputs
         committed_new = [x[0]+x[1] for x in zip(pstate.committed, pstate.scratch)]
         # check commit is sensible
-        for commit, output in zip(committed_new, pstate.outputs):
-            if not output.startswith(commit):
-                raise CommitPrefixError
+        # for commit, output in zip(committed_new, pstate.outputs):
+        #     if not output.startswith(commit):
+        #         raise CommitPrefixError
         return RobState(pstate.inputs,
                         scratch_new,
                         committed_new,
@@ -185,6 +185,7 @@ class Replace2(Button):
         if "Replace1" not in pstate.past_buttons[-1].name:
             raise ButtonSeqError
         d1 = pstate.replace1
+        print (pstate)
         scratch_new = [x.replace(d1, self.d2) for x in pstate.scratch]
         return RobState(pstate.inputs,
                         scratch_new,
@@ -955,6 +956,7 @@ def test9():
 
 def test10():
     S, A = get_supervised_sample()
+    assert 0
     print ("generated these number of states", len(S))
     from robut_net import Agent
     agent = Agent(ALL_BUTTS)
@@ -979,4 +981,4 @@ if __name__ == '__main__':
     #test7()
     #test8()
     #test9()
-    #test10()
+    test10()
