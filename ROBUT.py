@@ -627,7 +627,7 @@ def get_rollout(env, agent, max_iter):
 
 def get_supervised_sample(n_ios=5):
     from ROB import generate_FIO
-
+    
     prog, inputs, outputs = generate_FIO(n_ios)
     env = ROBENV(inputs, outputs)
     repeat_agent = RepeatAgent(prog.flatten())

@@ -8,7 +8,7 @@ num_char_types = len(string.printable[:-4]) + 1
 
 char_embed_dim = 20
 
-column_encoding_dim = 16
+column_encoding_dim = 32 #16
 
 strLen = 100
 
@@ -24,10 +24,13 @@ batchsize = 2000
 
 train_iterations = 100000
 
-save_path = 'robut_model.p'
+save_path = 'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
 
 print_freq = 20
 
 save_freq = 100
 
 test_freq = 1000
+
+column_enc = 'linear' #'conv' #'linear'
+kernel_size = 5
