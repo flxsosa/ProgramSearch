@@ -160,7 +160,6 @@ def test_get_rollouts():
 if __name__=='__main__':
 	#test_gsb()
 	#train()
-	play_with_trained_model()
-	
 	#play_with_trained_model()
-    # test_get_rollouts()
+	#play_with_trained_model()
+    test_get_rollouts()
