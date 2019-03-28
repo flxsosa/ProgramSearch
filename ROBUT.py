@@ -110,6 +110,10 @@ class Commit(Button):
     def __call__(self, pstate):
         scratch_new = pstate.inputs
         committed_new = [x[0]+x[1] for x in zip(pstate.committed, pstate.scratch)]
+        # check commit is sensible
+        for commit, output in zip(committed_new, pstate.outputs):
+            if not output.startswith(commit):
+                raise CommitPrefixError
         return RobState(pstate.inputs,
                         scratch_new,
                         committed_new,
@@ -614,7 +618,7 @@ class ROBENV:
         try:
             self.pstate = btn_action(self.pstate)
             state_ob = self.pstate.to_np()
-        except (IndexError, ButtonSeqError) as e:
+        except (IndexError, ButtonSeqError, CommitPrefixError) as e:
             print ("error ", e)
             print(traceback.format_exc())
             return RobState.crash_state_np(), -1.0, True 
@@ -665,8 +669,12 @@ def get_supervised_sample(n_ios=5):
 
 # ===================== UTILS ======================
 class ButtonSeqError(Exception):
-   """placeholder for button sequence error"""
-   pass
+    """placeholder for button sequence error"""
+    pass
+
+class CommitPrefixError(Exception):
+    """placeholder for commit mess up a prefix"""
+    pass
 
 def get_span_mask_render(str1, span_btns):
     """
@@ -818,16 +826,19 @@ def test3():
 
 def test4():
     pstate = RobState.new(["(hello)1)23", "(mis)ter)123"],
-                          ["HELLO", "MISTER"])
+                          ["HELLO", "MIS"])
     fs = [
-            SubStr1(3),
-            SubStr2(10),
-            Replace1(")"),
+            GetSpan1("("), 
+            GetSpan2(0), 
+            GetSpan3("End"), 
+            GetSpan4(")"), 
+            GetSpan5(0), 
+            GetSpan6("Start"), 
+            ToCase("AllCaps"),
+            Commit(),
          ]
     pstate_new = apply_fs(pstate, fs)
     _, scratch, _, _, masks, _ = pstate_new.to_np()
-    print (scratch[0])
-    print (masks[1])
 
 def test5():
     pstate = RobState.new(["123hello123goodbye1234hola123231"],
@@ -957,7 +968,7 @@ if __name__ == '__main__':
     #test1()
     #test2()
     #test3()
-    #test4()
+    test4()
     #test5()
     #test6()
     #test7()
