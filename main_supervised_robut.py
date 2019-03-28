@@ -100,21 +100,32 @@ def train():
 
 def play_with_trained_model():
 
-	from ROBUT import get_rollout, ROBENV
-	from ROB import generate_FIO
-	print(f"is cuda available? {torch.cuda.is_available()}")
-	agent = Agent(ALL_BUTTS)
-	agent.load(args.save_path)
-	print("loaded model")
-	num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
-	print("num params:", num_params)
-	while True:
-		prog, inputs, outputs = generate_FIO(5)
-		env = ROBENV(inputs, outputs)
-		trace = get_rollout(env, agent, 30)
-		print("trace", [x[1:3] for x in trace])
-		print("correct_trace", prog.flatten())
-		input()
+    from ROBUT import get_rollout, ROBENV, RepeatAgent
+    from ROB import generate_FIO
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS)
+    agent.load(args.save_path)
+    print("loaded model")
+    num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
+    print("num params:", num_params)
+    for i in range(100000):
+        print (f"checking valid programs do not crash interpreter / env {i}")
+        prog, inputs, outputs = generate_FIO(5)
+        env = ROBENV(inputs, outputs)
+        repeat_agent = RepeatAgent(prog.flatten())
+        trace_truth = get_rollout(env, repeat_agent, 30)
+        trace_sample = get_rollout(env, agent, 30)
+        # print ("outputs[0]", outputs[0])
+        # print("trace truth", [x[1:3] for x in trace_truth])
+        # print("trace sample", [x[1:3] for x in trace_sample])
+
+        # print ("truth trace states")
+        # for x in trace_truth:
+        #     print (x[-1])
+        # print ("sample trace states")
+        # for x in trace_sample:
+        #     print (x[-1])
+        # input()
 
 
 if __name__=='__main__':
