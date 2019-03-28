@@ -609,8 +609,10 @@ class ROBENV:
 
     def __init__(self, inputs, outputs):
         self.inputs, self.outputs = inputs, outputs
+        self.verbose = False
 
     def reset(self):
+        self.done = False
         self.pstate = RobState.new(self.inputs, self.outputs)
         return self.pstate.to_np()
 
@@ -619,8 +621,10 @@ class ROBENV:
             self.pstate = btn_action(self.pstate)
             state_ob = self.pstate.to_np()
         except (IndexError, ButtonSeqError, CommitPrefixError) as e:
-            print ("error ", e)
-            print(traceback.format_exc())
+            if self.verbose:
+                print ("error ", e)
+                print(traceback.format_exc())
+                self.done = True
             return RobState.crash_state_np(), -1.0, True 
 
         reward = 0.0 if self.pstate.committed != self.pstate.outputs else 1.0
@@ -631,6 +635,7 @@ class ROBENV:
         if n_commits == N_EXPRS:
             done = True
 
+        self.done = done
         return state_ob, reward, done
 
 class RepeatAgent:
@@ -974,4 +979,4 @@ if __name__ == '__main__':
     #test7()
     #test8()
     #test9()
-    test10()
+    #test10()
