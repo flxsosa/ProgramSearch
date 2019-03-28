@@ -259,8 +259,10 @@ class Agent:
 
 		traces = [ [] for _ in range(n_rollouts) ]
 		for i in range(max_iter):
-			if i==0: active_states = [s for _ in range(n_rollouts)]
-			else: active_states = [ss for _, _, _, ss, done in traces[-1] if not done]
+			if i==0:
+				active_states = [s for _ in range(n_rollouts)]
+			else:
+				active_states = [t[-1][3] for t in traces if not t[-1][4]]
 
 			action_list = self.sample_actions(active_states) if active_states else []
 			#prevents nn running on nothing 
@@ -268,7 +270,7 @@ class Agent:
 			action_list_iter = iter(action_list)
 			active_states_iter = iter(active_states)
 			if action_list == []: return traces
-			
+
 			for j in range(n_rollouts):
 				if i>0 and traces[j][-1][4]: #if done:
 					continue
@@ -279,10 +281,14 @@ class Agent:
 				else:
 					prev_s = traces[j][-1][3] #prev ss
 					xx = next(active_states_iter)
-					prev_s
-					assert all((ps == xxx).all() for ps, xxx in zip(prev_s, xx)) , f"oops:\n{type(prev_s)}\n{type(xx)}" #this should hold
+					assert np.all(xx[0] == prev_s[0])
+					assert np.all(xx[1] == prev_s[1])
+					assert np.all(xx[2] == prev_s[2])
+					assert np.all(xx[3] == prev_s[3])
+					assert np.all(xx[4] == prev_s[4])
+					assert xx[5] == prev_s[5]
 
-				traces[j].append((prev_s, a, r, ss, done))
+				traces[j].append( (prev_s, a, r, ss, done) )
 
 		return traces
 

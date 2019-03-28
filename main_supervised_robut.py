@@ -144,6 +144,7 @@ def play_with_trained_model():
         # input()
 
 def test_get_rollouts():
+	global traces
 	from ROB import generate_FIO
 	from ROBUT import ROBENV
 	print(f"is cuda available? {torch.cuda.is_available()}")
@@ -153,13 +154,12 @@ def test_get_rollouts():
 	prog, inputs, outputs = generate_FIO(5)
 	env = ROBENV(inputs, outputs)
 	traces = agent.get_rollouts(env, n_rollouts=50, max_iter=30)
-	print(traces)
+	#print(traces)
 
 
 if __name__=='__main__':
 	#test_gsb()
 	#train()
-	play_with_trained_model()
-	
 	#play_with_trained_model()
-    # test_get_rollouts()
+	#play_with_trained_model()
+    test_get_rollouts()
