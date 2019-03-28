@@ -13,6 +13,13 @@ todo:
 
 - [X] start a training job
 
+- [X] conv column_encoding
+
+- [ ] value fun
+- [ ] batched rollout
+- [ ] nn modifications
+- [ ] beam search
+
 - [ ] performance debugging
 - [ ] does a bigger network perform better??
 - [ ] robustfill baseline
@@ -22,6 +29,7 @@ todo:
 - [ ] good way to do multiple experiments? use git-working?
 
 - [ ] do args more effectively (probably in this file)
+
 """
 
 from ROBUT import get_supervised_sample, ALL_BUTTS
@@ -63,8 +71,13 @@ def train():
 
 	agent = Agent(ALL_BUTTS)
 
-	agent.load(args.save_path)
-	print("loaded model")
+	try:
+		agent.load(args.save_path)
+		print("loaded model")
+	except FileNotFoundError:
+		print ("no saved model found ... training from scratch")
+
+
 	num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
 	print("num params:", num_params)
 
@@ -97,6 +110,9 @@ def train():
 			print(actions)
 		enum_t2 = time.time()
 	agent.save(args.save_path)
+	if hasattr(agent, 'train_iterations'):
+		agent.train_iterations += 1
+	else: agent.train_iterations = 1
 
 def play_with_trained_model():
 
@@ -127,9 +143,23 @@ def play_with_trained_model():
         #     print (x[-1])
         # input()
 
+def test_get_rollouts():
+	from ROB import generate_FIO
+	from ROBUT import ROBENV
+	print(f"is cuda available? {torch.cuda.is_available()}")
+	agent = Agent(ALL_BUTTS)
+	agent.load(args.save_path)
+	print("loaded model")
+	prog, inputs, outputs = generate_FIO(5)
+	env = ROBENV(inputs, outputs)
+	traces = agent.get_rollouts(env, n_rollouts=50, max_iter=30)
+	print(traces)
+
 
 if __name__=='__main__':
 	#test_gsb()
 	#train()
 	play_with_trained_model()
 	
+	#play_with_trained_model()
+    # test_get_rollouts()

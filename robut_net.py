@@ -52,9 +52,18 @@ class Encoder(nn.Module):
 								args.num_char_types, args.char_embed_dim
 									).spec("stateLoc", "charEmb") #TODO: no idea if this is good
 
-		self.column_encoding = ntorch.nn.Linear( 
-								4*args.char_embed_dim+7, args.column_encoding_dim
-									).spec("inFeatures", "E") #TODO
+		if args.column_enc == 'linear':
+			self.column_encoding = ntorch.nn.Linear( 
+									4*args.char_embed_dim+7, args.column_encoding_dim
+										).spec("inFeatures", "E") #TODO
+		elif args.column_enc == 'conv':
+			self.column_encoding = ntorch.nn.Conv1d(
+			in_channels=4*args.char_embed_dim+7,
+			out_channels=args.column_encoding_dim,
+			kernel_size=(args.kernel_size),
+			padding=(args.kernel_size-1)/2).spec("inFeatures", "strLen", "E")
+		else: assert 0
+
 		print("WARNING: there are only 7 masks?? Change this in robut_net.py")
 
 		if args.encoder == 'dense':
@@ -237,6 +246,45 @@ class Agent:
 		targets = self.actions_to_target(actions)
 		loss = self.nn.learn_supervised(chars, masks, last_butts, targets)
 		return loss
+
+
+	def get_rollouts(self, env, n_rollouts=1000, max_iter=30):
+		from ROBUT import ROBENV
+		s = env.reset()
+		envs = []
+		for _ in range(n_rollouts):
+			e = ROBENV(env.inputs, env.outputs)
+			e.reset()
+			envs.append(e)
+
+		traces = [ [] for _ in range(n_rollouts) ]
+		for i in range(max_iter):
+			if i==0: active_states = [s for _ in range(n_rollouts)]
+			else: active_states = [ss for _, _, _, ss, done in traces[-1] if not done]
+
+			action_list = self.sample_actions(active_states) if active_states else []
+			#prevents nn running on nothing 
+
+			action_list_iter = iter(action_list)
+			active_states_iter = iter(active_states)
+			if action_list == []: return traces
+			
+			for j in range(n_rollouts):
+				if i>0 and traces[j][-1][4]: #if done:
+					continue
+				a = next(action_list_iter)
+				ss, r, done = envs[j].step(a)
+				if i==0:
+					prev_s = s
+				else:
+					prev_s = traces[j][-1][3] #prev ss
+					xx = next(active_states_iter)
+					prev_s
+					assert all((ps == xxx).all() for ps, xxx in zip(prev_s, xx)) , f"oops:\n{type(prev_s)}\n{type(xx)}" #this should hold
+
+				traces[j].append((prev_s, a, r, ss, done))
+
+		return traces
 
 	def save(self, loc):
 		self.nn.save(loc)
