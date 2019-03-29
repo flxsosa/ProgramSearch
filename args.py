@@ -26,6 +26,8 @@ train_iterations = 100000
 
 save_path = 'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
 
+#Vnet_save_path = 'robut_vnet.p' 
+
 print_freq = 20
 
 save_freq = 100

@@ -158,10 +158,22 @@ def test_get_rollouts():
 	traces = agent.get_rollouts(env, n_rollouts=1000, max_iter=30)
 	#print(traces)
 
+def test_beam():
+	global beam
+	from ROB import generate_FIO
+	from ROBUT import ROBENV
+	print(f"is cuda available? {torch.cuda.is_available()}")
+	agent = Agent(ALL_BUTTS)
+	agent.load(args.save_path)
+	print("loaded model")
+	prog, inputs, outputs = generate_FIO(5)
+	env = ROBENV(inputs, outputs)
+	beam = agent.beam_rollout(env, beam_size=10, max_iter=30)
 
 if __name__=='__main__':
 	#test_gsb()
 	#train()
 	#play_with_trained_model()
 	#play_with_trained_model()
-    test_get_rollouts()
+    #test_get_rollouts()
+    test_beam()

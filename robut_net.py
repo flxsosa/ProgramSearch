@@ -94,7 +94,7 @@ class Encoder(nn.Module):
 
 
 class Model(nn.Module):
-	def __init__(self, num_actions):
+	def __init__(self, num_actions, value_net=False):
 		super(Model, self).__init__()
 		self.encoder = Encoder()
 
@@ -110,6 +110,9 @@ class Model(nn.Module):
 		elif args.pooling == "attn":
 			self.pooling = AttnPooling(args)
 		else: assert 0, "oops, attention is wrong"
+
+		if value_net:
+			assert 0, "didnt write it yet, but it's really simple"
 
 		self.action_decoder = ntorch.nn.Linear(args.h_out, num_actions).spec("h", "actions")
 		self.lossfn = ntorch.nn.CrossEntropyLoss().spec("actions") #TODO
@@ -150,19 +153,22 @@ class Model(nn.Module):
 		self.load_state_dict(torch.load(loc))
 
 class Agent:
-	def __init__(self, actions, use_cuda=None):
+	def __init__(self, actions, use_cuda=None, value_net=False):
 		self.actions = actions
 		self.idx = {x.name: i for i, x in enumerate(actions)}
 		self.name_to_action = {x.name: x for x in actions}
 		self.idx_to_action = {self.idx[x.name]: self.name_to_action[x.name] for x in actions} 
 
 		self.use_cuda = use_cuda
+		self.value_net = value_net
 		if use_cuda == None: self.use_cuda = torch.cuda.is_available()
 
 		if self.use_cuda:
 			self.nn = Model(len(actions)).cuda() #TODO args
+			if self.value_net: self.Vnn = Model(len(actions), value_net=True).cuda()
 		else:
 			self.nn = Model(len(actions))
+			if self.value_net: self.Vnn = Model(len(actions), value_net=True)
 
 	def states_to_tensors(self, x):
 		"""
@@ -237,13 +243,12 @@ class Agent:
 		# returns a tuple of button, score
 		chars, masks, last_butts = self.states_to_tensors(states)
 		logits = self.nn.forward(chars, masks, last_butts)
-		lls = logits.log_softmax("actions")
-
+		#lls = logits.log_softmax("actions")
 		lls = logits._new(
 		 F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
 			) #TODO XXX FIXME DON"T LEAVE THIS
 		ll, argmax = lls.topk('actions', k)
-		action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}]) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
+		action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
 		return action_list
 
 	# not a symbolic state here
@@ -310,41 +315,63 @@ class Agent:
 			e = env.copy()
 			ss, r, done = e.step(action)
 			t = TraceEntry(s, action, r, ss, done)
-			beam.append(e, t, score)
+			beam.append(BeamEntry(e, [t], score))
 
 		beam = sorted(beam, key=lambda x: -x.score)
 
 
 		#beam = ( env, trace, score )
 
-		get_done = lambda x: x.trace.done
-		get_score = lambda x: x.score
+		#get_done = lambda x: x.trace.done
+		#get_score = lambda x: x.score
 
 		for i in range(1, max_iter):
 			#get top_k actions
 			new_beam = []
-
+			s_list = []
 			for b in beam:
-				if b.trace.done:
-					if b.trace.r == 1: #if it works
+				if b.trace[-1].done:
+					# if b.trace[-1].reward == 1: #if 
+					# 	new_beam.append(b)
+					continue
+				#tr = b.trace
+				s = b.trace[-1].s
+				s_list.append(s)
+
+			top_actions = self.topk_actions(s_list, len(self.actions))
+			top_actions_iter = iter(top_actions)
+			s_list_iter = iter(s_list)
+			for b in beam:
+				
+				if b.trace[-1].done:
+					if b.trace[-1].reward == 1: #if 
 						new_beam.append(b)
 					continue
+				tr = b.trace
+				#s = b.trace[-1].s
 
-				s = b.trace.s
-				top_actions = self.topk_actions([s], len(self.actions))
-				for action, score in top_actions[0]:
+				_top_actions = next(top_actions_iter)
+				s = next(s_list_iter)
+				for action, score in _top_actions:
 					e = b.env.copy()
 					ss, r, done = e.step(action)
-					t = TraceEntry(s, action, r, ss, done)
-					new_beam.append(e, t, score + b.score)
+					if done and r < 1.0: #ie, if it is a crash state, don't use it
+						continue
+					tr.append( TraceEntry(s, action, r, ss, done) )
+					new_beam.append(BeamEntry(e, tr, score + b.score))
 
-				new_beam = sorted(new_beam, key=lambda x: -x.score)
-
-
-			new_beam = 
+				new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
+			new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
+			beam = new_beam
+		return beam
 
 	def save(self, loc):
 		self.nn.save(loc)
+		if self.value_net: 
+			self.Vnn.save(loc+'vnet')
 
 	def load(self, loc):
 		self.nn.load(loc)
+		if self.value_net: 
+			self.Vnn.load(loc+'vnet')
+
