@@ -29,35 +29,12 @@ Overall Design Choice :
     tree can be evaluated
 """
 
-_INDEX = list(range(-5, 6))
-_POSITION_K = list(range(-100, 101))
-_CHARACTER = string.printable[:-4]
-_DELIMITER = "& , . ? ! @ ( ) [ ] % { } / : ; $ # \" '".split(' ')
-_BOUNDARY = ["Start", "End"]
 
-N_EXPRS = 6
+from ROBUT import _INDEX,_POSITION_K,_CHARACTER,_DELIMITER,_BOUNDARY,N_EXPRS,_POSSIBLE_TYPES,_POSSIBLE_DELIMS,_POSSIBLE_R
 
-_POSSIBLE_TYPES = {
-        "Number" :   (r'[0-9]+', pre.create('\\d+')),
-        "Word" :     (r'([A-z])+', pre.create('\\w+')),
-        "Alphanum" : (r'[A-z]', pre.create('\\w')),
-        "PropCase" : (r'[A-Z][a-z]+', pre.create('\\u\\l+')),
-        "AllCaps" :  (r'[A-Z]', pre.create('\\u')),
-        "Lower" :    (r'[a-z]', pre.create('\\l')),
-        "Digit" :    (r'[0-9]', pre.create('\\d')),
-        "Char" :     (r'.', pre.create('.')),
-        }
+from ROBUT import RepeatAgent, get_rollout, ALL_BUTTS, RobState, apply_fs
 
-_POSSIBLE_DELIMS = {}
-for i in _DELIMITER:
-    j = i
-    if j in ['(', ')', '.']: 
-        j = re.escape(j)
-    _POSSIBLE_DELIMS[i] = (re.escape(i), pre.create(j))
-
-_POSSIBLE_R = {**_POSSIBLE_TYPES, **_POSSIBLE_DELIMS}
-
-import ROBUT as BUTT #Hehe
+import ROBUT as BUTT
 
 class P:
     
@@ -535,38 +512,242 @@ def add_constr(c1, c2=None):
 def stepped_abs(x):
     return x + 1 if x >= 0 else abs(x)
 
+# =================== TESTS ========================
+
+def test1():
+    pstate = RobState.new(["12A", "2A4", "A45", "4&6", "&67"],
+                          ["", "", "", "", ""])
+    print (ALL_BUTTS)
+    print (len(ALL_BUTTS))
+    print (pstate)
+    fs = [
+            BUTT.ToCase("Lower"),
+            BUTT.Replace1("&"),
+            BUTT.Replace2("["),
+            BUTT.SubStr1(1),
+            BUTT.SubStr2(2),
+            BUTT.Commit(),
+            ]
+
+    print (apply_fs(pstate, fs))
+
+def test2():
+    print (ALL_BUTTS)
+    print (len(ALL_BUTTS))
+    pstate = RobState.new(["Mr.Pu", "Mr.Poo"],
+                          ["", ""])
+    fs = [
+            BUTT.GetToken1("Word"),
+            BUTT.GetToken2(1),
+            BUTT.Commit(),
+            ]
+    print (apply_fs(pstate, fs))
+    
+    gs = [
+            BUTT.GetUpTo("."),
+            BUTT.Commit(),
+            ]
+    print (apply_fs(pstate, gs))
+
+    hs = [
+            BUTT.GetFrom("."),
+            BUTT.Commit(),
+            ]
+    print (apply_fs(pstate, hs))
+
+    ts = [
+            BUTT.GetFirst1("Word"),
+            BUTT.GetFirst2(2),
+            BUTT.Commit(),
+            ]
+    print (apply_fs(pstate, ts))
+
+    vs = [
+            BUTT.GetAll("Word"),
+            BUTT.Commit(),
+            ]
+    print (apply_fs(pstate, vs))
+
+def test3():
+    print (ALL_BUTTS)
+    print (len(ALL_BUTTS))
+    pstate = RobState.new(["(hello)123", "(mister)123"],
+                          ["HELLORE", "MISTERRE"])
+    fs = [
+            BUTT.GetSpan1("("),
+            BUTT.GetSpan2(0),
+            BUTT.GetSpan3("End"),
+            BUTT.GetSpan4(")"),
+            BUTT.GetSpan5(0),
+            BUTT.GetSpan6("Start"),
+            BUTT.ToCase("AllCaps"),
+            BUTT.Commit(),
+            BUTT.Const("R"),
+            BUTT.Commit(),
+            BUTT.Const("E"),
+            BUTT.Commit(),
+            ]
+    print (apply_fs(pstate, fs))
+
+def test4():
+    pstate = RobState.new(["(hello)1)23", "(mis)ter)123"],
+                          ["HELLO", "MIS"])
+    fs = [
+            BUTT.GetSpan1("("), 
+            BUTT.GetSpan2(0), 
+            BUTT.GetSpan3("End"), 
+            BUTT.GetSpan4(")"), 
+            BUTT.GetSpan5(0), 
+            BUTT.GetSpan6("Start"), 
+            BUTT.ToCase("AllCaps"),
+            BUTT.Commit(),
+         ]
+    pstate_new = apply_fs(pstate, fs)
+    _, scratch, _, _, masks, _ = pstate_new.to_np()
+
+def test5():
+    pstate = RobState.new(["123hello123goodbye1234hola123231"],
+                          ["dontreadthis"])
+    fs = [
+            BUTT.GetToken1("Word"),
+         ]
+    pstate_new = apply_fs(pstate, fs)
+    print (pstate_new)
+    _, scratch, _, _, masks, _ = pstate_new.to_np()
+    print (scratch[0])
+    print (masks[0])
+
+def test6():
+    pstate = RobState.new(["123hello123goodbye1234hola123231"],
+                          ["dontreadthis"])
+    fs = [
+            BUTT.GetSpan1("Word"),
+            BUTT.GetSpan2(1),
+            BUTT.GetSpan3("End"),
+            BUTT.GetSpan4("Number"),
+            BUTT.GetSpan5(3),
+         ]
+    pstate_new = apply_fs(pstate, fs)
+    _, scratch, _, _, masks, _ = pstate_new.to_np()
+    print (scratch[0])
+    print (masks[0])
+
+def test7():
+
+    prog, inputs, outputs = generate_FIO(5)
+    env = BUTT.ROBENV(inputs, outputs)
+    repeat_agent = RepeatAgent(prog.flatten())
+    trace = get_rollout(env, repeat_agent, 30)
+    print ([(x[1],x[2]) for x in trace])
+
+def test8():
+    S, A = BUTT.get_supervised_sample()
+    print ("generated these number of states", len(S))
+    print ("generated these number of actions", len(A))
+
+    print ("============ first state")
+    inputs, scratch, committed, outputs, masks, last_butt = S[0]
+    print ("shapes of inputs, scratch, committed, outputs")
+    print (inputs.shape)
+    print (scratch.shape)
+    print (committed.shape)
+    print (outputs.shape)
+    print ("shape of mask")
+    print (masks.shape)
+    print ("last_butt is just a number")
+    print (last_butt)
+    print ("first action")
+    print (A[0])
+
+    print ("============ second state")
+    inputs, scratch, committed, outputs, masks, last_butt = S[1]
+    print ("shapes of inputs, scratch, committed, outputs")
+    print (inputs.shape)
+    print (scratch.shape)
+    print (committed.shape)
+    print (outputs.shape)
+    print ("shape of mask")
+    print (masks.shape)
+    print ("last_butt is just a number")
+    print (last_butt)
+    print ("second action")
+    print (A[1])
+
+def test9():
+    S, A = BUTT.get_supervised_sample()
+    print ("generated these number of states", len(S))
+    inputs, scratch, committed, outputs, masks, last_butt = S[0]
+    print ("shapes of inputs, scratch, committed, outputs")
+    print (inputs.shape)
+    print (scratch.shape)
+    print (committed.shape)
+    print (outputs.shape)
+    print ("shape of mask")
+    print (masks.shape)
+    print ("last_butt is just a number")
+    print (last_butt)
+    from robut_net import Agent
+    agent = Agent(ALL_BUTTS)
+    chars, masks, last_butts = agent.states_to_tensors(S)
+    print("chars shape")
+    print(chars.shape)
+    print("masks shape")
+    print(masks.shape)
+    print("last_butts shape")
+    print(last_butts.shape)
+    print(last_butts)
+
+    num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
+    print("num params:", num_params)
+
+    for i in range(200):
+        loss = agent.learn_supervised(S,A)
+        if i%10 == 0: print(i, loss)
+    j = 4
+    char, mask, last_butt = agent.states_to_tensors(S)#[S[j]])
+    dist = agent.nn.forward(char, mask, last_butt)
+    _, argmax = dist.max('actions')
+
+    print("real action", agent.idx[A[j].name])
+    print("selected_action", argmax)
+
+def test10():
+    S, A = BUTT.get_supervised_sample()
+    # print ("generated these number of states", len(S))
+    from robut_net import Agent
+    agent = Agent(ALL_BUTTS)
+    for i in range(400):
+        loss = agent.learn_supervised(S,A)
+        if i%10 == 0: print(f"iteration {i}, loss: {loss.item()}")
+    actions = agent.best_actions(S)
+    print("real actions:")
+    print(A)
+    print("model actions:")
+    print(actions)
+
+def test11():
+
+    for i in range(1000):
+
+        prog, inputs, outputs = generate_FIO(5)
+        env = BUTT.ROBENV(inputs, outputs)
+        env.verbose = True
+        repeat_agent = RepeatAgent(prog.flatten())
+        drop_idx = random.choice(range(len(repeat_agent.btns)-1))
+        repeat_agent.btns = repeat_agent.btns[:drop_idx-1] + repeat_agent.btns[drop_idx:]
+        trace = get_rollout(env, repeat_agent, 30)
+    #    print ([x[1:3] for x in trace])
+
 if __name__ == '__main__':
-    print ("hi i live")
-
-    # yo = GetSpan.generate()
-    # print (yo)
-
-    # print (yo.constr)
-    # input_str = generate_string(yo.constr)
-    # print (input_str)
-    # print (yo.str_execute(input_str))
-
-    # print ("get token ")
-    # get_tk = GetToken.generate()
-    # print (get_tk)
-    # input_str = generate_string(get_tk.constr)
-    # print (input_str)
-    # print (get_tk.str_execute(input_str))
-    prog = P.generate()
-    print(prog)
-    input_str = generate_string(prog.constr)
-    print(input_str)
-
-    butts = prog.flatten()
-
-
-    print(butts)
-
-    instate = BUTT.RobState.new([input_str], [""])
-    outstate = BUTT.apply_fs( instate, butts )
-
-    print("output state:", outstate)
-
-
-
+    test1()
+    test2()
+    test3()
+    test4()
+    test5()
+    test6()
+    test7()
+    test8()
+    # test9()
+    # test10()
+    test11()
 
