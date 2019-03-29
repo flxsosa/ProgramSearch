@@ -12,6 +12,15 @@ import torch.nn.functional as F
 from collections import namedtuple
 TraceEntry = namedtuple("TraceEntry", "prev_s action reward s done")
 
+class QEntry(object):
+    def __init__(self, priority, env):
+        self.score = priority
+        self.env = env
+    def __cmp__(self, other):
+        return cmp(-self.score, -other.score)
+
+    def __lt__(self, other):
+        return -self.score < -other.score
 
 class AttnPooling(nn.Module):
     """
@@ -289,12 +298,18 @@ class Agent:
         loss = self.nn.learn_supervised(chars, masks, last_butts, targets)
         return loss
 
-    def value_fun_step(self, states, rewards):
+    def value_fun_optim_step(self, states, rewards):
         chars, masks, last_butts = self.states_to_tensors(states)
         targets = self.rewards_to_target(rewards)
         print("TARGETS",targets.sum("batch").item())
         loss = self.Vnn.learn_supervised(chars, masks, last_butts, targets)
         return loss
+
+    def compute_values(self, states):
+        chars, masks, last_butts = self.states_to_tensors(states)
+        #self.Vnn.eval()
+        output_dists = self.Vnn(chars, masks, last_butts)
+        return output_dists
 
     def get_rollouts(self, env, n_rollouts=1000, max_iter=30):
 
@@ -348,6 +363,8 @@ class Agent:
             state_list = [be.env.last_step[0] for be in beam]
             # get the current log-likelihood for extending the head of the beam
             lls, argmax = self.all_actions(state_list)
+            vals
+
             lls = lls.detach().cpu().numpy()
             # massage the previous into the right shape and add it to the current head
             lls_prev = np.array([be.score for be in beam])
@@ -387,6 +404,50 @@ class Agent:
 
             beam = new_beam                
         return beam, solutions 
+
+    def a_star_rollout(self, env, batch_size=1000, max_count=1000*723*30, max_iter=30, verbose=False):
+
+        from queue import PriorityQueue
+        q = PriorityQueue()
+        env.reset()
+        q.put(QEntry(0.0, env))
+
+        solutions = []
+        while not q.empty() and q.qsize() < max_count: #TODO
+            toExpand = [ q.get_nowait() for _ in range(min(batch_size, q.qsize()))]
+            state_list = [ entry.env.last_step[0] for entry in toExpand]
+
+            action_ll, argmax = self.all_actions(state_list) 
+            value_ll = self.compute_values(state_list)
+            print('ran both nns')   
+            for i, entry in enumerate(toExpand):
+                score = entry.score
+                e = entry.env
+                state_ll = value_ll[{"batch":i, "value":1}].item() #TODO XXX
+                for idx in range(len(self.actions)): #can change this later to filter/prune
+                    action = self.idx_to_action[argmax[{"batch": i, "actions": idx}].item()]
+                    e_new = e.copy()
+
+                    e_new.step(action)
+                    if e_new.last_step[1] == -1: #reward
+                        if verbose: print ("crasherinoed!")
+                        continue
+                    if e_new.last_step[1] == 1: #reward
+                        solutions.append(e_new)
+                        if verbose: print ("success ! ")
+                        continue
+                    if len(e_new.pstate.past_buttons) > max_iter:
+                        if verbose: print("gone too far!")
+                        continue
+
+                    new_score = score + action_ll[{"batch": i, "actions": idx}].item() + state_ll
+                    q.put(QEntry(new_score, e_new))
+
+
+        return solutions
+
+
+
 
     def save(self, loc):
         self.nn.save(loc)

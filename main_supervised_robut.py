@@ -25,8 +25,9 @@ todo:
     - [ ] refactor get_rollouts for speed
     - [X] run!
 
-- [X] batched rollout
+- [ ] A* search!!!
 
+- [X] batched rollout
 - [ ] nn modifications
 
 - [X] beam search - make quicker
@@ -80,7 +81,7 @@ def test_gsb():
 def train():
     print(f"is cuda available? {torch.cuda.is_available()}")
 
-    agent = Agent(ALL_BUTTS)
+    agent = Agent(ALL_BUTTS, value_net=True)
 
     try:
         agent.load(args.save_path)
@@ -182,10 +183,26 @@ def test_beam():
     beam, solutions = agent.beam_rollout(env, beam_size=1000, max_iter=30)
     print("number of solutions", len(solutions))
 
+def test_a_star():
+    global beam
+    global solutions
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS, value_net=True)
+    agent.load(args.save_path)
+    print("loaded model")
+    prog, inputs, outputs = generate_FIO(5)
+    env = ROBENV(inputs, outputs)
+    solutions = agent.a_star_rollout(env, batch_size=1000, verbose=False)
+    print("number of solutions", len(solutions))
+    print("solutions:", solutions)
+
 if __name__=='__main__':
     #test_gsb()
     #train()
     #play_with_trained_model()
     #play_with_trained_model()
-    test_get_rollouts()
+    #test_get_rollouts()
     #test_beam()
+    test_a_star()

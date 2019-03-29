@@ -50,7 +50,7 @@ def train_value_fun(mode='unbiased'):
         states, rewards = sample_from_traces(traces) #TODO
 
         t = time.time()
-        loss = agent.value_fun_step(states, rewards) #TODO
+        loss = agent.value_fun_optim_step(states, rewards) #TODO
         t2 = time.time()
 
         if i!=0: print(f"iteration {i}, loss {loss.item()}, net time: {t2-t}, rollout time: {ro_t2 - ro_t}, tot other time {t-t3}")
