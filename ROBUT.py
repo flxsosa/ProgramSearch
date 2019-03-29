@@ -118,9 +118,11 @@ class Commit(Button):
         scratch_new = pstate.inputs
         committed_new = [x[0]+x[1] for x in zip(pstate.committed, pstate.scratch)]
         # check commit is sensible
-        # for commit, output in zip(committed_new, pstate.outputs):
-        #     if not output.startswith(commit):
-        #         raise CommitPrefixError
+        for commit, output in zip(committed_new, pstate.outputs):
+            if output == "":
+                continue
+            if not output.startswith(commit):
+                raise CommitPrefixError
         return RobState(pstate.inputs,
                         scratch_new,
                         committed_new,
@@ -1003,5 +1005,5 @@ if __name__ == '__main__':
     #test7()
     #test8()
     #test9()
-    #test10()
-    test11()
+    test10()
+    #test11()
