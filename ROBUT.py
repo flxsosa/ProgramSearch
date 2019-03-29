@@ -6,10 +6,36 @@ import string
 from string import printable
 import re
 import pregex as pre
-# from ROB import R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K
-from ROB import _POSSIBLE_TYPES, _POSSIBLE_DELIMS, _POSSIBLE_R, _INDEX, _DELIMITER, _CHARACTER, _POSITION_K, N_EXPRS
 
 import traceback
+
+_INDEX = list(range(-5, 6))
+_POSITION_K = list(range(-100, 101))
+_CHARACTER = string.printable[:-4]
+_DELIMITER = "& , . ? ! @ ( ) [ ] % { } / : ; $ # \" '".split(' ')
+_BOUNDARY = ["Start", "End"]
+
+N_EXPRS = 6
+
+_POSSIBLE_TYPES = {
+        "Number" :   (r'[0-9]+', pre.create('\\d+')),
+        "Word" :     (r'([A-z])+', pre.create('\\w+')),
+        "Alphanum" : (r'[A-z]', pre.create('\\w')),
+        "PropCase" : (r'[A-Z][a-z]+', pre.create('\\u\\l+')),
+        "AllCaps" :  (r'[A-Z]', pre.create('\\u')),
+        "Lower" :    (r'[a-z]', pre.create('\\l')),
+        "Digit" :    (r'[0-9]', pre.create('\\d')),
+        "Char" :     (r'.', pre.create('.')),
+        }
+
+_POSSIBLE_DELIMS = {}
+for i in _DELIMITER:
+    j = i
+    if j in ['(', ')', '.']: 
+        j = re.escape(j)
+    _POSSIBLE_DELIMS[i] = (re.escape(i), pre.create(j))
+
+_POSSIBLE_R = {**_POSSIBLE_TYPES, **_POSSIBLE_DELIMS}
 
 
 
@@ -117,6 +143,8 @@ class Commit(Button):
     def __call__(self, pstate):
         scratch_new = pstate.inputs
         committed_new = [x[0]+x[1] for x in zip(pstate.committed, pstate.scratch)]
+        # check we actually committed stuff
+        check_change(pstate.committed,committed_new)
         # check commit is sensible
         for commit, output in zip(committed_new, pstate.outputs):
             if output == "":
@@ -150,6 +178,7 @@ class ToCase(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -194,6 +223,7 @@ class Replace2(Button):
             raise ButtonSeqError
         d1 = pstate.past_buttons[-1].d1
         scratch_new = [x.replace(d1, self.d2) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -246,6 +276,7 @@ class SubStr2(Button):
         # get the k1 from the previous button
         k1 = pstate.past_buttons[-1].k1
         scratch_new = [x[k1:self.k2] for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -300,6 +331,7 @@ class GetToken2(Button):
         # get the type from GetToken1 button
         t = pstate.past_buttons[-1].t
         scratch_new = [self.f(x, t) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -322,6 +354,7 @@ class GetUpTo(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -344,6 +377,7 @@ class GetFrom(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -395,6 +429,7 @@ class GetFirst2(Button):
             raise ButtonSeqError
         t = pstate.past_buttons[-1].t
         scratch_new = [self.f(x, t) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -419,6 +454,7 @@ class GetAll(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -565,6 +601,7 @@ class GetSpan6(Button):
         i2 = pstate.past_buttons[-1].i2
         b2 = self.b2
         scratch_new = [self.f(x, r1, i1, b1, r2, i2, b2) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -583,6 +620,7 @@ class Const(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.c for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -637,11 +675,12 @@ class ROBENV:
         try:
             self.pstate = btn_action(self.pstate)
             state_ob = self.pstate.to_np()
-        except (IndexError, ButtonSeqError, CommitPrefixError) as e:
+        except (IndexError, ButtonSeqError, CommitPrefixError, NoChangeError) as e:
             if self.verbose:
+                print ("CATCHING")
                 print ("error ", e)
                 print(traceback.format_exc())
-                self.done = True
+            self.done = True
             self.last_step = RobState.crash_state_np(), -1.0, True 
             return self.last_step
 
@@ -665,6 +704,8 @@ class RepeatAgent:
 
     def act(self, state):
         self.idx += 1
+        if self.idx >= len(self.btns):
+            return Commit()
         return self.btns[self.idx]
 
 def get_rollout(env, agent, max_iter):
@@ -702,6 +743,14 @@ class ButtonSeqError(Exception):
 class CommitPrefixError(Exception):
     """placeholder for commit mess up a prefix"""
     pass
+
+class NoChangeError(Exception):
+    """make sure we did not commit empty stuff"""
+    pass
+
+def check_change(old, new):
+    if str(old) == str(new):
+        raise NoChangeError
 
 def get_span_mask_render(str1, span_btns):
     """
@@ -776,240 +825,3 @@ def apply_fs(pstate, funcs):
         last_state = apply_fs(pstate, funcs[:-1])
         return funcs[-1](last_state)
 
-# =================== TESTS ========================
-
-def test1():
-    pstate = RobState.new(["12A", "2A4", "A45", "4&6", "&67"],
-                          ["12a", "2a4", "a45", "4[6", "[67"])
-    print (ALL_BUTTS)
-    print (len(ALL_BUTTS))
-    print (pstate)
-    fs = [
-            ToCase("Lower"),
-            Replace1("&"),
-            Replace2("["),
-            SubStr1(1),
-            SubStr2(2),
-            Commit(),
-            ]
-
-    print (apply_fs(pstate, fs))
-
-def test2():
-    print (ALL_BUTTS)
-    print (len(ALL_BUTTS))
-    pstate = RobState.new(["Mr.Pu", "Mr.Poo"],
-                          ["Pu", "Poo"])
-    fs = [
-            GetToken1("Word"),
-            GetToken2(1),
-            Commit(),
-            ]
-    print (apply_fs(pstate, fs))
-    
-    gs = [
-            GetUpTo("."),
-            Commit(),
-            ]
-    print (apply_fs(pstate, gs))
-
-    hs = [
-            GetFrom("."),
-            Commit(),
-            ]
-    print (apply_fs(pstate, hs))
-
-    ts = [
-            GetFirst1("Word"),
-            GetFirst2(2),
-            Commit(),
-            ]
-    print (apply_fs(pstate, ts))
-
-    vs = [
-            GetAll("Word"),
-            Commit(),
-            ]
-    print (apply_fs(pstate, vs))
-
-def test3():
-    print (ALL_BUTTS)
-    print (len(ALL_BUTTS))
-    pstate = RobState.new(["(hello)123", "(mister)123"],
-                          ["1234", "4"])
-    fs = [
-            GetSpan1("("),
-            GetSpan2(0),
-            GetSpan3("End"),
-            GetSpan4(")"),
-            GetSpan5(0),
-            GetSpan6("Start"),
-            ToCase("AllCaps"),
-            Commit(),
-            Const("R"),
-            Commit(),
-            Const("E"),
-            Commit(),
-            ]
-    print (apply_fs(pstate, fs))
-
-def test4():
-    pstate = RobState.new(["(hello)1)23", "(mis)ter)123"],
-                          ["HELLO", "MIS"])
-    fs = [
-            GetSpan1("("), 
-            GetSpan2(0), 
-            GetSpan3("End"), 
-            GetSpan4(")"), 
-            GetSpan5(0), 
-            GetSpan6("Start"), 
-            ToCase("AllCaps"),
-            Commit(),
-         ]
-    pstate_new = apply_fs(pstate, fs)
-    _, scratch, _, _, masks, _ = pstate_new.to_np()
-
-def test5():
-    pstate = RobState.new(["123hello123goodbye1234hola123231"],
-                          ["dontreadthis"])
-    fs = [
-            GetToken1("Word"),
-         ]
-    pstate_new = apply_fs(pstate, fs)
-    print (pstate_new)
-    _, scratch, _, _, masks, _ = pstate_new.to_np()
-    print (scratch[0])
-    print (masks[0])
-
-def test6():
-    pstate = RobState.new(["123hello123goodbye1234hola123231"],
-                          ["dontreadthis"])
-    fs = [
-            GetSpan1("Word"),
-            GetSpan2(1),
-            GetSpan3("End"),
-            GetSpan4("Number"),
-            GetSpan5(3),
-         ]
-    pstate_new = apply_fs(pstate, fs)
-    _, scratch, _, _, masks, _ = pstate_new.to_np()
-    print (scratch[0])
-    print (masks[0])
-
-def test7():
-
-    from ROB import generate_FIO
-
-    prog, inputs, outputs = generate_FIO(5)
-    env = ROBENV(inputs, outputs)
-    repeat_agent = RepeatAgent(prog.flatten())
-    trace = get_rollout(env, repeat_agent, 30)
-    print ([(x[1],x[2]) for x in trace])
-
-def test8():
-    S, A = get_supervised_sample()
-    print ("generated these number of states", len(S))
-    print ("generated these number of actions", len(A))
-
-    print ("============ first state")
-    inputs, scratch, committed, outputs, masks, last_butt = S[0]
-    print ("shapes of inputs, scratch, committed, outputs")
-    print (inputs.shape)
-    print (scratch.shape)
-    print (committed.shape)
-    print (outputs.shape)
-    print ("shape of mask")
-    print (masks.shape)
-    print ("last_butt is just a number")
-    print (last_butt)
-    print ("first action")
-    print (A[0])
-
-    print ("============ second state")
-    inputs, scratch, committed, outputs, masks, last_butt = S[1]
-    print ("shapes of inputs, scratch, committed, outputs")
-    print (inputs.shape)
-    print (scratch.shape)
-    print (committed.shape)
-    print (outputs.shape)
-    print ("shape of mask")
-    print (masks.shape)
-    print ("last_butt is just a number")
-    print (last_butt)
-    print ("second action")
-    print (A[1])
-
-def test9():
-    S, A = get_supervised_sample()
-    print ("generated these number of states", len(S))
-    inputs, scratch, committed, outputs, masks, last_butt = S[0]
-    print ("shapes of inputs, scratch, committed, outputs")
-    print (inputs.shape)
-    print (scratch.shape)
-    print (committed.shape)
-    print (outputs.shape)
-    print ("shape of mask")
-    print (masks.shape)
-    print ("last_butt is just a number")
-    print (last_butt)
-    from robut_net import Agent
-    agent = Agent(ALL_BUTTS)
-    chars, masks, last_butts = agent.states_to_tensors(S)
-    print("chars shape")
-    print(chars.shape)
-    print("masks shape")
-    print(masks.shape)
-    print("last_butts shape")
-    print(last_butts.shape)
-    print(last_butts)
-
-    num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
-    print("num params:", num_params)
-
-    for i in range(200):
-        loss = agent.learn_supervised(S,A)
-        if i%10 == 0: print(i, loss)
-    j = 4
-    char, mask, last_butt = agent.states_to_tensors(S)#[S[j]])
-    dist = agent.nn.forward(char, mask, last_butt)
-    _, argmax = dist.max('actions')
-
-    print("real action", agent.idx[A[j].name])
-    print("selected_action", argmax)
-
-def test10():
-    S, A = get_supervised_sample()
-    # print ("generated these number of states", len(S))
-    from robut_net import Agent
-    agent = Agent(ALL_BUTTS)
-    for i in range(400):
-        loss = agent.learn_supervised(S,A)
-        if i%10 == 0: print(f"iteration {i}, loss: {loss.item()}")
-    actions = agent.best_actions(S)
-    print("real actions:")
-    print(A)
-    print("model actions:")
-    print(actions)
-
-def test11():
-
-    from ROB import generate_FIO
-
-    prog, inputs, outputs = generate_FIO(5)
-    env = ROBENV(inputs, outputs)
-    repeat_agent = RepeatAgent(prog.flatten())
-    trace = get_rollout(env, repeat_agent, 30)
-    print ([x[1:3] for x in trace])
-
-if __name__ == '__main__':
-    #test1()
-    #test2()
-    #test3()
-    #test4()
-    #test5()
-    #test6()
-    #test7()
-    #test8()
-    #test9()
-    #test10()
-    test11()
