@@ -113,10 +113,14 @@ class Model(nn.Module):
 
         if value_net:
             assert 0, "didnt write it yet, but it's really simple"
+            self.decoder = ntorch.nn.Linear(args.h_out, 1).spec("h", "value")
+            self.lossfn = ntorch.nn.CrossEntropyLoss().spec("value") #TODO
+            self.lossfn.reduction = None #TODO XXX FIXME DON"T LEAVE THIS
+        else:
+            self.decoder = ntorch.nn.Linear(args.h_out, num_actions).spec("h", "actions")
+            self.lossfn = ntorch.nn.CrossEntropyLoss().spec("actions") #TODO
+            self.lossfn.reduction = None #TODO XXX FIXME DON"T LEAVE THIS
 
-        self.action_decoder = ntorch.nn.Linear(args.h_out, num_actions).spec("h", "actions")
-        self.lossfn = ntorch.nn.CrossEntropyLoss().spec("actions") #TODO
-        self.lossfn.reduction = None #TODO XXX FIXME DON"T LEAVE THIS
         self.opt = torch.optim.Adam(self.parameters(), lr=0.001)
 
     def forward(self, chars, masks, last_butts): 
@@ -126,7 +130,7 @@ class Model(nn.Module):
         lb_emb = self.button_embedding(last_butts)
         x = ntorch.cat([x, lb_emb], "h")
         x = self.fc(x).relu()
-        x = self.action_decoder(x) #TODO, this may not exactly be enough?
+        x = self.decoder(x) #TODO, this may not exactly be enough?
         # x = x._new(
         #  F.log_softmax(x._tensor, dim=x._schema.get("actions"))
         #     ) #TODO XXX FIXME DON"T LEAVE THIS
@@ -262,6 +266,9 @@ class Agent:
          F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
             ) #TODO XXX FIXME DON"T LEAVE THIS
         ll, argmax = lls.topk('actions', k)
+        if self.use_cuda:
+            ll = ll.cpu()
+            argmax = argmax.cpu()
         action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
         return action_list
 
