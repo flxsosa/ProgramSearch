@@ -20,7 +20,7 @@ todo:
 - [ ] refactor batched rollout
 - [ ] namedtuple for trace element
 - [ ] nn modifications
-- [ ] beam search
+- [ ] beam search - make quicker
 
 - [ ] performance debugging
 - [ ] does a bigger network perform better??

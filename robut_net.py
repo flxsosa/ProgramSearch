@@ -251,6 +251,20 @@ class Agent:
 		action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
 		return action_list
 
+	def all_actions(self, states, k):
+		#assumes list of states, returns list of lists of k actions
+		#TODO for top k actions, use _, argmax = logits.topk("actions", k)
+		# returns a tuple of button, score
+		chars, masks, last_butts = self.states_to_tensors(states)
+		logits = self.nn.forward(chars, masks, last_butts)
+		#lls = logits.log_softmax("actions")
+		lls = logits._new(
+		 F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
+			) #TODO XXX FIXME DON"T LEAVE THIS
+		ll, argmax = lls.topk('actions', k)
+		action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
+		return action_list
+
 	# not a symbolic state here
 	# actions are 2, 3 instead of 0,1 index here
 	def learn_supervised(self, states, actions):
