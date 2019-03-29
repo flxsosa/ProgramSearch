@@ -12,15 +12,20 @@ todo:
 - [X] do advanced batching
 
 - [X] start a training job
-
 - [X] conv column_encoding
 
 - [ ] value fun
+- train value fun!!
+    - [ ] write training loop, both biased and unbiased
+    - [ ] make compatible with current networks easily
+    - [ ] refactor get_rollouts for speed
+    - [ ] run!
+
 - [X] batched rollout
-- [ ] refactor batched rollout
-- [ ] namedtuple for trace element
+
 - [ ] nn modifications
-- [ ] beam search - make quicker
+
+- [X] beam search - make quicker
 
 - [ ] performance debugging
 - [ ] does a bigger network perform better??
@@ -41,80 +46,80 @@ import torch
 import time
 
 def get_supervised_batchsize(fn, batchsize=200):
-	#takes a generation function and outputs lists of optimal size
-	remainder = [], []
-	while True:
-		preS, preA = remainder
-		S, A = fn()
-		S, A = preS+S, preA+A
-		ln = len(S)
+    #takes a generation function and outputs lists of optimal size
+    remainder = [], []
+    while True:
+        preS, preA = remainder
+        S, A = fn()
+        S, A = preS+S, preA+A
+        ln = len(S)
 
-		if ln > batchsize:
-			yield S[:batchsize], A[:batchsize]
-			remainder = S[batchsize:], A[batchsize:]
-			continue
-		elif ln < batchsize:
-			remainder = S, A
-			continue
-		elif ln == batchsize:
-			yield S, A
-			remainder = [], []
-			continue
-		else: assert 0, "uh oh, not a good place"
+        if ln > batchsize:
+            yield S[:batchsize], A[:batchsize]
+            remainder = S[batchsize:], A[batchsize:]
+            continue
+        elif ln < batchsize:
+            remainder = S, A
+            continue
+        elif ln == batchsize:
+            yield S, A
+            remainder = [], []
+            continue
+        else: assert 0, "uh oh, not a good place"
 
 def test_gsb():
-	for i, (S, A) in enumerate(get_supervised_batchsize(get_supervised_sample, 200)):
-		if i >= 20: break
-		print(len(A))
-		print(A[:10])
+    for i, (S, A) in enumerate(get_supervised_batchsize(get_supervised_sample, 200)):
+        if i >= 20: break
+        print(len(A))
+        print(A[:10])
 
 def train():
-	print(f"is cuda available? {torch.cuda.is_available()}")
+    print(f"is cuda available? {torch.cuda.is_available()}")
 
-	agent = Agent(ALL_BUTTS)
+    agent = Agent(ALL_BUTTS)
 
-	try:
-		agent.load(args.save_path)
-		print("loaded model")
-	except FileNotFoundError:
-		print ("no saved model found ... training from scratch")
+    try:
+        agent.load(args.save_path)
+        print("loaded model")
+    except FileNotFoundError:
+        print ("no saved model found ... training from scratch")
 
 
-	num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
-	print("num params:", num_params)
+    num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
+    print("num params:", num_params)
 
-	enum_t2 = 0
-	print_time = 0
-	for i, (S, A) in enumerate(get_supervised_batchsize(get_supervised_sample, args.batchsize)):
-		enum_t = time.time()
-		if i >= args.train_iterations: break
-		t = time.time()
-		loss = agent.learn_supervised(S,A)
-		t2 = time.time()
+    enum_t2 = 0
+    print_time = 0
+    for i, (S, A) in enumerate(get_supervised_batchsize(get_supervised_sample, args.batchsize)):
+        enum_t = time.time()
+        if i >= args.train_iterations: break
+        t = time.time()
+        loss = agent.learn_supervised(S,A)
+        t2 = time.time()
 
-		pt = time.time()
-		if i%args.print_freq == 0 and i!=0:
-			print("iteration {}, loss: {:.5f}, network time: {:.5f}, gen samples time: {:.5f}, prev print time: {:.5f}, total other time: {:.5f}".format(i, loss.item(), t2-t, enum_t - enum_t2, print_time, t-t3 ))
-		pt2 = time.time()
-		print_time = pt2-pt
+        pt = time.time()
+        if i%args.print_freq == 0 and i!=0:
+            print("iteration {}, loss: {:.5f}, network time: {:.5f}, gen samples time: {:.5f}, prev print time: {:.5f}, total other time: {:.5f}".format(i, loss.item(), t2-t, enum_t - enum_t2, print_time, t-t3 ))
+        pt2 = time.time()
+        print_time = pt2-pt
 
-		t3 = t2
-		if i%args.save_freq == 0 and i!=0:
-			agent.save(args.save_path)
-			print("saved model")
-		if i%args.test_freq == 0 and i!=0:	
-			print("testing...")
-			S, A = get_supervised_sample()
-			actions = agent.sample_actions(S)
-			print("real actions:")
-			print(A)
-			print("model actions:")
-			print(actions)
-		enum_t2 = time.time()
-	agent.save(args.save_path)
-	if hasattr(agent, 'train_iterations'):
-		agent.train_iterations += 1
-	else: agent.train_iterations = 1
+        t3 = t2
+        if i%args.save_freq == 0 and i!=0:
+            agent.save(args.save_path)
+            print("saved model")
+        if i%args.test_freq == 0 and i!=0:  
+            print("testing...")
+            S, A = get_supervised_sample()
+            actions = agent.sample_actions(S)
+            print("real actions:")
+            print(A)
+            print("model actions:")
+            print(actions)
+        enum_t2 = time.time()
+    agent.save(args.save_path)
+    if hasattr(agent, 'train_iterations'):
+        agent.train_iterations += 1
+    else: agent.train_iterations = 1
 
 def play_with_trained_model():
 
@@ -146,34 +151,37 @@ def play_with_trained_model():
         # input()
 
 def test_get_rollouts():
-	global traces
-	from ROB import generate_FIO
-	from ROBUT import ROBENV
-	print(f"is cuda available? {torch.cuda.is_available()}")
-	agent = Agent(ALL_BUTTS)
-	agent.load(args.save_path)
-	print("loaded model")
-	prog, inputs, outputs = generate_FIO(5)
-	env = ROBENV(inputs, outputs)
-	traces = agent.get_rollouts(env, n_rollouts=1000, max_iter=30)
-	#print(traces)
+    global traces
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS)
+    agent.load(args.save_path)
+    print("loaded model")
+    prog, inputs, outputs = generate_FIO(5)
+    env = ROBENV(inputs, outputs)
+    traces = agent.get_rollouts(env, n_rollouts=1000, max_iter=30)
+    num_hits = sum([t[-1].reward > 0 for t in traces ])
+    print (num_hits)#print(traces)
 
 def test_beam():
-	global beam
-	from ROB import generate_FIO
-	from ROBUT import ROBENV
-	print(f"is cuda available? {torch.cuda.is_available()}")
-	agent = Agent(ALL_BUTTS)
-	agent.load(args.save_path)
-	print("loaded model")
-	prog, inputs, outputs = generate_FIO(5)
-	env = ROBENV(inputs, outputs)
-	beam = agent.beam_rollout(env, beam_size=100, max_iter=30)
+    global beam
+    global solutions
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS)
+    agent.load(args.save_path)
+    print("loaded model")
+    prog, inputs, outputs = generate_FIO(5)
+    env = ROBENV(inputs, outputs)
+    beam, solutions = agent.beam_rollout(env, beam_size=1000, max_iter=30)
+    print("number of solutions", len(solutions))
 
 if __name__=='__main__':
-	#test_gsb()
-	#train()
-	#play_with_trained_model()
-	#play_with_trained_model()
-    #test_get_rollouts()
-    test_beam()
+    #test_gsb()
+    #train()
+    #play_with_trained_model()
+    #play_with_trained_model()
+    test_get_rollouts()
+    #test_beam()
