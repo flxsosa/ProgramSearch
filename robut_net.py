@@ -114,8 +114,8 @@ class Model(nn.Module):
 
         if value_net:
             assert 0, "didnt write it yet, but it's really simple"
-            self.decoder = ntorch.nn.Linear(args.h_out, 1).spec("h", "value")
-            self.lossfn = ntorch.nn.CrossEntropyLoss().spec("value") #TODO
+            self.decoder = ntorch.nn.Linear(args.h_out, 2).spec("h", "value")
+            self.lossfn = ntorch.nn.NLLLoss().spec("value") #TODO
             self.lossfn.reduction = None #TODO XXX FIXME DON"T LEAVE THIS
         else:
             self.decoder = ntorch.nn.Linear(args.h_out, num_actions).spec("h", "actions")
@@ -136,7 +136,7 @@ class Model(nn.Module):
         x = x._new(
          F.log_softmax(x._tensor, dim=x._schema.get("value"))
             ) #TODO XXX FIXME DON"T LEAVE THIS
-        return x 
+        return x
 
     def learn_supervised(self, chars, masks, last_butts, targets):
         self.train()
@@ -254,20 +254,6 @@ class Agent:
          F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
             ) #TODO XXX FIXME DON"T LEAVE THIS
         ll, argmax = lls.topk('actions', k)
-        action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
-        return action_list
-
-    def all_actions(self, states, k):
-        #assumes list of states, returns list of lists of k actions
-        #TODO for top k actions, use _, argmax = logits.topk("actions", k)
-        # returns a tuple of button, score
-        chars, masks, last_butts = self.states_to_tensors(states)
-        logits = self.nn.forward(chars, masks, last_butts)
-        #lls = logits.log_softmax("actions")
-        lls = logits._new(
-         F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
-            ) #TODO XXX FIXME DON"T LEAVE THIS
-        ll, argmax = lls.topk('actions', k)
         if self.use_cuda:
             ll = ll.cpu()
             argmax = argmax.cpu()
@@ -361,7 +347,7 @@ class Agent:
                 s = b.trace[-1].s
                 s_list.append(s)
 
-            top_actions = self.topk_actions(s_list, len(self.actions))
+            top_actions = self.topk_actions(s_list,len(self.actions))
             top_actions_iter = iter(top_actions)
             s_list_iter = iter(s_list)
             for b in beam:
