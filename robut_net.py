@@ -114,11 +114,11 @@ class Model(nn.Module):
 
         if value_net:
             assert 0, "didnt write it yet, but it's really simple"
-            self.decoder = ntorch.nn.Linear(args.h_out, 2).spec("h", "value")
+            self.action_decoder = ntorch.nn.Linear(args.h_out, 2).spec("h", "value")
             self.lossfn = ntorch.nn.NLLLoss().spec("value") #TODO
             self.lossfn.reduction = None #TODO XXX FIXME DON"T LEAVE THIS
         else:
-            self.decoder = ntorch.nn.Linear(args.h_out, num_actions).spec("h", "actions")
+            self.action_decoder = ntorch.nn.Linear(args.h_out, num_actions).spec("h", "actions")
             self.lossfn = ntorch.nn.CrossEntropyLoss().spec("actions") #TODO
             self.lossfn.reduction = None #TODO XXX FIXME DON"T LEAVE THIS
 
@@ -131,11 +131,11 @@ class Model(nn.Module):
         lb_emb = self.button_embedding(last_butts)
         x = ntorch.cat([x, lb_emb], "h")
         x = self.fc(x).relu()
-        x = self.decoder(x) #TODO, this may not exactly be enough?
+        x = self.action_decoder(x) #TODO, this may not exactly be enough? also, wrong name
         if self.value_net:
-        x = x._new(
-         F.log_softmax(x._tensor, dim=x._schema.get("value"))
-            ) #TODO XXX FIXME DON"T LEAVE THIS
+            x = x._new(
+                F.log_softmax(x._tensor, dim=x._schema.get("value"))
+                ) #TODO XXX FIXME DON"T LEAVE THIS
         return x
 
     def learn_supervised(self, chars, masks, last_butts, targets):
@@ -260,6 +260,23 @@ class Agent:
         action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
         return action_list
 
+    def all_actions(self, states):
+        #assumes list of states, returns list of lists of k actions
+        #TODO for top k actions, use _, argmax = logits.topk("actions", k)
+        # returns a tuple of button, score
+        chars, masks, last_butts = self.states_to_tensors(states)
+        logits = self.nn.forward(chars, masks, last_butts)
+        #lls = logits.log_softmax("actions")
+        lls = logits._new(
+         F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
+            ) #TODO XXX FIXME DON"T LEAVE THIS
+        ll, argmax = lls.topk('actions', len(self.actions))
+        if self.use_cuda:
+            ll = ll.cpu()
+            argmax = argmax.cpu()
+        #action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
+        return ll, argmax
+
     # not a symbolic state here
     # actions are 2, 3 instead of 0,1 index here
     def learn_supervised(self, states, actions):
@@ -317,25 +334,27 @@ class Agent:
 
         beam = []
         s = env.reset()
-        top_actions = self.topk_actions([s], len(self.actions)) #the whole thing
+        ll, argmax = self.all_actions([s]) #the whole thing
 
 
-        for action, score in top_actions[0]: #for first round:
+#action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
+        assert argmax.shape["batch"] == 1
+        for kk in range(argmax.shape["actions"]): #for first round:
+            action = self.idx_to_action[argmax[{"batch":0, "actions":kk}].item()]
+            score = ll[{"batch":0, "actions":kk}].item()
             e = env.copy()
             ss, r, done = e.step(action)
             t = TraceEntry(s, action, r, ss, done)
             beam.append(BeamEntry(e, [t], score))
 
-        beam = sorted(beam, key=lambda x: -x.score)
-
-
+        beam = sorted(beam, key=lambda x: -x.score)[:beam_size]
         #beam = ( env, trace, score )
-
         #get_done = lambda x: x.trace.done
         #get_score = lambda x: x.score
 
         for i in range(1, max_iter):
             #get top_k actions
+            print("iteration:", i)
             new_beam = []
             s_list = []
             for b in beam:
@@ -347,8 +366,9 @@ class Agent:
                 s = b.trace[-1].s
                 s_list.append(s)
 
-            top_actions = self.topk_actions(s_list,len(self.actions))
-            top_actions_iter = iter(top_actions)
+            ll, argmax = self.all_actions(s_list)
+            #top_actions_iter = iter(top_actions)
+            batch_size_iter = iter(range(argmax.shape["batch"]))
             s_list_iter = iter(s_list)
             for b in beam:
                 
@@ -358,17 +378,19 @@ class Agent:
                     continue
                 tr = b.trace
                 #s = b.trace[-1].s
-
-                _top_actions = next(top_actions_iter)
+                #_top_actions = next(top_actions_iter)
+                bb = next(batch_size_iter)
                 s = next(s_list_iter)
-                for action, score in _top_actions:
+                for kk in range(min(argmax.shape["actions"], beam_size)):
+                    action = self.idx_to_action[argmax[{"batch":bb, "actions":kk}].item()]
+                    score = ll[{"batch":bb, "actions":kk}].item()
                     e = b.env.copy()
                     ss, r, done = e.step(action)
                     if done and r < 1.0: #ie, if it is a crash state, don't use it
                         continue
-                    tr.append( TraceEntry(s, action, r, ss, done) )
-                    new_beam.append(BeamEntry(e, tr, score + b.score))
-
+                    new_te = TraceEntry(s, action, r, ss, done) 
+                    new_beam.append(BeamEntry(e, tr + [new_te], score + b.score))
+                    
                 new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
             new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
             beam = new_beam

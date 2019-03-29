@@ -168,7 +168,7 @@ def test_beam():
 	print("loaded model")
 	prog, inputs, outputs = generate_FIO(5)
 	env = ROBENV(inputs, outputs)
-	beam = agent.beam_rollout(env, beam_size=10, max_iter=30)
+	beam = agent.beam_rollout(env, beam_size=100, max_iter=30)
 
 if __name__=='__main__':
 	#test_gsb()
