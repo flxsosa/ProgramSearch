@@ -185,7 +185,7 @@ class Replace2(Button):
         if "Replace1" not in pstate.past_buttons[-1].name:
             raise ButtonSeqError
         d1 = pstate.replace1
-        print (pstate)
+        #print (pstate)
         scratch_new = [x.replace(d1, self.d2) for x in pstate.scratch]
         return RobState(pstate.inputs,
                         scratch_new,

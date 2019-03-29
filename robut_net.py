@@ -9,7 +9,8 @@ from namedtensor import ntorch, NamedTensor
 import torch.nn.functional as F
 #we will use namedtensor because it should help with attention ...
 #pip install -q torch torchtext opt_einsum git+https://github.com/harvardnlp/namedtensor
-
+from collections import namedtuple
+TraceEntry = namedtuple("TraceEntry", "prev_s action reward s done")
 
 
 class AttnPooling(nn.Module):
@@ -233,10 +234,16 @@ class Agent:
 	def topk_actions(self, states, k):
 		#assumes list of states, returns list of lists of k actions
 		#TODO for top k actions, use _, argmax = logits.topk("actions", k)
+		# returns a tuple of button, score
 		chars, masks, last_butts = self.states_to_tensors(states)
 		logits = self.nn.forward(chars, masks, last_butts)
-		_, argmax = logits.topk('actions', k)
-		action_list = [ [self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()] for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
+		lls = logits.log_softmax("actions")
+
+		lls = logits._new(
+		 F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
+			) #TODO XXX FIXME DON"T LEAVE THIS
+		ll, argmax = lls.topk('actions', k)
+		action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}]) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
 		return action_list
 
 	# not a symbolic state here
@@ -247,8 +254,9 @@ class Agent:
 		loss = self.nn.learn_supervised(chars, masks, last_butts, targets)
 		return loss
 
-
 	def get_rollouts(self, env, n_rollouts=1000, max_iter=30):
+
+
 		from ROBUT import ROBENV
 		s = env.reset()
 		envs = []
@@ -262,24 +270,22 @@ class Agent:
 			if i==0:
 				active_states = [s for _ in range(n_rollouts)]
 			else:
-				active_states = [t[-1][3] for t in traces if not t[-1][4]]
-
+				active_states = [t[-1].s for t in traces if not t[-1].done]
 			action_list = self.sample_actions(active_states) if active_states else []
 			#prevents nn running on nothing 
-
 			action_list_iter = iter(action_list)
 			active_states_iter = iter(active_states)
 			if action_list == []: return traces
 
 			for j in range(n_rollouts):
-				if i>0 and traces[j][-1][4]: #if done:
+				if i>0 and traces[j][-1].done: #if done:
 					continue
 				a = next(action_list_iter)
 				ss, r, done = envs[j].step(a)
 				if i==0:
 					prev_s = s
 				else:
-					prev_s = traces[j][-1][3] #prev ss
+					prev_s = traces[j][-1].prev_s
 					# xx = next(active_states_iter)
 					# assert np.all(xx[0] == prev_s[0])
 					# assert np.all(xx[1] == prev_s[1])
@@ -287,9 +293,55 @@ class Agent:
 					# assert np.all(xx[3] == prev_s[3])
 					# assert np.all(xx[4] == prev_s[4])
 					# assert xx[5] == prev_s[5]
-				traces[j].append( (prev_s, a, r, ss, done) )
+				traces[j].append( TraceEntry(prev_s, a, r, ss, done) )
 
 		return traces
+
+	def beam_rollout(self, env, beam_size=1000, max_iter=30):
+		BeamEntry = namedtuple("BeamEntry", "env trace score")
+		#TraceEntry = namedtuple("TraceEntry", "prev_s action reward s done")
+
+		beam = []
+		s = env.reset()
+		top_actions = self.topk_actions([s], len(self.actions)) #the whole thing
+
+
+		for action, score in top_actions[0]: #for first round:
+			e = env.copy()
+			ss, r, done = e.step(action)
+			t = TraceEntry(s, action, r, ss, done)
+			beam.append(e, t, score)
+
+		beam = sorted(beam, key=lambda x: -x.score)
+
+
+		#beam = ( env, trace, score )
+
+		get_done = lambda x: x.trace.done
+		get_score = lambda x: x.score
+
+		for i in range(1, max_iter):
+			#get top_k actions
+			new_beam = []
+
+			for b in beam:
+				if b.trace.done:
+					if b.trace.r == 1: #if it works
+						new_beam.append(b)
+					continue
+
+				s = b.trace.s
+				top_actions = self.topk_actions([s], len(self.actions))
+				for action, score in top_actions[0]:
+					e = b.env.copy()
+					ss, r, done = e.step(action)
+					t = TraceEntry(s, action, r, ss, done)
+					new_beam.append(e, t, score + b.score)
+
+				new_beam = sorted(new_beam, key=lambda x: -x.score)
+
+
+			new_beam = 
 
 	def save(self, loc):
 		self.nn.save(loc)

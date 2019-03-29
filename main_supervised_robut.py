@@ -155,7 +155,7 @@ def test_get_rollouts():
 	print("loaded model")
 	prog, inputs, outputs = generate_FIO(5)
 	env = ROBENV(inputs, outputs)
-	traces = agent.get_rollouts(env, n_rollouts=50, max_iter=30)
+	traces = agent.get_rollouts(env, n_rollouts=1000, max_iter=30)
 	#print(traces)
 
 
