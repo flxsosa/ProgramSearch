@@ -117,6 +117,8 @@ class Commit(Button):
     def __call__(self, pstate):
         scratch_new = pstate.inputs
         committed_new = [x[0]+x[1] for x in zip(pstate.committed, pstate.scratch)]
+        # check we actually committed stuff
+        check_change(pstate.committed,committed_new)
         # check commit is sensible
         for commit, output in zip(committed_new, pstate.outputs):
             if output == "":
@@ -150,6 +152,7 @@ class ToCase(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -194,6 +197,7 @@ class Replace2(Button):
             raise ButtonSeqError
         d1 = pstate.past_buttons[-1].d1
         scratch_new = [x.replace(d1, self.d2) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -246,6 +250,7 @@ class SubStr2(Button):
         # get the k1 from the previous button
         k1 = pstate.past_buttons[-1].k1
         scratch_new = [x[k1:self.k2] for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -300,6 +305,7 @@ class GetToken2(Button):
         # get the type from GetToken1 button
         t = pstate.past_buttons[-1].t
         scratch_new = [self.f(x, t) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -322,6 +328,7 @@ class GetUpTo(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -344,6 +351,7 @@ class GetFrom(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -395,6 +403,7 @@ class GetFirst2(Button):
             raise ButtonSeqError
         t = pstate.past_buttons[-1].t
         scratch_new = [self.f(x, t) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -419,6 +428,7 @@ class GetAll(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -565,6 +575,7 @@ class GetSpan6(Button):
         i2 = pstate.past_buttons[-1].i2
         b2 = self.b2
         scratch_new = [self.f(x, r1, i1, b1, r2, i2, b2) for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -583,6 +594,7 @@ class Const(Button):
 
     def __call__(self, pstate):
         scratch_new = [self.c for x in pstate.scratch]
+        check_change(pstate.scratch, scratch_new)
         return RobState(pstate.inputs,
                         scratch_new,
                         pstate.committed,
@@ -637,11 +649,12 @@ class ROBENV:
         try:
             self.pstate = btn_action(self.pstate)
             state_ob = self.pstate.to_np()
-        except (IndexError, ButtonSeqError, CommitPrefixError) as e:
+        except (IndexError, ButtonSeqError, CommitPrefixError, NoChangeError) as e:
             if self.verbose:
+                print ("CATCHING")
                 print ("error ", e)
                 print(traceback.format_exc())
-                self.done = True
+            self.done = True
             self.last_step = RobState.crash_state_np(), -1.0, True 
             return self.last_step
 
@@ -702,6 +715,14 @@ class ButtonSeqError(Exception):
 class CommitPrefixError(Exception):
     """placeholder for commit mess up a prefix"""
     pass
+
+class NoChangeError(Exception):
+    """make sure we did not commit empty stuff"""
+    pass
+
+def check_change(old, new):
+    if str(old) == str(new):
+        raise NoChangeError
 
 def get_span_mask_render(str1, span_btns):
     """
@@ -995,11 +1016,18 @@ def test11():
 
     from ROB import generate_FIO
 
-    prog, inputs, outputs = generate_FIO(5)
-    env = ROBENV(inputs, outputs)
-    repeat_agent = RepeatAgent(prog.flatten())
-    trace = get_rollout(env, repeat_agent, 30)
-    print ([x[1:3] for x in trace])
+    for i in range(1000):
+
+        prog, inputs, outputs = generate_FIO(5)
+        env = ROBENV(inputs, outputs)
+        env.verbose = True
+        repeat_agent = RepeatAgent(prog.flatten())
+        print (repeat_agent.btns)
+        drop_idx = random.choice(range(len(repeat_agent.btns)))
+        repeat_agent.btns = repeat_agent.btns[:drop_idx-1] + repeat_agent.btns[drop_idx:]
+        print (repeat_agent.btns)
+        trace = get_rollout(env, repeat_agent, 30)
+    #    print ([x[1:3] for x in trace])
 
 if __name__ == '__main__':
     #test1()

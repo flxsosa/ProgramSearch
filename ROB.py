@@ -510,7 +510,8 @@ def generate_FIO(n_ios, verbose=False):
                 continue
             inputs.append(inp)
             outputs.append(out)
-        except:
+        except Exception as e:
+            #print (e)
             pass
 
     if verbose: print ("gneration failed retrying")
