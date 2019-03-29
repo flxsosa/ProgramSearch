@@ -5,30 +5,60 @@ from robut_net import Agent
 import args
 import torch
 import time
+import random
 
-def train_value_fun():
+
+def sample_from_traces(traces, biased=False):
+    #reward is 1 for hit and 0 for not hit
+    if biased: raise NotImplementedError
+    states = []
+    rewards = []
+    for trace in traces:
+        ln = len(trace)
+        idx = random.choice(range(ln))
+        states.append( trace[idx].s )
+        rewards.append( trace[-1].reward ) #TODO beware
+    return states, rewards
+
+def train_value_fun(mode='unbiased'):
+    global traces
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
     print(f"is cuda available? {torch.cuda.is_available()}")
-
-    agent = Agent(ALL_BUTTS, value_fun=True)
+    agent = Agent(ALL_BUTTS, value_net=True)
 
     try:
         agent.load(args.save_path)
         print("loaded model")
     except FileNotFoundError:
-        print ("no saved model found ... training value function from scratch")
+        print ("no saved model found ... training value function from scratch") #TODO XXX
 
 
     num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
-    print("num params:", num_params)
+    print("num params in policy net:", num_params)
+    num_params = sum(p.numel() for p in agent.Vnn.parameters() if p.requires_grad)
+    print("num params in value net:", num_params)
 
-    enum_t2 = 0
-    print_time = 0
+
     for i in range(1000):
-       
-       traces = get_rollouts()
+        prog, inputs, outputs = generate_FIO(5)
+        env = ROBENV(inputs, outputs)
+        
+        ro_t = time.time()
+        traces = agent.get_rollouts(env, n_rollouts=args.n_rollouts) #TODO refactor
+        ro_t2 = time.time()
+        states, rewards = sample_from_traces(traces) #TODO
 
-       states, rewards = sample_some_from_traces(traces)
+        t = time.time()
+        loss = agent.value_fun_step(states, rewards) #TODO
+        t2 = time.time()
 
-       loss = train_value_fun(states, rewards)
+        if i!=0: print(f"iteration {i}, loss {loss.item()}, net time: {t2-t}, rollout time: {ro_t2 - ro_t}, tot other time {t-t3}")
+        t3 = t2
 
-       
+        if i%10==0: 
+            agent.save(args.save_path)
+            print("Model saved")
+
+if __name__=='__main__':
+    train_value_fun()

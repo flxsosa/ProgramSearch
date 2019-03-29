@@ -36,3 +36,5 @@ test_freq = 1000
 
 column_enc = 'linear' #'conv' #'linear'
 kernel_size = 5
+
+n_rollouts = 1000

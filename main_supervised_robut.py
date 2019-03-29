@@ -16,10 +16,14 @@ todo:
 
 - [ ] value fun
 - train value fun!!
-    - [ ] write training loop, both biased and unbiased
-    - [ ] make compatible with current networks easily
+    - [X] write training loop
+        - [ ] write biased version?
+        - [ ] batch multiple states together during rollout to lower reward variance
+    - [ ] is getting the indicies the step which takes the longest???
+    
+    - [X] make compatible with current networks easily
     - [ ] refactor get_rollouts for speed
-    - [ ] run!
+    - [X] run!
 
 - [X] batched rollout
 

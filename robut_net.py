@@ -113,7 +113,7 @@ class Model(nn.Module):
         else: assert 0, "oops, attention is wrong"
 
         if value_net:
-            assert 0, "didnt write it yet, but it's really simple"
+            #assert 0, "didnt write it yet, but it's really simple"
             self.action_decoder = ntorch.nn.Linear(args.h_out, 2).spec("h", "value")
             self.lossfn = ntorch.nn.NLLLoss().spec("value") #TODO
             self.lossfn.reduction = None #TODO XXX FIXME DON"T LEAVE THIS
@@ -219,6 +219,10 @@ class Agent:
         target = ntorch.tensor( indices, ("batch",) ).long()
         return target.cuda() if self.use_cuda else target
 
+    def rewards_to_target(self, rewards):
+        target = ntorch.tensor( rewards, ("batch",) ).long().relu()
+        return target.cuda() if self.use_cuda else target
+
     def sample_actions(self, states):
         #assumes list of states, returns corresponding list of actions
         chars, masks, last_butts = self.states_to_tensors(states)
@@ -283,6 +287,13 @@ class Agent:
         chars, masks, last_butts = self.states_to_tensors(states)
         targets = self.actions_to_target(actions)
         loss = self.nn.learn_supervised(chars, masks, last_butts, targets)
+        return loss
+
+    def value_fun_step(self, states, rewards):
+        chars, masks, last_butts = self.states_to_tensors(states)
+        targets = self.rewards_to_target(rewards)
+        print("TARGETS",targets.sum("batch").item())
+        loss = self.Vnn.learn_supervised(chars, masks, last_butts, targets)
         return loss
 
     def get_rollouts(self, env, n_rollouts=1000, max_iter=30):
@@ -384,8 +395,10 @@ class Agent:
 
     def load(self, loc):
         self.nn.load(loc)
+        print('loaded policy net')
         if self.value_net: 
             self.Vnn.load(loc+'vnet')
+            print('loaded value net')
 
 if __name__ == '__main__':
     print ("hi")
