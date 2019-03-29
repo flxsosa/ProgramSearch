@@ -329,71 +329,88 @@ class Agent:
         return traces
 
     def beam_rollout(self, env, beam_size=1000, max_iter=30):
-        BeamEntry = namedtuple("BeamEntry", "env trace score")
-        #TraceEntry = namedtuple("TraceEntry", "prev_s action reward s done")
+        BeamEntry = namedtuple("BeamEntry", "env score")
 
-        beam = []
-        s = env.reset()
-        ll, argmax = self.all_actions([s]) #the whole thing
+        beam = [ BeamEntry(env.copy(), 0.0) for _ in range(beam_size)]
+
+        for t in range(max_iter):
+
+            state_list = [ be.env.reset() for be in beam ] #if not be.env.done
+            lls, argmax = self.all_actions(state_list)
 
 
-#action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
-        assert argmax.shape["batch"] == 1
-        for kk in range(argmax.shape["actions"]): #for first round:
-            action = self.idx_to_action[argmax[{"batch":0, "actions":kk}].item()]
-            score = ll[{"batch":0, "actions":kk}].item()
-            e = env.copy()
+            #sort by score + prev_score
+
+            #cut off top beam_size
+            #make actual buttons, run step on envs
             ss, r, done = e.step(action)
-            t = TraceEntry(s, action, r, ss, done)
-            beam.append(BeamEntry(e, [t], score))
 
-        beam = sorted(beam, key=lambda x: -x.score)[:beam_size]
-        #beam = ( env, trace, score )
-        #get_done = lambda x: x.trace.done
-        #get_score = lambda x: x.score
 
-        for i in range(1, max_iter):
-            #get top_k actions
-            print("iteration:", i)
-            new_beam = []
-            s_list = []
-            for b in beam:
-                if b.trace[-1].done:
-                    # if b.trace[-1].reward == 1: #if 
-                    #     new_beam.append(b)
-                    continue
-                #tr = b.trace
-                s = b.trace[-1].s
-                s_list.append(s)
 
-            ll, argmax = self.all_actions(s_list)
-            #top_actions_iter = iter(top_actions)
-            batch_size_iter = iter(range(argmax.shape["batch"]))
-            s_list_iter = iter(s_list)
-            for b in beam:
+
+
+#         BeamEntry = namedtuple("BeamEntry", "env trace score")
+#         #TraceEntry = namedtuple("TraceEntry", "prev_s action reward s done")
+
+#         beam = []
+#         s = env.reset()
+#         ll, argmax = self.all_actions([s]) #the whole thing
+
+# #action_list = [[ (self.idx_to_action[argmax[{"batch":i, "actions":kk}].item()], ll[{"batch":i, "actions":kk}].item()) for kk in range(k)] for i in range(argmax.shape["batch"])  ] 
+#         assert argmax.shape["batch"] == 1
+#         for kk in range(argmax.shape["actions"]): #for first round:
+#             action = self.idx_to_action[argmax[{"batch":0, "actions":kk}].item()]
+#             score = ll[{"batch":0, "actions":kk}].item()
+#             e = env.copy()
+#             ss, r, done = e.step(action)
+#             t = TraceEntry(s, action, r, ss, done)
+#             beam.append(BeamEntry(e, [t], score))
+
+#         beam = sorted(beam, key=lambda x: -x.score)[:beam_size]
+#         #beam = ( env, trace, score )
+#         #get_done = lambda x: x.trace.done
+#         #get_score = lambda x: x.score
+
+#         for i in range(1, max_iter):
+#             #get top_k actions
+#             print("iteration:", i)
+#             new_beam = []
+#             s_list = []
+#             for b in beam:
+#                 if b.trace[-1].done:
+#                     # if b.trace[-1].reward == 1: #if 
+#                     #     new_beam.append(b)
+#                     continue
+#                 #tr = b.trace
+#                 s = b.trace[-1].s
+#                 s_list.append(s)
+
+#             ll, argmax = self.all_actions(s_list)
+#             #top_actions_iter = iter(top_actions)
+#             batch_size_iter = iter(range(argmax.shape["batch"]))
+#             s_list_iter = iter(s_list)
+#             for b in beam:
                 
-                if b.trace[-1].done:
-                    if b.trace[-1].reward == 1: #if 
-                        new_beam.append(b)
-                    continue
-                tr = b.trace
-                #s = b.trace[-1].s
-                #_top_actions = next(top_actions_iter)
-                bb = next(batch_size_iter)
-                s = next(s_list_iter)
-                for kk in range(min(argmax.shape["actions"], beam_size)):
-                    action = self.idx_to_action[argmax[{"batch":bb, "actions":kk}].item()]
-                    score = ll[{"batch":bb, "actions":kk}].item()
-                    e = b.env.copy()
-                    ss, r, done = e.step(action)
-                    if done and r < 1.0: #ie, if it is a crash state, don't use it
-                        continue
-                    new_te = TraceEntry(s, action, r, ss, done) 
-                    new_beam.append(BeamEntry(e, tr + [new_te], score + b.score))
-                    
-                new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
-            new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
-            beam = new_beam
+#                 if b.trace[-1].done:
+#                     if b.trace[-1].reward == 1: #if 
+#                         new_beam.append(b)
+#                     continue
+#                 tr = b.trace
+#                 bb = next(batch_size_iter)
+#                 s = next(s_list_iter)
+#                 for kk in range(min(argmax.shape["actions"], beam_size)):
+#                     action = self.idx_to_action[argmax[{"batch":bb, "actions":kk}].item()]
+#                     score = ll[{"batch":bb, "actions":kk}].item()
+#                     e = b.env.copy()
+#                     ss, r, done = e.step(action)
+#                     if done and r < 1.0: #ie, if it is a crash state, don't use it
+#                         continue
+#                     new_te = TraceEntry(s, action, r, ss, done) 
+#                     new_beam.append(BeamEntry(e, tr + [new_te], score + b.score))
+
+#                 new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
+#             new_beam = sorted(new_beam, key=lambda x: -x.score)[:beam_size]
+#             beam = new_beam
         return beam
 
     def save(self, loc):
