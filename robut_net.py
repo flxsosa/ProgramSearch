@@ -95,6 +95,7 @@ class Encoder(nn.Module):
 
 class Model(nn.Module):
     def __init__(self, num_actions, value_net=False):
+        self.value_net = value_net
         super(Model, self).__init__()
         self.encoder = Encoder()
 
@@ -131,9 +132,10 @@ class Model(nn.Module):
         x = ntorch.cat([x, lb_emb], "h")
         x = self.fc(x).relu()
         x = self.decoder(x) #TODO, this may not exactly be enough?
-        # x = x._new(
-        #  F.log_softmax(x._tensor, dim=x._schema.get("actions"))
-        #     ) #TODO XXX FIXME DON"T LEAVE THIS
+        if self.value_net:
+        x = x._new(
+         F.log_softmax(x._tensor, dim=x._schema.get("value"))
+            ) #TODO XXX FIXME DON"T LEAVE THIS
         return x 
 
     def learn_supervised(self, chars, masks, last_butts, targets):
