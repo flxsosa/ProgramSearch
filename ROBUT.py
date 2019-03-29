@@ -622,12 +622,15 @@ class ROBENV:
     def reset(self):
         self.done = False
         self.pstate = RobState.new(self.inputs, self.outputs)
-        return self.pstate.to_np()
+        first_ob = self.pstate.to_np()
+        self.last_step = first_ob, 0.0, self.done
+        return first_ob
 
     def copy(self):
         to_ret = ROBENV(self.inputs, self.outputs)
         to_ret.done = self.done
         to_ret.pstate = self.pstate.copy()
+        to_ret.last_step = self.last_step
         return to_ret
 
     def step(self, btn_action):
@@ -639,7 +642,8 @@ class ROBENV:
                 print ("error ", e)
                 print(traceback.format_exc())
                 self.done = True
-            return RobState.crash_state_np(), -1.0, True 
+            self.last_step = RobState.crash_state_np(), -1.0, True 
+            return self.last_step
 
         reward = 0.0 if self.pstate.committed != self.pstate.outputs else 1.0
         done = False if reward == 0.0 else True
@@ -650,7 +654,8 @@ class ROBENV:
             done = True
 
         self.done = done
-        return state_ob, reward, done
+        self.last_step = state_ob, reward, done
+        return self.last_step
 
 class RepeatAgent:
 
@@ -770,6 +775,8 @@ def apply_fs(pstate, funcs):
     else:
         last_state = apply_fs(pstate, funcs[:-1])
         return funcs[-1](last_state)
+
+# =================== TESTS ========================
 
 def test1():
     pstate = RobState.new(["12A", "2A4", "A45", "4&6", "&67"],
@@ -972,8 +979,7 @@ def test9():
 
 def test10():
     S, A = get_supervised_sample()
-    assert 0
-    print ("generated these number of states", len(S))
+    # print ("generated these number of states", len(S))
     from robut_net import Agent
     agent = Agent(ALL_BUTTS)
     for i in range(400):
@@ -1005,5 +1011,5 @@ if __name__ == '__main__':
     #test7()
     #test8()
     #test9()
-    test10()
-    #test11()
+    #test10()
+    test11()
