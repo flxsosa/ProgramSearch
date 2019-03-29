@@ -37,6 +37,13 @@ class RobState:
         self.outputs   = [x for x in outputs]
         self.past_buttons = [x for x in past_buttons]
 
+    def copy(self):
+        return RobState(self.inputs,
+                        self.scratch,
+                        self.committed,
+                        self.outputs,
+                        self.past_buttons)
+
     def __repr__(self):
         return str((self.inputs, self.scratch, self.committed, self.outputs, self.past_buttons))
 
@@ -111,9 +118,11 @@ class Commit(Button):
         scratch_new = pstate.inputs
         committed_new = [x[0]+x[1] for x in zip(pstate.committed, pstate.scratch)]
         # check commit is sensible
-        # for commit, output in zip(committed_new, pstate.outputs):
-        #     if not output.startswith(commit):
-        #         raise CommitPrefixError
+        for commit, output in zip(committed_new, pstate.outputs):
+            if output == "":
+                continue
+            if not output.startswith(commit):
+                raise CommitPrefixError
         return RobState(pstate.inputs,
                         scratch_new,
                         committed_new,
@@ -169,7 +178,6 @@ class Replace1(Button):
                         pstate.committed,
                         pstate.outputs,
                         pstate.past_buttons + [self])
-        ret.replace1 = self.d1
         return ret
 
 class Replace2(Button):
@@ -184,8 +192,7 @@ class Replace2(Button):
     def __call__(self, pstate):
         if "Replace1" not in pstate.past_buttons[-1].name:
             raise ButtonSeqError
-        d1 = pstate.replace1
-        #print (pstate)
+        d1 = pstate.past_buttons[-1].d1
         scratch_new = [x.replace(d1, self.d2) for x in pstate.scratch]
         return RobState(pstate.inputs,
                         scratch_new,
@@ -617,6 +624,12 @@ class ROBENV:
         self.pstate = RobState.new(self.inputs, self.outputs)
         return self.pstate.to_np()
 
+    def copy(self):
+        to_ret = ROBENV(self.inputs, self.outputs)
+        to_ret.done = self.done
+        to_ret.pstate = self.pstate.copy()
+        return to_ret
+
     def step(self, btn_action):
         try:
             self.pstate = btn_action(self.pstate)
@@ -653,6 +666,9 @@ def get_rollout(env, agent, max_iter):
     trace = []
     s = env.reset()
     for i in range(max_iter):
+        
+        if random.random() < 0.5:
+            env = env.copy()
         a = agent.act(s)
         ss, r, done = env.step(a)
         trace.append((s, a, r, ss, str(env.pstate.scratch[0])))
@@ -969,16 +985,25 @@ def test10():
     print("model actions:")
     print(actions)
 
+def test11():
 
+    from ROB import generate_FIO
+
+    prog, inputs, outputs = generate_FIO(5)
+    env = ROBENV(inputs, outputs)
+    repeat_agent = RepeatAgent(prog.flatten())
+    trace = get_rollout(env, repeat_agent, 30)
+    print ([x[1:3] for x in trace])
 
 if __name__ == '__main__':
     #test1()
     #test2()
     #test3()
-    test4()
+    #test4()
     #test5()
     #test6()
     #test7()
     #test8()
     #test9()
     test10()
+    #test11()
