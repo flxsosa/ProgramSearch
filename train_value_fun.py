@@ -2,10 +2,11 @@
 
 from ROBUT import get_supervised_sample, ALL_BUTTS
 from robut_net import Agent
-import args
+import arguments.args as args
 import torch
 import time
 import random
+
 
 
 def sample_from_traces(traces, biased=False):
@@ -26,7 +27,6 @@ def train_value_fun(mode='unbiased'):
     from ROBUT import ROBENV
     print(f"is cuda available? {torch.cuda.is_available()}")
     agent = Agent(ALL_BUTTS, value_net=True)
-
     try:
         agent.load(args.save_path)
         print("loaded model")
@@ -40,17 +40,20 @@ def train_value_fun(mode='unbiased'):
     print("num params in value net:", num_params)
 
 
-    for i in range(1000):
-        prog, inputs, outputs = generate_FIO(5)
-        env = ROBENV(inputs, outputs)
-        
+    for i in range(4000):
+        envs = []
+        for _ in range(args.n_envs_per_rollout):
+            prog, inputs, outputs = generate_FIO(5)
+            env = ROBENV(inputs, outputs)
+            envs.append(env)
+            
         ro_t = time.time()
-        traces = agent.get_rollouts(env, n_rollouts=args.n_rollouts) #TODO refactor
+        traces = agent.get_rollouts(envs, n_rollouts=args.n_rollouts) #TODO refactor
         ro_t2 = time.time()
-        states, rewards = sample_from_traces(traces) #TODO
+        states, rewards = sample_from_traces(traces)
 
         t = time.time()
-        loss = agent.value_fun_optim_step(states, rewards) #TODO
+        loss = agent.value_fun_optim_step(states, rewards)
         t2 = time.time()
 
         if i!=0: print(f"iteration {i}, loss {loss.item()}, net time: {t2-t}, rollout time: {ro_t2 - ro_t}, tot other time {t-t3}")

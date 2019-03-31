@@ -16,7 +16,7 @@ encoder = 'dense'
 
 num_dense_layers = 10
 
-growth_rate = 56
+growth_rate = 128
 
 button_embed_dim = 32
 
@@ -24,7 +24,9 @@ batchsize = 2000
 
 train_iterations = 100000
 
-save_path = 'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
+save_path = 'robut_model_big_conv.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
+
+#big means fatter ... 10 layers of 128 growth rate
 
 #Vnet_save_path = 'robut_vnet.p' 
 
@@ -34,7 +36,9 @@ save_freq = 100
 
 test_freq = 1000
 
-column_enc = 'linear' #'conv' #'linear'
+column_enc = 'conv' #'linear' #'conv' #'linear' 
 kernel_size = 5
 
-n_rollouts = 1000
+n_rollouts = 20
+
+n_envs_per_rollout = 50

@@ -3,7 +3,7 @@ import torch
 # Text text processing library and methods for pretrained word embeddings
 from torch import nn
 import numpy as np
-import args
+import arguments.args as args
 # Named Tensor wrappers
 from namedtensor import ntorch, NamedTensor
 import torch.nn.functional as F
@@ -311,21 +311,27 @@ class Agent:
         output_dists = self.Vnn(chars, masks, last_butts)
         return output_dists
 
-    def get_rollouts(self, env, n_rollouts=1000, max_iter=30):
-
+    def get_rollouts(self, initial_envs, n_rollouts=1000, max_iter=30):
+        """
+        initial_envs is a list of initial envs
+        n_rollouts is per initial_env
+        """
         from ROBUT import ROBENV
-        s = env.reset()
+        n_initial_envs = len(initial_envs)
         envs = []
-        for _ in range(n_rollouts):
-            e = ROBENV(env.inputs, env.outputs)
-            e.reset()
-            envs.append(e)
+        traces = []
+        active_states = []
+        for env in initial_envs:
+            env.reset()
+            for _ in range(n_rollouts):
+                e = env.copy()
+                envs.append(e)
+                traces.append([])
+                active_states.append( env.last_step[0] )
 
-        traces = [ [] for _ in range(n_rollouts) ]
+        #traces = [ [] for _ in range(n_rollouts) ]
         for i in range(max_iter):
-            if i==0:
-                active_states = [s for _ in range(n_rollouts)]
-            else:
+            if not i==0:
                 active_states = [t[-1].s for t in traces if not t[-1].done]
             action_list = self.sample_actions(active_states) if active_states else []
             #prevents nn running on nothing 
@@ -333,24 +339,16 @@ class Agent:
             active_states_iter = iter(active_states)
             if action_list == []: return traces
 
-            for j in range(n_rollouts):
+            for j in range(n_initial_envs*n_rollouts):
                 if i>0 and traces[j][-1].done: #if done:
                     continue
                 a = next(action_list_iter)
                 ss, r, done = envs[j].step(a)
                 if i==0:
-                    prev_s = s
+                    prev_s = envs[j].last_step[0]
                 else:
                     prev_s = traces[j][-1].prev_s
-                    # xx = next(active_states_iter)
-                    # assert np.all(xx[0] == prev_s[0])
-                    # assert np.all(xx[1] == prev_s[1])
-                    # assert np.all(xx[2] == prev_s[2])
-                    # assert np.all(xx[3] == prev_s[3])
-                    # assert np.all(xx[4] == prev_s[4])
-                    # assert xx[5] == prev_s[5]
                 traces[j].append( TraceEntry(prev_s, a, r, ss, done) )
-
         return traces
 
     def beam_rollout(self, env, beam_size=1000, max_iter=30, verbose=False):
@@ -456,10 +454,10 @@ class Agent:
 
     def load(self, loc):
         self.nn.load(loc)
-        print('loaded policy net')
+        print(f"loaded policy net from {loc}")
         if self.value_net: 
             self.Vnn.load(loc+'vnet')
-            print('loaded value net')
+            print(f"loaded value net from {loc}")
 
 if __name__ == '__main__':
     print ("hi")

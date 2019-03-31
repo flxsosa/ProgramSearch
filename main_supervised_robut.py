@@ -46,7 +46,7 @@ todo:
 
 from ROBUT import get_supervised_sample, ALL_BUTTS
 from robut_net import Agent
-import args
+import arguments.args as args
 import torch
 import time
 
@@ -165,7 +165,7 @@ def test_get_rollouts():
     print("loaded model")
     prog, inputs, outputs = generate_FIO(5)
     env = ROBENV(inputs, outputs)
-    traces = agent.get_rollouts(env, n_rollouts=1000, max_iter=30)
+    traces = agent.get_rollouts([env], n_rollouts=1000, max_iter=30)
     num_hits = sum([t[-1].reward > 0 for t in traces ])
     print (num_hits)#print(traces)
 
@@ -198,6 +198,24 @@ def test_a_star():
     print("number of solutions", len(solutions))
     print("solutions:", solutions)
 
+def test_multistate_rollouts():
+    global traces
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS)
+    agent.load(args.save_path)
+    print("loaded model")
+    envs = []
+    for i in range(50):
+        prog, inputs, outputs = generate_FIO(5)
+        env = ROBENV(inputs, outputs)
+        envs.append(env)
+
+    traces = agent.get_rollouts(envs, n_rollouts=20, max_iter=30)
+    num_hits = sum([t[-1].reward > 0 for t in traces ])
+    print (num_hits)#print(traces)
+
 if __name__=='__main__':
     #test_gsb()
     #train()
@@ -205,4 +223,6 @@ if __name__=='__main__':
     #play_with_trained_model()
     #test_get_rollouts()
     #test_beam()
-    test_a_star()
+    #test_a_star()
+    test_multistate_rollouts()
+    #train_value_fun()
