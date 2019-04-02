@@ -10,7 +10,9 @@ import pregex as pre
 import traceback
 
 _INDEX = list(range(-5, 6))
-_POSITION_K = list(range(-100, 101))
+# TODO boost length of input so these number gets tested
+# _POSITION_K = list(range(-100, 101))
+_POSITION_K = list(range(-50, 51))
 _CHARACTER = string.printable[:-4]
 _DELIMITER = "& , . ? ! @ ( ) [ ] % { } / : ; $ # \" '".split(' ')
 _BOUNDARY = ["Start", "End"]
