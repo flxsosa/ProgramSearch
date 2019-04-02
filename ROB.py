@@ -383,8 +383,8 @@ class GetAll:
     @staticmethod
     def generate():
         t = R.generate_type()
-        i = random.choice(_INDEX)
-        return GetFrom(t, i)
+        #i = random.choice(_INDEX)
+        return GetAll(t)
 
     def __init__(self, t):
         self.t = t

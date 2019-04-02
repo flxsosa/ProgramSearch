@@ -14,18 +14,25 @@ todo:
 - [X] start a training job
 - [X] conv column_encoding
 
-- [ ] value fun
+- [X] value fun
 - train value fun!!
     - [X] write training loop
-        - [ ] write biased version?
-        - [ ] batch multiple states together during rollout to lower reward variance
+        - [ ] write biased version? - nah
+        - [X] batch multiple states together during rollout to lower reward variance
     - [ ] is getting the indicies the step which takes the longest???
     
     - [X] make compatible with current networks easily
     - [ ] refactor get_rollouts for speed
     - [X] run!
 
-- [ ] A* search!!!
+- [X] A* search!!!
+
+*** in beam with value: 
+- [ ] mini batch running value fun so we can do more without memory error
+
+*** training
+    - use button type head
+    - modify training distribution
 
 - [X] batched rollout
 - [ ] nn modifications
@@ -49,6 +56,8 @@ from robut_net import Agent
 import arguments.args as args
 import torch
 import time
+
+from train_value_fun import train_value_fun
 
 def get_supervised_batchsize(fn, batchsize=200):
     #takes a generation function and outputs lists of optimal size
@@ -84,7 +93,7 @@ def train():
     agent = Agent(ALL_BUTTS, value_net=True)
 
     try:
-        agent.load(args.save_path)
+        agent.load(args.load_path)
         print("loaded model")
     except FileNotFoundError:
         print ("no saved model found ... training from scratch")
@@ -175,13 +184,16 @@ def test_beam():
     from ROB import generate_FIO
     from ROBUT import ROBENV
     print(f"is cuda available? {torch.cuda.is_available()}")
-    agent = Agent(ALL_BUTTS)
+    agent = Agent(ALL_BUTTS, value_net=True)
     agent.load(args.save_path)
     print("loaded model")
     prog, inputs, outputs = generate_FIO(5)
+    print("desired prog:", prog.flatten())
     env = ROBENV(inputs, outputs)
-    beam, solutions = agent.beam_rollout(env, beam_size=1000, max_iter=30)
-    print("number of solutions", len(solutions))
+    beam, solutions = agent.beam_rollout(env, beam_size=1000, max_iter=30, use_value=False)
+    print("number of solutions, no value", len(solutions))
+    beam, solutions = agent.beam_rollout(env, beam_size=1000, max_iter=30, use_value=True)
+    print("number of solutions, w value", len(solutions))
 
 def test_a_star():
     global beam
@@ -216,13 +228,32 @@ def test_multistate_rollouts():
     num_hits = sum([t[-1].reward > 0 for t in traces ])
     print (num_hits)#print(traces)
 
+def interact_beam():
+    global beam
+    global solutions
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS, value_net=True)
+    agent.load(args.save_path)
+    print("loaded model")
+    prog, inputs, outputs = generate_FIO(5)
+    env = ROBENV(inputs, outputs)
+    print("inputs:", inputs)
+    print("outputs", outputs)
+    print("gt:", prog.flatten())
+    solutions = agent.interact_beam_rollout(env, beam_size=20, verbose=True)
+    print("number of solutions", len(solutions))
+    print("solutions:", solutions)
+
 if __name__=='__main__':
     #test_gsb()
     #train()
     #play_with_trained_model()
     #play_with_trained_model()
     #test_get_rollouts()
-    #test_beam()
+    test_beam()
     #test_a_star()
-    test_multistate_rollouts()
+    #test_multistate_rollouts()
     #train_value_fun()
+    #interact_beam()
