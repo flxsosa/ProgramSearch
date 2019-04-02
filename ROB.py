@@ -738,16 +738,75 @@ def test11():
         trace = get_rollout(env, repeat_agent, 30)
     #    print ([x[1:3] for x in trace])
 
+def test12():
+    '''
+    get the statistics of all the buttons
+    '''
+    ALL_A = dict()
+    for i in range(10000):
+        S, A = BUTT.get_supervised_sample()
+        ob_list = [str(s) for s in S]
+            
+        for a in A:
+            if a.name not in ALL_A:
+                ALL_A[a.name] = 0
+            ALL_A[a.name] += 1
+
+        print (i)
+        if i % 1000 == 0:
+            xx = []
+            for b in BUTT.ALL_BUTTS:
+                b_name = b.name
+                if b_name not in ALL_A:
+                    xx.append(0)
+                else:
+                    xx.append(ALL_A[b_name])
+
+            import matplotlib.pyplot as plt
+            
+            objects = [b.name for b in BUTT.ALL_BUTTS][:-1]
+            y_pos = np.arange(len(objects))
+            performance = xx[:-1]
+
+            fig, ax = plt.subplots(figsize=(50, 100))
+
+            ax.barh(y_pos, performance)
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(objects)
+
+            plt.savefig('butt_distr.png')
+
+def test13():
+    for i in range(100000):
+        prog, inputs, outputs = generate_FIO(5)
+        env = BUTT.ROBENV(inputs, outputs)
+        repeat_agent = BUTT.RepeatAgent(prog.flatten())
+        trace = get_rollout(env, repeat_agent, 30)
+
+        str_obs = [str(x[0]) for x in trace]
+        if len(str_obs) != len(set(str_obs)):
+            for i in range(len(trace)):
+                for j in range(len(trace)):
+                    if i != j:
+                        if str(trace[i][0]) == str(trace[j][0]):
+                            print ("collision across ")
+                            print (i)
+                            print (j)
+                            import pdb; pdb.set_trace()
+
+
 if __name__ == '__main__':
-    test1()
-    test2()
-    test3()
-    test4()
-    test5()
-    test6()
-    test7()
-    test8()
-    # test9()
-    # test10()
-    test11()
+    # test1()
+    # test2()
+    # test3()
+    # test4()
+    # test5()
+    # test6()
+    # test7()
+    # test8()
+    # # test9() crashes
+    # # test10() crashes
+    # test11()
+    test12()
+    # test13()
 
