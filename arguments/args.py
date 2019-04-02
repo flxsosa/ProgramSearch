@@ -1,5 +1,5 @@
 
-pooling = 'mean'
+pooling = 'mean' #"max"
 
 h_out = 128
 
@@ -25,7 +25,7 @@ batchsize = 2000
 train_iterations = 100000
 
 save_path = 'robut_model_big_conv.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
-
+load_path = 'robut_model_big_conv.p'
 #big means fatter ... 10 layers of 128 growth rate
 
 #Vnet_save_path = 'robut_vnet.p' 

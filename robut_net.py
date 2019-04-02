@@ -114,7 +114,7 @@ class Model(nn.Module):
         self.fc = ntorch.nn.Linear(args.h_out+args.button_embed_dim, args.h_out)
         #pooling:
         if args.pooling == "max":
-            self.pooling = lambda x: x.max("Examples")
+            self.pooling = lambda x: x.max("Examples")[0]
         elif args.pooling == "mean":
             self.pooling = lambda x: x.mean("Examples")
         elif args.pooling == "attn":
@@ -301,7 +301,7 @@ class Agent:
     def value_fun_optim_step(self, states, rewards):
         chars, masks, last_butts = self.states_to_tensors(states)
         targets = self.rewards_to_target(rewards)
-        print("TARGETS",targets.sum("batch").item())
+        #print("TARGETS",targets.sum("batch").item())
         loss = self.Vnn.learn_supervised(chars, masks, last_butts, targets)
         return loss
 
@@ -351,7 +351,7 @@ class Agent:
                 traces[j].append( TraceEntry(prev_s, a, r, ss, done) )
         return traces
 
-    def beam_rollout(self, env, beam_size=1000, max_iter=30, verbose=False):
+    def beam_rollout(self, env, beam_size=1000, max_iter=30, verbose=False, use_value=False, value_filter_size=4000):
         BeamEntry = namedtuple("BeamEntry", "env score")
         env.reset()
         beam = [ BeamEntry(env.copy(), 0.0)] #for _ in range(beam_size)]
@@ -361,7 +361,6 @@ class Agent:
             state_list = [be.env.last_step[0] for be in beam]
             # get the current log-likelihood for extending the head of the beam
             lls, argmax = self.all_actions(state_list)
-            vals
 
             lls = lls.detach().cpu().numpy()
             # massage the previous into the right shape and add it to the current head
@@ -394,14 +393,84 @@ class Agent:
                 new_beam.append( bentry )
                 new_beam_size += 1
 
+                max_size = value_filter_size if use_value else beam_size
+                if new_beam_size >= max_size:
+                    break
+
+            if use_value:
+                new_states = [b.env.last_step[0] for b in new_beam]
+                value_ll = self.compute_values(new_states)
+
+                new_beam_w_value = []
+                for i, b in enumerate(new_beam):
+                    val = value_ll[{"batch":i, "value":1}].item()
+                    new_beam_w_value.append((b, val))
+
+                new_beam_w_value = sorted(new_beam_w_value, key = lambda x: - x[0].score - x[1])
+                new_beam = list(zip(*new_beam_w_value[:beam_size]))[0]
+
+            beam = new_beam                
+        return beam, solutions 
+
+    def interact_beam_rollout(self, env, beam_size=10, max_iter=30, verbose=True):
+        BeamEntry = namedtuple("BeamEntry", "env score")
+        env.reset()
+        beam = [ BeamEntry(env.copy(), 0.0)] #for _ in range(beam_size)]
+        solutions = []
+        for t in range(max_iter):
+            print("beam iteration", t)
+            state_list = [be.env.last_step[0] for be in beam]
+            # get the current log-likelihood for extending the head of the beam
+            lls, argmax = self.all_actions(state_list)
+
+            lls = lls.detach().cpu().numpy()
+            # massage the previous into the right shape and add it to the current head
+            lls_prev = np.array([be.score for be in beam])
+            curr_beam_len = len(beam)
+            lls_prev = np.expand_dims(lls_prev, axis=1)
+            lls_prev = np.repeat(lls_prev, len(self.actions), axis=1)
+            # this is the llhood of all the candidate beams which we need to sort
+            lls_curr = lls_prev + lls
+            lls_curr = np.reshape(lls_curr, (curr_beam_len * len(self.actions), ))
+
+            idxs = np.argsort(-lls_curr)
+            new_beam = []
+            new_beam_size = 0
+            for idx in idxs:
+                s_a_idx = np.unravel_index(idx, (curr_beam_len, len(self.actions)))
+                action = self.idx_to_action[argmax[{"batch": int(s_a_idx[0]), "actions": int(s_a_idx[1])}].item()]
+                state = beam[int(s_a_idx[0])].env.copy()
+
+                state.step(action)
+
+                value_ll = self.compute_values([state.last_step[0]])
+                state_ll = value_ll[{"batch":0, "value":1}].item()
+                
+                if state.last_step[1] == -1: #reward
+                    if verbose: print (f"crasherinoed! with action: {action}, score: {lls_curr[idx]}, value: {state_ll}")
+                    continue
+                if state.last_step[1] == 1: #reward
+                    solutions.append(state)
+                    if verbose: 
+                        print (f"success ! with action: {action}, score: {lls_curr[idx]}, value: {state_ll}")
+                    continue
+
+                bentry = BeamEntry(state, lls_curr[idx])
+                new_beam.append( bentry )
+                new_beam_size += 1
+
+                print (f"i: {len(new_beam)-1} action: {action}, score: {bentry.score}, value: {state_ll}")
+
                 if new_beam_size >= beam_size:
                     break
                 # print(action)
                 # print(state)
                 # print (bentry.env.last_step)
 
-            beam = new_beam                
-        return beam, solutions 
+            i = input()
+            beam = [new_beam[int(i)]]  
+            print("button selected:", beam[0].env.pstate.past_buttons[-1])              
+        return beam, solutions
 
     def a_star_rollout(self, env, batch_size=1000, max_count=1000*723*30, max_iter=30, verbose=False):
 
@@ -443,9 +512,6 @@ class Agent:
 
 
         return solutions
-
-
-
 
     def save(self, loc):
         self.nn.save(loc)

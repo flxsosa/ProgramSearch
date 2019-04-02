@@ -2,7 +2,7 @@
 
 from ROBUT import get_supervised_sample, ALL_BUTTS
 from robut_net import Agent
-import arguments.args as args
+import arguments.args_max as args
 import torch
 import time
 import random
@@ -28,7 +28,7 @@ def train_value_fun(mode='unbiased'):
     print(f"is cuda available? {torch.cuda.is_available()}")
     agent = Agent(ALL_BUTTS, value_net=True)
     try:
-        agent.load(args.save_path)
+        agent.load(args.load_path)
         print("loaded model")
     except FileNotFoundError:
         print ("no saved model found ... training value function from scratch") #TODO XXX
@@ -56,7 +56,7 @@ def train_value_fun(mode='unbiased'):
         loss = agent.value_fun_optim_step(states, rewards)
         t2 = time.time()
 
-        if i!=0: print(f"iteration {i}, loss {loss.item()}, net time: {t2-t}, rollout time: {ro_t2 - ro_t}, tot other time {t-t3}")
+        if i%args.print_freq==0 and i!=0: print(f"iteration {i}, loss {loss.item()}, net time: {t2-t}, rollout time: {ro_t2 - ro_t}, tot other time {t-t3}")
         t3 = t2
 
         if i%10==0: 
