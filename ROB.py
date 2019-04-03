@@ -752,7 +752,6 @@ def test12():
                 ALL_A[a.name] = 0
             ALL_A[a.name] += 1
 
-        print (i)
         if i % 1000 == 0:
             xx = []
             for b in BUTT.ALL_BUTTS:
@@ -796,17 +795,17 @@ def test13():
 
 
 if __name__ == '__main__':
-    # test1()
-    # test2()
-    # test3()
-    # test4()
-    # test5()
-    # test6()
-    # test7()
-    # test8()
-    # # test9() crashes
-    # # test10() crashes
-    # test11()
+    test1()
+    test2()
+    test3()
+    test4()
+    test5()
+    test6()
+    test7()
+    test8()
+    # test9() crashes
+    # test10() crashes
+    test11()
     test12()
     # test13()
 
