@@ -13,14 +13,18 @@ from collections import namedtuple
 TraceEntry = namedtuple("TraceEntry", "prev_s action reward s done")
 
 class QEntry(object):
-    def __init__(self, priority, env):
-        self.score = priority
+    def __init__(self, action_ll, value_score, env):
+        self.policy_score = action_ll
         self.env = env
+        self.value_score = value_score
+
+        self._score = self.policy_score + self.value_score
+
     def __cmp__(self, other):
-        return cmp(-self.score, -other.score)
+        return cmp(-self._score, -other._score)
 
     def __lt__(self, other):
-        return -self.score < -other.score
+        return -self._score < -other._score
 
 class AttnPooling(nn.Module):
     """
@@ -472,12 +476,13 @@ class Agent:
             print("button selected:", beam[0].env.pstate.past_buttons[-1])              
         return beam, solutions
 
-    def a_star_rollout(self, env, batch_size=1000, max_count=1000*723*30, max_iter=30, verbose=False):
+    def a_star_rollout(self, env, batch_size=1, max_count=1000*723*30, max_iter=30, verbose=False, max_num_actions_expand=800, beam_size=800):
 
         from queue import PriorityQueue
         q = PriorityQueue()
         env.reset()
-        q.put(QEntry(0.0, env))
+        val = self.compute_values([env.last_step[0]])
+        q.put(QEntry(0.0, val[{"batch":0, "value":1}].item(), env))
 
         solutions = []
         while not q.empty() and q.qsize() < max_count: #TODO
@@ -485,31 +490,60 @@ class Agent:
             state_list = [ entry.env.last_step[0] for entry in toExpand]
 
             action_ll, argmax = self.all_actions(state_list) 
-            value_ll = self.compute_values(state_list)
-            print('ran both nns')   
+            
+            #value_ll = self.compute_values(state_list)
+    
+            print('ran policy nn')   
+
+
             for i, entry in enumerate(toExpand):
-                score = entry.score
+                print("i", i, entry.env.pstate.past_buttons, "total score", entry._score)
+                print("queue size:",  q.qsize())
+                prev_policy_score = entry.policy_score
                 e = entry.env
-                state_ll = value_ll[{"batch":i, "value":1}].item() #TODO XXX
+                #state_ll = value_ll[{"batch":i, "value":1}].item() #TODO XXX
+                new_beam = []
+                new_beam_size = 0
                 for idx in range(len(self.actions)): #can change this later to filter/prune
                     action = self.idx_to_action[argmax[{"batch": i, "actions": idx}].item()]
                     e_new = e.copy()
 
                     e_new.step(action)
                     if e_new.last_step[1] == -1: #reward
-                        if verbose: print ("crasherinoed!")
+                        #if verbose: print ("crasherinoed!")
                         continue
                     if e_new.last_step[1] == 1: #reward
                         solutions.append(e_new)
                         if verbose: print ("success ! ")
+                        assert 0
                         continue
                     if len(e_new.pstate.past_buttons) > max_iter:
                         if verbose: print("gone too far!")
                         continue
 
-                    new_score = score + action_ll[{"batch": i, "actions": idx}].item() + state_ll
-                    q.put(QEntry(new_score, e_new))
+                    new_beam.append(( e_new, action_ll[{"batch": i, "actions": idx}].item() ) )
+                    new_beam_size += 1
 
+                    # breaking condition for filter here FILTERING WITH JUST POLICY
+                    if new_beam_size >= max_num_actions_expand: break
+
+
+                new_states = [b[0].last_step[0] for b in new_beam]
+                value_ll = self.compute_values(new_states)
+
+                new_beam_w_value = []
+                for i, b in enumerate(new_beam):
+                    val = value_ll[{"batch":i, "value":1}].item()
+                    new_beam_w_value.append((b, val))
+
+                new_beam_w_value = sorted(new_beam_w_value, key = lambda x: - x[0][1] - x[1])
+                new_beam = new_beam_w_value[:beam_size]
+                #^^ FILTERING WITH POLICY + VALUE PREDICTION
+                for b, value_score in new_beam:      
+                    e_new, policy_score = b 
+
+                    #print(f"putting in: {e_new.pstate.past_buttons}, total score: {policy_score + prev_policy_score + value_score } ")
+                    q.put(QEntry(policy_score + prev_policy_score , value_score, e_new))
 
         return solutions
 

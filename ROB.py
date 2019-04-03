@@ -337,18 +337,18 @@ class GetFrom:
     @staticmethod
     def generate():
         r = R.generate()
-        i = random.choice(_INDEX)
-        return GetFrom(r, i)
+        #i = random.choice(_INDEX)
+        return GetFrom(r)
 
-    def __init__(self, r, i):
-        self.r, self.i = r, i
+    def __init__(self, r):
+        self.r = r
 
         dic = {r : 1, 
               }
         self.constr = dic, 0
 
     def __str__(self):
-        return "GetFrom" + str((self.r, self.i))
+        return "GetFrom" + str(self.r)
 
     def str_execute(self, input_str):
         raise NotImplementedError
@@ -750,4 +750,6 @@ if __name__ == '__main__':
     # test9()
     # test10()
     test11()
+
+
 
