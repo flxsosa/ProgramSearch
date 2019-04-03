@@ -84,13 +84,12 @@ class RobState:
         ret = np.zeros(shape = (len(list_of_str), max(_POSITION_K)))
         for i, strr in enumerate(list_of_str):
             for j, char in enumerate(strr):
-                ret[i][j] = _CHARACTER.index(char)
+                ret[i][j] = _CHARACTER.index(char) + 1
         return ret
         
 
     def to_np(self):
         last_butt = 0 if len(self.past_buttons) == 0 else ALL_BUTTS_TYPES.index(self.past_buttons[-1].__class__) + 1
-
 
         if self.past_buttons == []:
             masks = [Button.str_masks_to_np_default() for _ in range(len(self.inputs))]
