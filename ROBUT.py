@@ -127,6 +127,10 @@ class Button:
     def __str__(self):
         return self.__repr__()
 
+    # check if the next button is legal or not legal
+    def check_next_btn(self, nxt_btn):
+        return True
+
     def str_masks_to_np(self, str1, pstate):
         return Button.str_masks_to_np_default()
 
@@ -193,6 +197,9 @@ class Replace1(Button):
         self.name = f"Replace1({d1})"
         self.d1 = d1
 
+    def check_next_btn(self, nxt_btn):
+        if "Replace2" not in nxt_btn.name:
+            raise ButtonSeqError
 
     def str_masks_to_np(self, str1, pstate):
         str_masks = Button.str_masks_to_np_default()
@@ -234,14 +241,16 @@ class SubStr1(Button):
 
     @staticmethod
     def generate_buttons():
-        k1s = range(-100, 101)
-        ret = [SubStr1(k1) for k1 in k1s]
+        ret = [SubStr1(k1) for k1 in _POSITION_K]
         return ret
 
     def __init__(self, k1):
         self.name = f"SubStr1({k1})"
         self.k1 = k1
 
+    def check_next_btn(self, nxt_btn):
+        if "SubStr2" not in nxt_btn.name:
+            raise ButtonSeqError
 
     def str_masks_to_np(self, str1, pstate):
         str_masks = Button.str_masks_to_np_default()
@@ -261,8 +270,7 @@ class SubStr2(Button):
 
     @staticmethod
     def generate_buttons():
-        k2s = range(-100, 101)
-        ret = [SubStr2(k2) for k2 in k2s]
+        ret = [SubStr2(k2) for k2 in _POSITION_K]
         return ret
 
     def __init__(self, k2):
@@ -292,6 +300,10 @@ class GetToken1(Button):
         self.name = f"GetToken1({rname})"
         self.rname = rname
         self.t = _POSSIBLE_TYPES[rname]
+
+    def check_next_btn(self, nxt_btn):
+        if "GetToken2" not in nxt_btn.name:
+            raise ButtonSeqError
 
     def str_masks_to_np(self, str1, pstate):
         str_masks = Button.str_masks_to_np_default()
@@ -394,6 +406,10 @@ class GetFirst1(Button):
         self.rname = rname
         self.t = _POSSIBLE_TYPES[rname]
 
+    def check_next_btn(self, nxt_btn):
+        if "GetFirst2" not in nxt_btn.name:
+            raise ButtonSeqError
+
     def str_masks_to_np(self, str1, pstate):
         str_masks = Button.str_masks_to_np_default()
         # enumerate over all the regex masks
@@ -471,6 +487,10 @@ class GetSpan1(Button):
         self.rname = rname
         self.r1 = _POSSIBLE_R[rname]
 
+    def check_next_btn(self, nxt_btn):
+        if "GetSpan2" not in nxt_btn.name:
+            raise ButtonSeqError
+
     def str_masks_to_np(self, str1, pstate):
         return get_span_mask_render(str1, pstate.past_buttons[-1:])
 
@@ -490,6 +510,10 @@ class GetSpan2(Button):
     def __init__(self, i1):
         self.name = f"GetSpan2({i1})"
         self.i1 = i1
+
+    def check_next_btn(self, nxt_btn):
+        if "GetSpan3" not in nxt_btn.name:
+            raise ButtonSeqError
 
     def str_masks_to_np(self, str1, pstate):
         return get_span_mask_render(str1, pstate.past_buttons[-2:])
@@ -512,6 +536,10 @@ class GetSpan3(Button):
     def __init__(self, b1):
         self.name = f"GetSpan3({b1})"
         self.b1 = b1
+
+    def check_next_btn(self, nxt_btn):
+        if "GetSpan4" not in nxt_btn.name:
+            raise ButtonSeqError
 
     def str_masks_to_np(self, str1, pstate):
         return get_span_mask_render(str1, pstate.past_buttons[-3:])
@@ -536,6 +564,9 @@ class GetSpan4(Button):
         self.rname = rname
         self.r2 = _POSSIBLE_R[rname]
 
+    def check_next_btn(self, nxt_btn):
+        if "GetSpan5" not in nxt_btn.name:
+            raise ButtonSeqError
 
     def str_masks_to_np(self, str1, pstate):
         return get_span_mask_render(str1, pstate.past_buttons[-4:])
@@ -558,6 +589,10 @@ class GetSpan5(Button):
     def __init__(self, i2):
         self.name = f"GetSpan5({i2})"
         self.i2 = i2
+
+    def check_next_btn(self, nxt_btn):
+        if "GetSpan6" not in nxt_btn.name:
+            raise ButtonSeqError
 
     def str_masks_to_np(self, str1, pstate):
         return get_span_mask_render(str1, pstate.past_buttons[-5:])
@@ -674,6 +709,10 @@ class ROBENV:
         try:
             self.pstate = btn_action(self.pstate)
             state_ob = self.pstate.to_np()
+            # check sequence other way around
+            if len(self.pstate.past_buttons) >= 2:
+                prev_btn, cur_btn = self.pstate.past_buttons[-2:]
+                prev_btn.check_next_btn(cur_btn)
         except (IndexError, ButtonSeqError, CommitPrefixError, NoChangeError) as e:
             if self.verbose:
                 print ("CATCHING")

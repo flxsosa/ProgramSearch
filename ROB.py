@@ -743,7 +743,7 @@ def test12():
     get the statistics of all the buttons
     '''
     ALL_A = dict()
-    for i in range(10000):
+    for i in range(100000):
         S, A = BUTT.get_supervised_sample()
         ob_list = [str(s) for s in S]
             
@@ -752,7 +752,6 @@ def test12():
                 ALL_A[a.name] = 0
             ALL_A[a.name] += 1
 
-        print (i)
         if i % 1000 == 0:
             xx = []
             for b in BUTT.ALL_BUTTS:
@@ -817,6 +816,7 @@ def test15():
     print (masks[0])
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     # test1()
     # test2()
     # test3()
