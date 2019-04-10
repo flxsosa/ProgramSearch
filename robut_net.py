@@ -356,6 +356,10 @@ class Agent:
         return traces
 
     def beam_rollout(self, env, beam_size=1000, max_iter=30, verbose=False, use_value=False, value_filter_size=4000):
+        nodes_expanded = 0
+        policy_runs = 0
+        policy_gpu_runs = 0
+
         BeamEntry = namedtuple("BeamEntry", "env score")
         env.reset()
         beam = [ BeamEntry(env.copy(), 0.0)] #for _ in range(beam_size)]
@@ -365,6 +369,8 @@ class Agent:
             state_list = [be.env.last_step[0] for be in beam]
             # get the current log-likelihood for extending the head of the beam
             lls, argmax = self.all_actions(state_list)
+            policy_runs += len(state_list)
+            policy_gpu_runs += 1
 
             lls = lls.detach().cpu().numpy()
             # massage the previous into the right shape and add it to the current head
@@ -385,13 +391,20 @@ class Agent:
                 state = beam[int(s_a_idx[0])].env.copy()
 
                 state.step(action)
+                nodes_expanded += 1
                 if state.last_step[1] == -1: #reward
                     if verbose: print ("crasherinoed!")
                     continue
                 if state.last_step[1] == 1: #reward
                     solutions.append(state)
                     if verbose: print ("success ! ")
-                    continue
+                    print( f"success! in iteration {t}" )
+
+                    print("total nodes expanded", nodes_expanded)
+                    print("policy runs", policy_runs)
+                    print("gpu runs", policy_gpu_runs) 
+                    return beam, solutions
+                    #continue
 
                 bentry = BeamEntry(state, lls_curr[idx])
                 new_beam.append( bentry )
@@ -413,7 +426,11 @@ class Agent:
                 new_beam_w_value = sorted(new_beam_w_value, key = lambda x: - x[0].score - x[1])
                 new_beam = list(zip(*new_beam_w_value[:beam_size]))[0]
 
-            beam = new_beam                
+            beam = new_beam 
+
+        print("total nodes expanded", nodes_expanded)
+        print("policy runs", policy_runs)
+        print("gpu runs", policy_gpu_runs)               
         return beam, solutions 
 
     def interact_beam_rollout(self, env, beam_size=10, max_iter=30, verbose=True):
@@ -476,28 +493,35 @@ class Agent:
             print("button selected:", beam[0].env.pstate.past_buttons[-1])              
         return beam, solutions
 
-    def a_star_rollout(self, env, batch_size=1, max_count=1000*723*30, max_iter=30, verbose=False, max_num_actions_expand=800, beam_size=800):
+    def a_star_rollout(self, env, batch_size=1, max_count=1000*723*30, max_iter=30, verbose=False, max_num_actions_expand=800, beam_size=800, no_value=False):
+        nodes_expanded = 0
+        policy_runs = 0
+        policy_gpu_runs = 0
+        value_runs = 0
+        value_gpu_runs = 0
 
         from queue import PriorityQueue
         q = PriorityQueue()
         env.reset()
-        val = self.compute_values([env.last_step[0]])
-        q.put(QEntry(0.0, val[{"batch":0, "value":1}].item(), env))
+        val = self.compute_values([env.last_step[0]])[{"batch":0, "value":1}].item() if not no_value else 0.0
+        q.put(QEntry(0.0, val, env))
 
         solutions = []
         while not q.empty() and q.qsize() < max_count: #TODO
             toExpand = [ q.get_nowait() for _ in range(min(batch_size, q.qsize()))]
             state_list = [ entry.env.last_step[0] for entry in toExpand]
 
+
             action_ll, argmax = self.all_actions(state_list) 
-            
+            policy_gpu_runs += 1
+            policy_runs += len(state_list)
             #value_ll = self.compute_values(state_list)
     
             print('ran policy nn')   
 
 
             for i, entry in enumerate(toExpand):
-                print("i", i, entry.env.pstate.past_buttons, "total score", entry._score)
+                print(entry.env.pstate.past_buttons, "total score", entry._score)
                 print("queue size:",  q.qsize())
                 prev_policy_score = entry.policy_score
                 e = entry.env
@@ -509,14 +533,21 @@ class Agent:
                     e_new = e.copy()
 
                     e_new.step(action)
+                    nodes_expanded += 1
+
                     if e_new.last_step[1] == -1: #reward
                         #if verbose: print ("crasherinoed!")
                         continue
                     if e_new.last_step[1] == 1: #reward
                         solutions.append(e_new)
                         if verbose: print ("success ! ")
-                        assert 0
-                        continue
+                        print("total nodes expanded", nodes_expanded)
+                        print("policy runs", policy_runs)
+                        print("policy gpu runs", policy_gpu_runs)
+                        print("value runs", value_runs)
+                        print("value gpu runs", value_gpu_runs)
+                        return [e_new]
+                        #continue
                     if len(e_new.pstate.past_buttons) > max_iter:
                         if verbose: print("gone too far!")
                         continue
@@ -529,11 +560,13 @@ class Agent:
 
 
                 new_states = [b[0].last_step[0] for b in new_beam]
-                value_ll = self.compute_values(new_states)
+                value_ll = self.compute_values(new_states) if not no_value
+                value_runs += len(new_states)
+                value_gpu_runs += 1
 
                 new_beam_w_value = []
                 for i, b in enumerate(new_beam):
-                    val = value_ll[{"batch":i, "value":1}].item()
+                    val = value_ll[{"batch":i, "value":1}].item() if not no_value else 0.0
                     new_beam_w_value.append((b, val))
 
                 new_beam_w_value = sorted(new_beam_w_value, key = lambda x: - x[0][1] - x[1])
@@ -545,6 +578,11 @@ class Agent:
                     #print(f"putting in: {e_new.pstate.past_buttons}, total score: {policy_score + prev_policy_score + value_score } ")
                     q.put(QEntry(policy_score + prev_policy_score , value_score, e_new))
 
+        print("total nodes expanded", nodes_expanded)
+        print("policy runs", policy_runs)
+        print("policy gpu runs", policy_gpu_runs)
+        print("value runs", value_runs)
+        print("value gpu runs", value_gpu_runs)
         return solutions
 
     def save(self, loc):
@@ -552,10 +590,10 @@ class Agent:
         if self.value_net: 
             self.Vnn.save(loc+'vnet')
 
-    def load(self, loc):
+    def load(self, loc, policy_only=False):
         self.nn.load(loc)
         print(f"loaded policy net from {loc}")
-        if self.value_net: 
+        if self.value_net and not policy_only:
             self.Vnn.load(loc+'vnet')
             print(f"loaded value net from {loc}")
 

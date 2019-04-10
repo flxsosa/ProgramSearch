@@ -1,4 +1,4 @@
-from utilities import *
+from util import *
 
 import random
 import math

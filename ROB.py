@@ -794,6 +794,27 @@ def test13():
                             print (j)
                             import pdb; pdb.set_trace()
 
+def test14():
+    for i in range(10000):
+        prog, inputs, outputs = generate_FIO(5)
+        for p in prog.flatten():
+            #print(p.__class__.__name__)
+            if p.__class__.__name__ == 'GetFrom': 
+                print(p)
+                print(prog)
+                #assert 0
+
+def test15():
+    pstate = RobState.new(["123hello123goodbye1234hola123231"],
+                          ["dontreadthis"])
+    fs = [
+            BUTT.GetFrom("Char"),
+            BUTT.Commit(),
+         ]
+    pstate_new = apply_fs(pstate, fs)
+    _, scratch, _, _, masks, _ = pstate_new.to_np()
+    print (scratch[0])
+    print (masks[0])
 
 if __name__ == '__main__':
     # test1()
@@ -807,8 +828,9 @@ if __name__ == '__main__':
     # # test9() crashes
     # # test10() crashes
     # test11()
-    test12()
+    # test12()
     # test13()
-
+    # test14()
+    test15()
 
 

@@ -2,7 +2,7 @@
 
 from ROBUT import get_supervised_sample, ALL_BUTTS
 from robut_net import Agent
-import arguments.args_max as args
+import arguments.args as args
 import torch
 import time
 import random
@@ -40,7 +40,7 @@ def train_value_fun(mode='unbiased'):
     print("num params in value net:", num_params)
 
 
-    for i in range(4000):
+    for i in range(6000):
         envs = []
         for _ in range(args.n_envs_per_rollout):
             prog, inputs, outputs = generate_FIO(5)

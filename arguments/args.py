@@ -20,12 +20,12 @@ growth_rate = 128
 
 button_embed_dim = 32
 
-batchsize = 2000
+batchsize = 4000
 
 train_iterations = 100000
 
-save_path = 'robut_model_big_conv.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
-load_path = 'robut_model_big_conv.p'
+save_path = 'robut_model_new_prelim.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
+load_path = 'robut_model_new_prelim.p'
 #big means fatter ... 10 layers of 128 growth rate
 
 #Vnet_save_path = 'robut_vnet.p' 
@@ -39,6 +39,6 @@ test_freq = 1000
 column_enc = 'conv' #'linear' #'conv' #'linear' 
 kernel_size = 5
 
-n_rollouts = 20
+n_rollouts = 40
 
 n_envs_per_rollout = 50

@@ -1,4 +1,4 @@
-from utilities import *
+from util import *
 import torch.nn.functional as F
 
 class MultiHeadAttention(Module):
