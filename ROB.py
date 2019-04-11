@@ -816,7 +816,6 @@ def test15():
     print (masks[0])
 
 if __name__ == '__main__':
-<<<<<<< HEAD
     # test1()
     # test2()
     # test3()

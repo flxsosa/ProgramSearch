@@ -359,6 +359,8 @@ class Agent:
         nodes_expanded = 0
         policy_runs = 0
         policy_gpu_runs = 0
+        value_runs = 0
+        value_gpu_runs = 0
 
         BeamEntry = namedtuple("BeamEntry", "env score")
         env.reset()
@@ -402,7 +404,10 @@ class Agent:
 
                     print("total nodes expanded", nodes_expanded)
                     print("policy runs", policy_runs)
-                    print("gpu runs", policy_gpu_runs) 
+                    print("policy gpu runs", policy_gpu_runs)
+                    if use_value:
+                        print("value runs", value_runs)
+                        print("value gpu runs", value_gpu_runs)
                     return beam, solutions
                     #continue
 
@@ -417,6 +422,8 @@ class Agent:
             if use_value:
                 new_states = [b.env.last_step[0] for b in new_beam]
                 value_ll = self.compute_values(new_states)
+                value_gpu_runs += 1
+                value_runs += len(new_states)
 
                 new_beam_w_value = []
                 for i, b in enumerate(new_beam):
@@ -430,7 +437,10 @@ class Agent:
 
         print("total nodes expanded", nodes_expanded)
         print("policy runs", policy_runs)
-        print("gpu runs", policy_gpu_runs)               
+        print("policy gpu runs", policy_gpu_runs) 
+        if use_value:
+            print("value runs", value_runs)
+            print("value gpu runs", value_gpu_runs)              
         return beam, solutions 
 
     def interact_beam_rollout(self, env, beam_size=10, max_iter=30, verbose=True):
@@ -558,9 +568,15 @@ class Agent:
                     # breaking condition for filter here FILTERING WITH JUST POLICY
                     if new_beam_size >= max_num_actions_expand: break
 
-
+                if new_beam_size ==0: continue #none of the expansions worked, so move on to a different node
+                
                 new_states = [b[0].last_step[0] for b in new_beam]
-                value_ll = self.compute_values(new_states) if not no_value
+                try:
+                    value_ll = self.compute_values(new_states) if not no_value else 0.0
+                except:
+                    #print("state", new_states)
+                    import pdb; pdb.set_trace()
+
                 value_runs += len(new_states)
                 value_gpu_runs += 1
 

@@ -32,7 +32,6 @@ todo:
     - [ ] make beam search suck less
     - [ ] 
 
-
 - [X] write bestFS (just not using value) 
     - [ ] test it
 - [ ] parallel data gen
@@ -224,13 +223,20 @@ def test_a_star():
     agent = Agent(ALL_BUTTS, value_net=True)
     agent.load(args.save_path)
     print("loaded model")
-    prog, inputs, outputs = generate_FIO(5)
+
+    tasklist = makeTestdata(synth=False, challenge=True, max_num_ex=4)
+    print("loaded data")
+    import random
+    random.shuffle(tasklist)
+    inputs, outputs = tasklist[0]
+
+
     print("inputs:", inputs, sep='\n\t')
     print("outputs", outputs, sep='\n\t')
-    print("ground truth program:\n\t", prog.flatten())
+    #print("ground truth program:\n\t", prog.flatten())
     env = ROBENV(inputs, outputs)
 
-    print("BEAM SEARCH:")
+    print("BEAM SEARCH: (no value)")
     beam, solutions = agent.beam_rollout(env, beam_size=1000, max_iter=30, use_value=False)
     if len(solutions) > 0:
         print("beam search found solution:")
