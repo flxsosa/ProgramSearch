@@ -5,11 +5,13 @@
 - [ ] Formalise Train / Test Scaffold
 
 ## ROBUST FILL ABLATION STUDIES 
-- [ ] With / Without Intermediates (big / smol buttons) (with / without scratch)
+- [ ] With / Without Intermediates (big / smol buttons) (with / without scratch) (maybe lower priority)
 - [ ] With / Without Value Function 
 - [ ] Normal RobustFill (RNN)
-- [ ] Robustfill which renders and then commits for each line (like Xinyun and Kevin)
+- [ ] Robustfill which renders and then commits for each line (like Xinyun and Kevin) (also maybe lower prioryt)
 - [ ] Beam Search vs A* (pending . . . )
+- [ ] SMC
+- [ ] MCTS
 
 ## OTHER DOMAINS
 - [ ] Numpy Manipulations
@@ -20,3 +22,5 @@
 ## WRITING/PITCHING
 - [ ] write for ICML workshop paper
 - [ ] Ask advisors for help pitching our approach
+
+Kevin's input: let's focus more on formalizing the MDP situation and pushing on the search + value function additions, which are what seperate us from prior work
