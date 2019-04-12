@@ -198,13 +198,17 @@ class ToCase(Button):
 
     def __init__(self, s):
         self.name = f"ToCase({s})"
+        self.s = s
 
-        if s == "Proper":
-            self.f = lambda x: x.title()
-        if s == "AllCaps":
-            self.f = lambda x: x.upper()
-        if s == "Lower":
-            self.f = lambda x: x.lower()
+    def f(self, x):
+        if self.s == "Proper":
+            return x.title()
+        if self.s == "AllCaps":
+            return x.upper()
+        if self.s == "Lower":
+            return x.lower()
+
+
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
@@ -356,12 +360,12 @@ class GetToken2(Button):
     def __init__(self, i):
         self.name = f"GetToken2({i})"
         self.i = i
-        def f(x, t):
-            # print (t[0])
-            allz = re.finditer(t[0], x)
-            match = list(allz)[i]
-            return x[match.start():match.end()]
-        self.f = f
+
+    def f(self, x, t):
+        # print (t[0])
+        allz = re.finditer(t[0], x)
+        match = list(allz)[i]
+        return x[match.start():match.end()]
 
     def __call__(self, pstate):
         if "GetToken1" not in pstate.past_buttons[-1].name:
@@ -387,8 +391,11 @@ class GetUpTo(Button):
         self.name = f"GetUpTo({rname})"
         self.rname = rname
         self.r = _POSSIBLE_R[rname]
-        self.f = lambda string: string[:[m.end() \
-                for m in re.finditer(self.r[0], string)][0]]
+
+
+    def f(self, string): 
+        return string[:[m.end() \
+            for m in re.finditer(self.r[0], string)][0]]
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
@@ -410,8 +417,11 @@ class GetFrom(Button):
         self.name = f"GetFrom({rname})"
         self.rname = rname
         self.r = _POSSIBLE_R[rname] 
-        self.f = lambda string: string[[m.end() \
-                for m in re.finditer(self.r[0], string)][-1]:]
+
+
+    def f(self, string): 
+        return string[[m.end() \
+            for m in re.finditer(self.r[0], string)][-1]:]
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
@@ -461,10 +471,10 @@ class GetFirst2(Button):
     def __init__(self, i):
         self.name = f"GetFirst2({i})"
         self.i = i
-        def f(string, t):
-            xx = [string[x.start():x.end()] for x in list(re.finditer(t[0], string))]
-            return "".join(xx[:(i+1)])
-        self.f = f
+
+    def f(self, string, t):
+        xx = [string[x.start():x.end()] for x in list(re.finditer(t[0], string))]
+        return "".join(xx[:(i+1)])
 
     def __call__(self, pstate):
         if "GetFirst1" not in pstate.past_buttons[-1].name:
@@ -489,10 +499,10 @@ class GetAll(Button):
         self.name = f"GetAll({rname})"
         self.rname = rname
         self.r = _POSSIBLE_TYPES[rname]
-        def f(string):
-            xx = [string[x.start():x.end()] for x in list(re.finditer(self.r[0], string))]
-            return "".join(xx)
-        self.f = f
+
+    def f(self, string):
+        xx = [string[x.start():x.end()] for x in list(re.finditer(self.r[0], string))]
+        return "".join(xx)
 
     def __call__(self, pstate):
         scratch_new = [self.f(x) for x in pstate.scratch]
@@ -643,14 +653,12 @@ class GetSpan6(Button):
         self.name = f"GetSpan6({b2})"
         self.b2 = b2
 
-        def f(input_str, r1, i1, b1, r2, i2, b2):
-            """
-            all complaints of this function please send to mnye@mit.edu
-            evanthebouncy took no part in this :v
-            """
-            return input_str[[m.end() for m in re.finditer(r1[0], input_str)][i1] if b1 == "End" else [m.start() for m in re.finditer(r1[0], input_str)][i1] : [m.end() for m in re.finditer(r2[0], input_str)][i2] if b2 == "End" else [m.start() for m in re.finditer(r2[0], input_str)][i2]]
-
-        self.f = f
+    def f(self, input_str, r1, i1, b1, r2, i2, b2):
+        """
+        all complaints of this function please send to mnye@mit.edu
+        evanthebouncy took no part in this :v
+        """
+        return input_str[[m.end() for m in re.finditer(r1[0], input_str)][i1] if b1 == "End" else [m.start() for m in re.finditer(r1[0], input_str)][i1] : [m.end() for m in re.finditer(r2[0], input_str)][i2] if b2 == "End" else [m.start() for m in re.finditer(r2[0], input_str)][i2]]
 
     def __call__(self, pstate):
         if "GetSpan5" not in pstate.past_buttons[-1].name:

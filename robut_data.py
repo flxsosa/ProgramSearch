@@ -1,5 +1,7 @@
 #robut_data.py
 from multiprocessing import Queue, Process
+
+#from pathos.multiprocessing import Queue, Process 
 #parallel data gen
 
 def get_supervised_batchsize(fn, batchsize=200):
@@ -47,10 +49,10 @@ class GenData:
         print("started queue ...")
 
         # instantiate workers
-        workers = [Process(target=consumer, args=(self.Q,))
+        self.workers = [Process(target=consumer, args=(self.Q,))
                for i in range(n_processes)]
 
-        for w in workers:
+        for w in self.workers:
             w.start()
         print("started parallel workers, ready to work!")
 
@@ -61,8 +63,12 @@ class GenData:
         #KILL stuff
         # tell all workers, no more data (one msg for each)
         # join on the workers
-        for w in workers:
-            w.close() #this will cause a valueError apparently??
+        for w in self.workers:
+            try:
+                w.close() #this will cause a valueError apparently??
+            except ValueError:
+                print("killed a worker")
+                continue
 
 
 if __name__ == '__main__':
@@ -76,21 +82,21 @@ if __name__ == '__main__':
         assert len(S) == 2000
         if i >= 20 - 1: break
     tot = time.time() - t
-    print(f"unparallelized average time for 20 batches: {tot/20} sec ")
+    print(f"unparallelized average time for 20 batches: {tot/20} sec ", flush=True)
 
 
-    GenData(fn, n_processes=4, max_size=100000)
+    dataqueue = GenData(fn, n_processes=8, max_size=10000)
 
     print("waiting 5 seconds ...")
     time.sleep(5)
 
     t = time.time()
-    for i, (S, A) in enumerate( GenData.batchIterator(batchsize=1000) ):
+    for i, (S, A) in enumerate( dataqueue.batchIterator(batchsize=2000) ):
         assert len(S) == 2000
         if i >= 20 - 1: break
     tot = time.time() - t
     print(f"parallelized average time for 20 batches: {tot/20} sec ")
 
-    GenData.kill()
+    dataqueue.kill()
 
 
