@@ -24,13 +24,6 @@ def get_supervised_batchsize(fn, batchsize=200):
             continue
         else: assert 0, "uh oh, not a good place"
 
-
-
-def get_parallel_batchsize(fn, batchsize=200, queue_size=10000, n_parallel=20):
-
-    yield from thingy that gets from queue
-
-
 class GenData:
     def __init__(self, fn, n_processes=20, max_size=10000):
         ##what needs to happen:
@@ -79,7 +72,7 @@ if __name__ == '__main__':
     fn = get_supervised_sample
     print("normal, unparallelized:")
     t = time.time()
-    for i, (S, A) in enumerate(get_supervised_batchsize(batchsize=2000))
+    for i, (S, A) in enumerate(get_supervised_batchsize(fn, batchsize=2000)):
         assert len(S) == 2000
         if i >= 20 - 1: break
     tot = time.time() - t
@@ -92,7 +85,7 @@ if __name__ == '__main__':
     time.sleep(5)
 
     t = time.time()
-    for i, (S, A) in enumerate(GenData.batchIterator(batchsize=1000))
+    for i, (S, A) in enumerate( GenData.batchIterator(batchsize=1000) ):
         assert len(S) == 2000
         if i >= 20 - 1: break
     tot = time.time() - t
