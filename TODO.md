@@ -5,7 +5,7 @@
 - [ ] Formalise Train / Test Scaffold
 
 ## ROBUST FILL ABLATION STUDIES 
-- [ ] With / Without Intermediates (big / smol buttons) (with / without scratch) (maybe lower priority)
+- [x] With / Without Intermediates (with / without scratch) (maybe lower priority)
 - [ ] With / Without Value Function 
 - [ ] Normal RobustFill (RNN)
 - [ ] Robustfill which renders and then commits for each line (like Xinyun and Kevin) (also maybe lower prioryt)

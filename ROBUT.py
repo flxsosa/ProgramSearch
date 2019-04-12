@@ -87,8 +87,32 @@ class RobState:
                 ret[i][j] = _CHARACTER.index(char) + 1
         return ret
         
+    def to_np(self, kind='full'):
+        assert kind in ['full', 'ablate_scratch']
+        if kind == 'full':
+            return self.to_np_full()
+        if kind == 'ablate_scratch':
+            return self.to_np_ablate_scratch()
 
-    def to_np(self):
+    def to_np_ablate_scratch(self):
+        # have the last butt to have all button information
+        last_butt = 0 if len(self.past_buttons) == 0 else ALL_BUTTS.index(self.past_buttons[-1]) + 1
+
+        masks = [Button.str_masks_to_np_default() for _ in range(len(self.inputs))]
+
+        zero_scratch = np.zeros(shape = (len(self.scratch), max(_POSITION_K)))
+
+        masks = np.array(masks)
+        last_butt = np.array([last_butt])
+        return (self.str_to_np(self.inputs),
+                zero_scratch,
+                self.str_to_np(self.committed),
+                self.str_to_np(self.outputs),
+                masks,
+                last_butt,
+                )
+
+    def to_np_full(self):
         last_butt = 0 if len(self.past_buttons) == 0 else ALL_BUTTS_TYPES.index(self.past_buttons[-1].__class__) + 1
 
         if self.past_buttons == []:
@@ -133,6 +157,9 @@ class Button:
 
     def str_masks_to_np(self, str1, pstate):
         return Button.str_masks_to_np_default()
+
+    def __eq__(self, other):
+        return self.name == other.name
 
 
 class Commit(Button):
@@ -687,9 +714,11 @@ ALL_BUTTS = [x for butt_type in ALL_BUTTS_TYPES for x in butt_type.generate_butt
 
 class ROBENV:
 
-    def __init__(self, inputs, outputs):
+    def __init__(self, inputs, outputs, render_kind = 'full'):
+        assert render_kind in ['full', 'ablate_scratch']
         self.inputs, self.outputs = inputs, outputs
         self.verbose = False
+        self.render_kind = render_kind
 
     def reset(self):
         self.done = False
@@ -699,7 +728,7 @@ class ROBENV:
         return first_ob
 
     def copy(self):
-        to_ret = ROBENV(self.inputs, self.outputs)
+        to_ret = ROBENV(self.inputs, self.outputs, self.render_kind)
         to_ret.done = self.done
         to_ret.pstate = self.pstate.copy()
         to_ret.last_step = self.last_step
@@ -708,7 +737,7 @@ class ROBENV:
     def step(self, btn_action):
         try:
             self.pstate = btn_action(self.pstate)
-            state_ob = self.pstate.to_np()
+            state_ob = self.pstate.to_np(self.render_kind)
             # check sequence other way around
             if len(self.pstate.past_buttons) >= 2:
                 prev_btn, cur_btn = self.pstate.past_buttons[-2:]

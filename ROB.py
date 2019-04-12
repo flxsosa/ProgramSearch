@@ -815,6 +815,14 @@ def test15():
     print (scratch[0])
     print (masks[0])
 
+def test16():
+    prog, inputs, outputs = generate_FIO(5)
+    env = BUTT.ROBENV(inputs, outputs, render_kind = 'ablate_scratch')
+    repeat_agent = BUTT.RepeatAgent(prog.flatten())
+    trace = get_rollout(env, repeat_agent, 30)
+    obs = [x[0] for x in trace]
+    print (obs[-1])
+
 if __name__ == '__main__':
     # test1()
     # test2()
@@ -830,6 +838,6 @@ if __name__ == '__main__':
     # test12()
     # test13()
     # test14()
-    test15()
+    test16()
 
 
