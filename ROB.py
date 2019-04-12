@@ -777,6 +777,7 @@ def test12():
 
 def test13():
     for i in range(100000):
+        print (i)
         prog, inputs, outputs = generate_FIO(5)
         env = BUTT.ROBENV(inputs, outputs)
         repeat_agent = BUTT.RepeatAgent(prog.flatten())
@@ -836,8 +837,8 @@ if __name__ == '__main__':
     # # test10() crashes
     # test11()
     # test12()
-    # test13()
+    test13()
     # test14()
-    test16()
+    # test16()
 
 
