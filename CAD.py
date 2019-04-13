@@ -46,6 +46,9 @@ class CSG(Program):
     def __repr__(self):
         return str(self)
 
+    def __eq__(self,o):
+        return self.serialize() == o.serialize()
+
     def __ne__(self, o): return not (self == o)
 
     def execute(self):
@@ -365,7 +368,7 @@ class Union(CSG):
         return isinstance(o, Union) and tuple(o.elements) == tuple(self.elements)
 
     def __hash__(self):
-        return hash(('u', tuple(self.elements)))
+        return hash(('u', tuple(hash(e) for e in self.elements )))
 
     def __contains__(self, p):
         return any( p in e for e in self.elements )
@@ -578,7 +581,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None,
                 nudge=False, disjointUnion=True, translate=True):
     import matplotlib.pyplot as plot
-    
+
     def translation(x,y,child):
         if not nudge: return Translation(x,y,child)
         for _ in range(x):
@@ -713,8 +716,9 @@ def testCSG(m, getProgram, timeout, export):
     print(f"One parent restriction?  {oneParent}")
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
-               #SMC(m),
-#        BeamSearch(m),
+               SMC(m),
+        BeamSearch(m, criticCoefficient=1),
+                BeamSearch(m, criticCoefficient=0.),
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
@@ -729,24 +733,29 @@ def testCSG(m, getProgram, timeout, export):
         print()
         saveMatrixAsImage(spec.highresolution(256), "data/test/%03d.png"%ti)
         for n, solver in enumerate(solvers):
-            print(f"Running solver {solver}")
+            print(f"Running solver {solver.name}")
             solver.maximumLength = len(ProgramGraph.fromRoot(spec).nodes) + 1
             testSequence = solver.infer(spec, loss, timeout)
+            if len(testSequence) == 0:
+                testSequence = [SearchResult(ProgramGraph([]), 1., 0., 1)]
             testResults[n].append(testSequence)
             for result in testSequence:
                 print(f"After time {result.time}, achieved loss {result.loss} w/")
                 print(result.program.prettyPrint())
                 print()
             if len(testSequence) > 0:
-                bestProgram = max(testSequence[-1].program.objects(),
-                                  key=lambda bp: bp.IoU(spec))
-                saveMatrixAsImage(bestProgram.highresolution(256),
+                obs = testSequence[-1].program.objects()
+                if len(obs) == 0:
+                    bestProgram = np.zeros((256,256))
+                else:
+                    bestProgram = max(obs, key=lambda bp: bp.IoU(spec)).highresolution(256)
+                saveMatrixAsImage(bestProgram,
                                   "data/test/%03d_%s.png"%(ti,solver.name))
                 
 
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=["FS"],
+                    names=[s.name for s in solvers],
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
@@ -921,9 +930,10 @@ if __name__ == "__main__":
             m = pickle.load(handle)
         critic = A2C(m)
         def R(spec, program):
-            if len(program) == 0: return False
+            if len(program) == 0 or len(program) > len(spec.toTrace()): return False
+            spec = spec.execute() > 0.5
             for o in program.objects():
-                if o.IoU(spec) > 0.99: return True
+                if np.all((o.execute() > 0.5) == spec): return True
             return False
         critic.train(
             lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate, disjointUnion=arguments.disjointUnion), 
@@ -950,5 +960,6 @@ if __name__ == "__main__":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
         testCSG(m,
-                lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate, disjointUnion=arguments.disjointUnion), arguments.timeout,
+                getTrainingData('CSG_data.p'),#lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate, disjointUnion=arguments.disjointUnion),
+                arguments.timeout,
                 export=f"figures/CAD_{arguments.maxShapes}_shapes.png")

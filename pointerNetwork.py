@@ -171,20 +171,17 @@ class LineDecoder(Module):
     def logLikelihood(self, initialState, target, encodedInputs):
         return self.logLikelihood_hidden(initialState, target, encodedInputs)[0]
 
-    def batchedSample(self, initialStates, encodedInputs, numberOfInputs):
-        # return [self.sample(initialStates[b], None if encodedInputs is None else encodedInputs[b])
-        #         for b in range(initialStates.size(0)) ]
-        
+    def batchedSample(self, initialStates, encodedInputs, numberOfInputs):        
         B = initialStates.shape[0]
         assert encodedInputs is None or encodedInputs.size(0) == B
         assert len(numberOfInputs) == B
-        
+
         sequences = [ ["STARTING"] for _ in range(B) ]
         finished = [False for _ in range(B) ]
 
         hs = initialStates
 
-        for _ in range(8):
+        for _ in range(12):
             lastWords = [sequence[-1] for sequence in sequences]
             latestPointers = torch.stack([ encodedInputs[b,lastWord.i] if isinstance(lastWord, Pointer) else \
                                            self.device(torch.zeros(self.encoderDimensionality))
@@ -198,8 +195,8 @@ class LineDecoder(Module):
             o = o.squeeze(0)
             hs = h.squeeze(0)
             distribution = self.output(o).exp().cpu()
-            for b,ni in enumerate(numberOfInputs):
-                if ni == 0: distribution[b,self.wordToIndex["POINTER"]] = 0
+            # for b,ni in enumerate(numberOfInputs):
+            #     if ni == 0: distribution[b,self.wordToIndex["POINTER"]] = 0
 
             next_symbols = torch.multinomial(distribution, 1).cpu().numpy()[:,0]
             next_symbols = [self.lexicon[n] for n in next_symbols]
@@ -215,9 +212,14 @@ class LineDecoder(Module):
                 if finished[b]: continue
                 
                 if next_symbol == "POINTER":
-                    assert pointerAttention is not None
-                    i = torch.multinomial(pointerAttention[b].exp(),1)[0].data.item()
-                    sequences[b].append(Pointer(i))
+                    # a = self.pointerAttention(hs[b].unsqueeze(0), encodedInputs[b][:numberOfInputs[b]]).squeeze(0)
+                    # next_symbol = Pointer(torch.multinomial(a.exp(),1)[0].data.item())
+                    # sequences[b].append(next_symbol)
+                    if pointerAttention is None:
+                        finished[b] = True
+                    else:
+                        i = torch.multinomial(pointerAttention[b].exp(),1)[0].data.item()
+                        sequences[b].append(Pointer(i))
                 elif next_symbol == "ENDING":
                     finished[b] = True
                 elif not finished[b]:
@@ -455,6 +457,7 @@ class ScopeEncoding():
     def registerObjects(self, objectsAndSpecs):
         os = [o for o in objectsAndSpecs if o not in self.object2index ]
         if len(os) == 0: return self
+        os = list(set(os))
         encodings = self.owner.objectEncoder([s.execute() for _,s in os ],
                                              [o.execute() for o,_ in os])
         if self.objectEncoding is None:
@@ -471,8 +474,9 @@ class ScopeEncoding():
         If objects is the empty list then return None"""
         if len(objects) == 0: return None
         self.registerObjects([(o,spec) for o in objects])
-        preAttention = self.objectEncoding[self.owner.device(torch.tensor([self.object2index[(o,spec)]
-                                                                           for o in objects ]))]
+        objectIndices = self.owner.device(torch.tensor([self.object2index[(o,spec)]
+                                                        for o in objects ]))
+        preAttention = self.objectEncoding[objectIndices]
         return self.owner.selfAttention(preAttention)
             
 class ProgramPointerNetwork(Module):
@@ -501,7 +505,7 @@ class ProgramPointerNetwork(Module):
             nn.Linear(H + specEncoder.outputDimensionality, H),
             nn.ReLU(),
             nn.Linear(H, 1),
-            nn.ReLU())
+            nn.Softplus())
 
         self.selfAttention = nn.Sequential(
             nn.Linear(objectEncoder.outputDimensionality, H),
@@ -527,6 +531,16 @@ class ProgramPointerNetwork(Module):
 
         return self._distance(torch.cat([specEncoding, objectEncodings]))
 
+    def batchedDistance(self, objectEncodings, specEncodings):
+        """objectEncodings: [n_objectsXH|None] of length batch size
+        specEncodings: [H] of length batch size"""
+        objectEncodings = torch.stack([
+            self.device(torch.zeros(self.H)) if oe is None else oe.sum(0)
+            for oe in objectEncodings])
+        specEncodings = torch.stack(specEncodings)
+        composite = torch.cat([specEncodings, objectEncodings], 1)
+        return self._distance(composite).squeeze(1)
+    
     def traceLogLikelihood(self, spec, trace, scopeEncoding=None, specEncoding=None):
         scopeEncoding = scopeEncoding or ScopeEncoding(self).\
                         registerObjects([(o,spec)
@@ -587,11 +601,15 @@ class ProgramPointerNetwork(Module):
         optimizer.step()
         return losses
 
-    def sample(self, spec, maxMoves=None):
-        specEncoding = self.specEncoder(spec.execute())
-        objectEncodings = ScopeEncoding(self)
+    def sample(self, spec, maxMoves=99, graph=None, specEncoding=None, objectEncodings=None):
+        if specEncoding is None:
+            specEncoding = self.specEncoder(spec.execute())
+        if objectEncodings is None:
+            objectEncodings = ScopeEncoding(self)
 
-        graph = ProgramGraph([])
+        graph = graph or ProgramGraph([])
+
+        moves = 0        
 
         while True:
             # Make the encoding matrix
@@ -601,17 +619,94 @@ class ProgramPointerNetwork(Module):
 
             nextLineOfCode = self.decoder.sample(h0, oe)
             if nextLineOfCode is None: return None
+
             nextLineOfCode = [objectsInScope[t.i] if isinstance(t, Pointer) else t
                               for t in nextLineOfCode ]
 
-            if 'RETURN' in nextLineOfCode or len(graph) >= maxMoves: return graph
+            if 'RETURN' in nextLineOfCode or moves >= maxMoves: return graph
 
             nextObject = self.DSL.parseLine(nextLineOfCode)
             if nextObject is None: return None
 
             graph = graph.extend(nextObject)
 
+            moves += 1
+
     def batchedSample(self, specs, specEncodings, graphs, objectEncodings):
+
+        if False: # WORKING
+            samples = []
+            for b in range(len(specs)):
+                spec = specs[b]
+                graph = graphs[b]
+
+                if True: # WORKING
+                    objectsInScope = list(graph.objects(oneParent=self.oneParent))
+                    oe = objectEncodings.encoding(spec, objectsInScope)
+                    specEncoding = self.specEncoder(spec.execute())
+                    h0 = self.initialHidden(oe, specEncoding)
+
+                    if objectsInScope:
+                        print(set(objectsInScope))
+                        print(h0.sum())
+                        print(oe.sum())
+                    
+
+                    nextLineOfCode = self.decoder.sample(h0, oe)
+
+                    if nextLineOfCode is None:
+                        samples.append(None)
+                        continue
+                    
+                    nextLineOfCode = [objectsInScope[t.i] if isinstance(t, Pointer) else t
+                                      for t in nextLineOfCode ]
+
+                    if 'RETURN' in nextLineOfCode:
+                        samples.append(None)
+                        continue
+                    
+                    nextObject = self.DSL.parseLine(nextLineOfCode)
+                    if nextObject is None:
+                        samples.append(None)
+                        continue
+
+                    samples.append(nextObject)
+                    continue
+                
+                    
+            
+                    
+                
+                newGraph = self.sample(spec,maxMoves=1,graph=graph,specEncoding=specEncodings[b],
+                                       objectEncodings=objectEncodings)
+                if newGraph is None or len(newGraph) == len(graph):
+                    samples.append(None)
+                else:
+                    samples.append(newGraph.nodes[0])
+                continue
+            
+
+                
+                oe = objectEncodings.encoding(spec, objectsInScope[b])
+                h0 = self.initialHidden(oe, se)
+                nextLineOfCode = self.decoder.sample(h0, oe)
+                if nextLineOfCode is None:
+                    samples.append(None)
+                    continue
+                
+                nextLineOfCode = [objectsInScope[b][t.i] if isinstance(t, Pointer) else t
+                                  for t in nextLineOfCode ]
+                if 'RETURN' in nextLineOfCode:
+                    samples.append(None)
+                    continue
+                nextObject = self.DSL.parseLine(nextLineOfCode)
+                if nextObject is None:
+                    samples.append(None)
+                    continue
+
+                samples.append(nextObject)
+            return samples
+
         objectsInScope = [list(graph.objects(oneParent=self.oneParent))
                           for graph in graphs ]
         oes = [objectEncodings.encoding(spec, objects)
@@ -626,10 +721,14 @@ class ProgramPointerNetwork(Module):
         if maxObjects > 0:
             # padding w/ zeros
             # oes: [B,maxObjects,object dimensionality]
-            oes = torch.stack([torch.cat( (oe, self.device(torch.zeros(maxObjects - oe.size(0), oe.size(1))))) \
-                               if oe is not None else \
-                               self.device(torch.zeros(maxObjects, self.H))
-                               for oe in oes ])
+            _oes = []
+            for oe in oes:
+                if oe is None:
+                    oe = self.device(torch.zeros(maxObjects,self.H))
+                elif oe.size(0) < maxObjects:
+                    oe = torch.cat([oe, self.device(torch.zeros(maxObjects - oe.size(0), oe.size(1)))])
+                _oes.append(oe)
+            oes = torch.stack(_oes)
         else:
             oes = None
             

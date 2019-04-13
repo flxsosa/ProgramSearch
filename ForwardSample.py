@@ -12,7 +12,7 @@ class ForwardSample(ExitSolver):
         self.model = model
 
     @property
-    def name(self): return "fs"
+    def name(self): return "forwardSample"
     
     def _infer(self, spec, loss, timeout):
        
@@ -64,6 +64,7 @@ class ForwardSample(ExitSolver):
     
     def batchedRollout(self, specs, B, objectEncodings=None, specEncodings=None):
         """For each spec, does B rollouts. Returns [[trajectory]]"""
+        torch.manual_seed(0)
         if specEncodings is None:
             assert False
             specEncodings = self.model.specEncoder(np.array([s.execute() for s in specs ]))
@@ -71,7 +72,7 @@ class ForwardSample(ExitSolver):
         if objectEncodings is None:
             objectEncodings = ScopeEncoding(self.model)
 
-        maximumLengths = [len(s.toTrace()) + 1
+        maximumLengths = [len(s.toTrace()) + 2
                           for s in specs ]
 
         trajectory = [ [[] for _ in range(B)]
@@ -82,7 +83,6 @@ class ForwardSample(ExitSolver):
 
         listOfListOfTrajectories = [[] for _ in specs ]
         while any( len(tr) > 0 for tr in trajectory ):
-            numberActive = sum(len(tr) for tr in trajectory )
             specEncoding = torch.cat([ specEncodings[b].unsqueeze(0).repeat(len(trajectory[b]),1)
                                        for b in range(len(specs))
                                        if len(trajectory[b]) > 0])
@@ -98,7 +98,7 @@ class ForwardSample(ExitSolver):
                 _newObjects.append(newObjects[:len(tr)])
                 newObjects = newObjects[len(tr):]
             newObjects = _newObjects
-            #print("newObjects",newObjects)
+            
 
             finished = []
             toRegister = []

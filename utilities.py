@@ -76,3 +76,19 @@ def showMatrixAsImage(*m):
     plot.show()
 
 NEGATIVEINFINITY = float('-inf')
+
+def binary_cross_entropy(y,t, epsilon=10**-10):
+    """y: tensor of size B, elements <= 0. each element is a log probability.
+    t: tensor of size B, elements in [0,1]. intended target.
+    returns: 1/B * - \sum_b t*y + (1 - t)*(log(1 - e^y + epsilon))"""
+
+    B = y.size(0)
+    log_yes_probability = y
+    log_no_probability = torch.log(1 - y.exp() + epsilon)
+    assert torch.all(log_yes_probability <= 0.)
+    assert torch.all(log_no_probability <= 0.)
+    correctYes = t
+    correctNo = 1 - t
+    return -(correctYes*log_yes_probability + correctNo*log_no_probability).sum()/B
+
+    
