@@ -51,6 +51,8 @@ class CSG(Program):
 
     def __ne__(self, o): return not (self == o)
 
+    def __hash__(self): return hash(self.serialize())
+
     def execute(self):
         if self._rendering is None: self._rendering = self.render()
         return self._rendering
@@ -59,291 +61,182 @@ class CSG(Program):
         if isinstance(other, CSG): other = other.execute()
         return (self.execute()*other).sum()/(self.execute() + other - self.execute()*other).sum()
     
-    def render(self, w=None, h=None):
-        w = w or RESOLUTION
-        h = h or RESOLUTION
+    def render(self, r=None):
+        r = r or RESOLUTION
         
-        a = np.zeros((w,h))
-        for x in range(w):
-            for y in range(h):
-                if (x,y) in self:
-                    a[x,y] = 1
+        a = np.zeros((r,r,r))
+        for x in range(r):
+            for y in range(r):
+                for z in range(r):
+                    if (RESOLUTION*x/r, RESOLUTION*y/r, RESOLUTION*z/r) in self:
+                        a[x,y,z] = 1
         return a
-
-    def highresolution(self, hr):
-        assert hr > RESOLUTION
-        a = np.zeros((hr,hr))
-        for x in range(hr):
-            for y in range(hr):
-                if (RESOLUTION*x/hr, RESOLUTION*y/hr) in self:
-                    a[x,y] = 1
-        return a
-                
 
     def removeDeadCode(self): return self
+
+    def depthMaps(self, r=None):
+        """Returns six depth maps"""
+        r = r or RESOLUTION
+        vs = self.render(r=r)
+
+        span = np.arange(0.,1.,1./r)
+
+        x, y, z = np.indices((r,r,r))/float(r)
+        
+        maps = []
+
+        # collapsing Z (front)
+        ds = np.zeros((r,r,r))
+        ds[:,:,:] = span
+
+        maps.append(np.amax((vs*z), axis=2))
+
+        # collapsing Z (behind)
+        ds[:,:,:] = np.flip(span)
+        maps.append(np.amax((vs*np.flip(z,2)), axis=2))
+
+        maps = [m
+                for n,i in enumerate(np.indices((r,r,r))/float(r))
+                for m in [np.amax(vs * i, axis=n),
+                          np.amax(vs * np.flip(i,n), axis=n)] ]
+
+        return maps
+        
 
     def show(self):
         """Open up a new window and show the CSG"""
         import matplotlib.pyplot as plot
-        plot.imshow(self.execute())
+        from mpl_toolkits.mplot3d import Axes3D
+        columns = 2
+        f = plot.figure()
+
+        maps = self.depthMaps(32)
+
+        a = f.add_subplot(1, 1 + len(maps), 1,
+                          projection='3d')
+        a.voxels(self.execute(), edgecolor='k')
+
+        for i,m in enumerate(maps):
+            a = f.add_subplot(1, 1 + len(maps), 2 + i)
+            a.imshow(1 - m, cmap='Greys',
+                     vmin=0., vmax=1.)
+            a.get_xaxis().set_visible(False)
+            a.get_yaxis().set_visible(False)
+        
         plot.show()
         
                 
 # The type of CSG's
 tCSG = BaseType(CSG)
 
-class Rectangle(CSG):
-    token = 'r'
-    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), tCSG)
-    
-    def __init__(self, w, h):
-        super(Rectangle, self).__init__()
-        self.w = w
-        self.h = h
-
-    def toTrace(self): return [self]
-
-    def heatMapTarget(self): assert False
-
-    def __str__(self):
-        return f"(r {self.w} {self.h})"
-
-    def children(self): return []
-
-    def __eq__(self, o):
-        return isinstance(o, Rectangle) and o.w == self.w and o.h == self.h
-
-    def __hash__(self):
-        return hash(('r',self.w,self.h))
-
-    def serialize(self):
-        return (self.__class__.token, self.w, self.h)
-
-    def __contains__(self, p):
-        return p[0] >= 0 and p[1] >= 0 and \
-            p[0] < self.w and p[1] < self.h
-
-class TRectangle(CSG):
-    token = 'tr'
-    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
-                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+class Cuboid(CSG):
+    token = 'cuboid'
+    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
                  tCSG)
     
-    def __init__(self, x0, y0, x1, y1):
-        super(TRectangle, self).__init__()
+    def __init__(self, x0, y0, z0, x1, y1, z1):
+        super(Cuboid, self).__init__()
         if x1 <= x0: raise ParseFailure()
         if y1 <= y0: raise ParseFailure()
+        if z1 <= z0: raise ParseFailure()
         self.x0 = x0
         self.y0 = y0
+        self.z0 = z0
         self.x1 = x1
         self.y1 = y1
+        self.z1 = z1
 
     def toTrace(self): return [self]
 
-    def heatMapTarget(self):
-        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
-        hm[self.x0,self.y0,0] = True
-        hm[self.x1,self.y1,1] = True
-        return hm
+    def render(self,r=None):
+        r = r or RESOLUTION
+
+        a = np.zeros((r,r,r))
+        a[int(self.x0*r/RESOLUTION):int(self.x1*r/RESOLUTION),
+          int(self.y0*r/RESOLUTION):int(self.y1*r/RESOLUTION),
+          int(self.z0*r/RESOLUTION):int(self.z1*r/RESOLUTION)] = 1
+
+        return a
+        
 
     def __str__(self):
-        return f"(tr {self.x0} {self.y0} {self.x1} {self.y1})"
+        return f"(cuboid {self.x0} {self.y0} {self.z0} ; {self.x1} {self.y1} {self.z1})"
 
     def children(self): return []
 
-    def __eq__(self, o):
-        return isinstance(o, TRectangle) and self.serialize() == o.serialize()
-
-    def __hash__(self):
-        return hash(self.serialize())
-
     def serialize(self):
-        return (self.__class__.token, self.x0, self.y0, self.x1, self.y1)
+        return (self.__class__.token, self.x0, self.y0, self.z0, self.x1, self.y1, self.z1)
 
     def __contains__(self, p):
-        return p[0] >= self.x0 and p[1] >= self.y0 and \
-            p[0] < self.x1 and p[1] < self.y1
+        return p[0] >= self.x0 and p[1] >= self.y0 and p[2] >= self.z0 and \
+            p[0] < self.x1 and p[1] < self.y1 and p[2] < self.z1
 
     def flipX(self):
-        return TRectangle(RESOLUTION - self.x1, self.y0,
-                          RESOLUTION - self.x0, self.y1)
+        return Cuboid(RESOLUTION - self.x1, self.y0, self.z0,
+                      RESOLUTION - self.x0, self.y1, self.z1)
 
     def flipY(self):
-        return TRectangle(self.x0, RESOLUTION - self.y1,
-                          self.x1, RESOLUTION - self.y0)
+        return Cuboid(self.x0, RESOLUTION - self.y1, self.z0,
+                      self.x1, RESOLUTION - self.y0, self.z1)
 
-class MRectangle(CSG):
-    token = 'mr'
-    type = arrow(coordinate(RESOLUTION), coordinate(RESOLUTION), 
-                 tCSG)
-    
-    def __init__(self, p0, p1):
-        super(MRectangle, self).__init__()
-        self.p0 = p0
-        self.p1 = p1
-        
-    def toTrace(self): return [self]
+    def flipZ(self):
+        return Cuboid(self.x0, self.y1, RESOLUTION - self.z0,
+                      self.x1, self.y0, RESOLUTION - self.z1)
 
-    def __str__(self):
-        return f"(mr {self.p0[0]} {self.p0[1]} {self.p1[0]} {self.p1[1]})"
+# Cuboid(9,9,2,
+#        18,27,8).show()
 
-    def children(self): return []
 
-    def __eq__(self, o):
-        return isinstance(o, MRectangle) and self.serialize() == o.serialize()
-
-    def __hash__(self):
-        return hash(self.serialize())
-
-    def serialize(self):
-        return (self.__class__.token, self.p0[0], self.p0[1], self.p1[0], self.p1[1])
-
-    def __contains__(self, p):
-        return p[0] >= self.p0[0] and p[1] >= self.p0[1] and \
-            p[0] < self.p1[0] and p[1] < self.p1[1]
-
-class Circle(CSG):
-    token = 'c'
-    type = arrow(integer(0, RESOLUTION - 1), tCSG)
-    
-    def __init__(self, r):
-        super(Circle, self).__init__()
-        self.r = r
-
-    def toTrace(self): return [self]
-
-    def heatMapTarget(self): assert False
-        
-    def __str__(self):
-        return f"(c {self.r})"
-
-    def children(self): return []
-
-    def __eq__(self, o):
-        return isinstance(o, Circle) and o.r == self.r
-    def __hash__(self):
-        return hash(('c', str(self.r)))
-
-    def serialize(self):
-        return (self.__class__.token, self.r)
-
-    def __contains__(self, p):
-        return p[0]*p[0] + p[1]*p[1] <= self.r*self.r
-
-class TCircle(CSG):
-    token = 'tc'
-    type = arrow(integer(0, RESOLUTION - 1),
-                 integer(0, RESOLUTION - 1),
+class Sphere(CSG):
+    token = 'sphere'
+    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
                  integer(0, RESOLUTION - 1),
                  tCSG)
     
-    def __init__(self, x,y,r):
-        super(TCircle, self).__init__()
+    def __init__(self, x,y,z,r):
+        super(Sphere, self).__init__()
         self.r = r
         self.x = x
         self.y = y
+        self.z = z
 
     def toTrace(self): return [self]
 
-    def heatMapTarget(self):
-        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
-        hm[self.x,self.y,2] = 1
-        return hm
+    def render(self,r=None):
+        r = r or RESOLUTION
+        x, y, z = np.indices((r,r,r))/float(r)
+        a = np.zeros((r,r,r))
+
+        dx = (x - self.x/RESOLUTION)
+        dy = (y - self.y/RESOLUTION)
+        dz = (z - self.z/RESOLUTION)
+        distance2 = dx*dx + dy*dy + dz*dz
+
+        return 1.*(distance2 <= (self.r/RESOLUTION)*(self.r/RESOLUTION))
         
     def __str__(self):
-        return f"(tc ({self.x}, {self.y}) {self.r})"
+        return f"(sphere ({self.x}, {self.y}, {self.z}) {self.r})"
 
     def children(self): return []
 
-    def __eq__(self, o):
-        return isinstance(o, TCircle) and self.serialize() == o.serialize()
-    def __hash__(self):
-        return hash(self.serialize())
-
     def serialize(self):
-        return (self.__class__.token, self.x,self.y,self.r)
+        return (self.__class__.token, self.x,self.y,self.z,self.r)
 
     def __contains__(self, p):
-        return (p[0]-self.x)*(p[0]-self.x) + (p[1] - self.y)*(p[1] - self.y) <= self.r*self.r
+        return (p[0]-self.x)*(p[0]-self.x) + (p[1] - self.y)*(p[1] - self.y) + (p[2] - self.z)*(p[2] - self.z)\
+            <= self.r*self.r
 
     def flipX(self):
-        return TCircle(RESOLUTION - self.x, self.y, self.r)
+        return Sphere(RESOLUTION - self.x, self.y, self.z, self.r)
 
     def flipY(self):
-        return TCircle(self.x, RESOLUTION - self.y, self.r)
+        return Sphere(self.x, RESOLUTION - self.y, self.z, self.r)
 
-class MCircle(CSG):
-    token = 'mc'
-    type = arrow(coordinate(RESOLUTION),
-                 integer(0, RESOLUTION - 1),
-                 tCSG)
-    
-    def __init__(self, p,r):
-        super(MCircle, self).__init__()
-        self.p = p
-        self.r = r
+    def flipZ(self):
+        return Sphere(self.x, self.y, RESOLUTION - self.z, self.r)
 
-    def toTrace(self): return [self]
-
-    def __str__(self):
-        return f"(mc {self.p} {self.r})"
-
-    def children(self): return []
-
-    def __eq__(self, o):
-        return isinstance(o, MCircle) and self.serialize() == o.serialize()
-    def __hash__(self):
-        return hash(self.serialize())
-
-    def serialize(self):
-        return (self.__class__.token, self.p,self.r)
-
-    def __contains__(self, p):
-        return (p[0]-self.p[0])*(p[0]-self.p[0]) + (p[1] - self.p[1])*(p[1] - self.p[1]) <= self.r*self.r
-
-class Translation(CSG):
-    token = 't'
-    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), tCSG, tCSG)
-    
-    def __init__(self, x, y, child):
-        super(Translation, self).__init__()
-        self.v = (x, y)
-        self.child = child
-
-    def toTrace(self): return self.child.toTrace() + [self]
-
-    def heatMapTarget(self): assert False
-    
-    def __str__(self):
-        return f"(t {self.v} {self.child})"
-
-    def children(self): return [self.child]
-
-    def serialize(self):
-        return ('t', self.v[0], self.v[1], self.child)
-
-    def __eq__(self, o):
-        return isinstance(o, Translation) and o.v == self.v and self.child == o.child
-
-    def __hash__(self):
-        return hash(('t', self.v, self.child))
-
-    def __contains__(self, p):
-        p = (p[0] - self.v[0],
-             p[1] - self.v[1])
-        return p in self.child
-
-    def toNudge(self):
-        child = self.child
-        x = self.v[0]
-        y = self.v[1]
-        while x > 0:
-            child = Translation(1,0,child)
-            x -= 1
-        while y > 0:
-            child = Translation(0,1,child)
-            y -= 1
-        return child
+Sphere(3,16,25,9).show()
 
 class Union(CSG):
     token = '+'
@@ -390,7 +283,14 @@ class Union(CSG):
                                   self.elements[1].flipX())
     def flipY(self): return Union(self.elements[0].flipY(),
                                   self.elements[1].flipY())
-        
+    def flipZ(self): return Union(self.elements[0].flipZ(),
+                                  self.elements[1].flipZ())
+
+    def render(self,r=None):
+        r = r or RESOLUTION
+        a = 1.*(self.elements[0].render(r))
+        b = 1.*(self.elements[1].render(r))
+        return a + b - a*b        
 
 class Difference(CSG):
     token = '-'
@@ -438,43 +338,16 @@ class Difference(CSG):
                                        self.b.flipY())
     def flipX(self): return Difference(self.a.flipX(),
                                        self.b.flipX())
+    def flipZ(self): return Difference(self.a.flipZ(),
+                                       self.b.flipZ())
 
-class Repeat(CSG):
-    token = 'repeat'
-    type = arrow(tCSG,
-                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
-                 integer(1, 5),
-                 tCSG)
-    
-    def __init__(self, child, dx, dy, n):
-        super(Repeat, self).__init__()
-        self.dx, self.dy, self.n, self.child = dx, dy, n, child
+    def render(self,r):
+        a = 1.*self.a.render(r)
+        b = 1.*self.b.render(r)
+        return np.clip(a - b,
+                       0., 1.)
 
-    def toTrace(self):
-        return self.child.toTrace() + [self]
-
-    def __str__(self):
-        return f"(repeat ({self.dx}, {self.dy}) {self.n} {self.child})"
-        
-    def children(self): return [self.child]
-
-    def serialize(self):
-        return ('repeat',self.child,self.dx,self.dy,self.n)
-
-    def __eq__(self, o):
-        return isinstance(o, Repeat) and self.serialize() == o.serialize()
-
-    def __hash__(self):
-        return hash(self.serialize())
-    
-    def __contains__(self, p):
-        for i in range(self.n):
-            if p in self.child: return True
-            p = (p[0] - self.dx,
-                 p[1] - self.dy)
-        return False
-
-dsl = DSL([Union, Difference, TRectangle, TCircle],
+dsl = DSL([Union, Difference, Cuboid, Sphere],
           lexicon=CSG.lexicon)
 
 """Neural networks"""
