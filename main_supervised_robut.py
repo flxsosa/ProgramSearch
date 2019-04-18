@@ -67,7 +67,7 @@ todo:
 
 from ROBUT import get_supervised_sample, ALL_BUTTS
 from robut_net import Agent
-import arguments.args as args
+from load_args import args #requires
 import torch
 import time
 

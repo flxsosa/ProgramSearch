@@ -3,7 +3,7 @@ import torch
 # Text text processing library and methods for pretrained word embeddings
 from torch import nn
 import numpy as np
-import arguments.args as args
+from load_args import args #requires
 # Named Tensor wrappers
 from namedtensor import ntorch, NamedTensor
 import torch.nn.functional as F
@@ -201,7 +201,7 @@ class Agent:
         last_butts will be batch (and the entries will be longs)
         """    
         #chars:
-        inputs, scratchs, committeds, outputs, masks, last_butts = zip(*x)
+        inputs, scratchs, committeds, outputs, masks, last_butts, _ = zip(*x)
 
         inputs = np.stack( [i for i in inputs])
         in_tensor = ntorch.tensor(inputs, ("batch", "Examples", "strLen"))
@@ -224,7 +224,8 @@ class Agent:
         masks = masks.transpose("batch", "Examples", "strLen", "inFeatures").float()
         
         last_butts = np.stack(last_butts)
-        last_butts = ntorch.tensor(last_butts, ("batch", "extra")).sum("extra").long()
+        print("last buts shape", last_butts.shape)
+        last_butts = ntorch.tensor(last_butts, ("batch")).long()
 
         if self.use_cuda:
             return chars.cuda(), masks.cuda(), last_butts.cuda()

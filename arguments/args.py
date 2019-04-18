@@ -26,8 +26,8 @@ train_iterations = 100000
 
 parallel = True
 n_processes = 8
-save_path = 'robut_model_new_prelim.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
-load_path = 'robut_model_new_prelim.p'
+save_path = 'robut_model_new.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
+load_path = 'robut_model_new.p'
 #big means fatter ... 10 layers of 128 growth rate
 
 #Vnet_save_path = 'robut_vnet.p' 
@@ -45,6 +45,8 @@ n_rollouts = 40
 
 n_envs_per_rollout = 25
 
+
+rl_iterations = 6000
 
 ##test scaffold
 test_type = 'smc'

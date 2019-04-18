@@ -1,8 +1,9 @@
 #learn_value_fun
 
-from ROBUT import get_supervised_sample, ALL_BUTTS
+from ROBUT import ALL_BUTTS
+from ROB import get_supervised_sample
 from robut_net import Agent
-import arguments.args as args
+from load_args import args #requires
 import torch
 import time
 import random
@@ -27,26 +28,14 @@ def sample_from_traces(traces, biased=False, keep_all=False):
 
     return states, rewards
 
-def train_value_fun(mode='unbiased'):
-    global traces
-    from ROB import generate_FIO
-    from ROBUT import ROBENV
-    print(f"is cuda available? {torch.cuda.is_available()}")
-    agent = Agent(ALL_BUTTS, value_net=True)
-    try:
-        agent.load(args.load_path)
-        print("loaded model")
-    except FileNotFoundError:
-        print ("no saved model found ... training value function from scratch") #TODO XXX
-
+def train_value_fun(agent, mode='unbiased'):
 
     num_params = sum(p.numel() for p in agent.nn.parameters() if p.requires_grad)
     print("num params in policy net:", num_params)
     num_params = sum(p.numel() for p in agent.Vnn.parameters() if p.requires_grad)
     print("num params in value net:", num_params)
 
-
-    for i in range(6000):
+    for i in range(args.rl_iterations): #TODO
         envs = []
         for _ in range(args.n_envs_per_rollout):
             prog, inputs, outputs = generate_FIO(5)
@@ -70,4 +59,15 @@ def train_value_fun(mode='unbiased'):
             print("Model saved")
 
 if __name__=='__main__':
-    train_value_fun()
+    global traces
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS, value_net=True)
+    try:
+        agent.load(args.load_path)
+        print("loaded model")
+    except FileNotFoundError:
+        print ("no saved model found ... training value function from scratch") #TODO XXX
+
+    train_value_fun(agent)
