@@ -9,16 +9,22 @@ import random
 
 
 
-def sample_from_traces(traces, biased=False):
+def sample_from_traces(traces, biased=False, keep_all=False):
     #reward is 1 for hit and 0 for not hit
     if biased: raise NotImplementedError
     states = []
     rewards = []
     for trace in traces:
-        ln = len(trace)
-        idx = random.choice(range(ln))
-        states.append( trace[idx].s )
-        rewards.append( trace[-1].reward ) #TODO beware
+        if keep_all: #instead of sampling, just use all of them for gradient update
+            for te in trace:
+                states.append( te.s )
+                rewards.append( trace[-1].reward )
+        else:
+            ln = len(trace)
+            idx = random.choice(range(ln))
+            states.append( trace[idx].s )
+            rewards.append( trace[-1].reward ) #TODO beware
+
     return states, rewards
 
 def train_value_fun(mode='unbiased'):
@@ -50,7 +56,7 @@ def train_value_fun(mode='unbiased'):
         ro_t = time.time()
         traces = agent.get_rollouts(envs, n_rollouts=args.n_rollouts) #TODO refactor
         ro_t2 = time.time()
-        states, rewards = sample_from_traces(traces)
+        states, rewards = sample_from_traces(traces, keep_all=True)
 
         t = time.time()
         loss = agent.value_fun_optim_step(states, rewards)
@@ -59,7 +65,7 @@ def train_value_fun(mode='unbiased'):
         if i%args.print_freq==0 and i!=0: print(f"iteration {i}, loss {loss.item()}, net time: {t2-t}, rollout time: {ro_t2 - ro_t}, tot other time {t-t3}")
         t3 = t2
 
-        if i%10==0: 
+        if i%args.print_freq==0: 
             agent.save(args.save_path)
             print("Model saved")
 

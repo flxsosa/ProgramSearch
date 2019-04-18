@@ -8,7 +8,7 @@
 - [x] With / Without Intermediates (with / without scratch) (maybe lower priority)
 - [ ] With / Without Value Function 
 - [ ] Normal RobustFill (RNN)
-- [ ] Robustfill which renders and then commits for each line (like Xinyun and Kevin) (also maybe lower prioryt)
+- [ ] Robustfill which renders and then commits for each line (like Xinyun and Kevin) (also maybe lower priority)
 - [ ] Beam Search vs A* (pending . . . )
 - [ ] SMC
 - [ ] MCTS
@@ -17,7 +17,6 @@
 - [ ] Numpy Manipulations
 - [ ] ??? With Long Programs
 - [ ] CAD -- figure out situation there
-
 
 ## WRITING/PITCHING
 - [ ] write for ICML workshop paper

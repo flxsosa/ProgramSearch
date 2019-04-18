@@ -34,9 +34,10 @@ class GenData:
                 try:
                     # get a new message
                     size = Q.qsize()
+                    #print(size)
                     if size < max_size:
                         # process the data
-                        ret = fn() #TODO
+                        ret = fn()
                         Q.put( ret )
                 except ValueError as e:
                     print("I think you closed the thing while it was running, but that's okay")
@@ -70,6 +71,29 @@ class GenData:
                 print("killed a worker")
                 continue
 
+def makeTestdata(synth=True, challenge=False, max_num_ex=4):
+    import sys
+    import os
+    sys.path.append(os.path.abspath('./'))
+    sys.path.append(os.path.abspath('./ec'))
+    from makeTextTasks import makeTasks, loadPBETasks
+    from type import arrow, tlist, tcharacter
+    tasks = []
+    if synth:
+        tasks = makeTasks() 
+    if challenge:
+        challenge_tasks, _ = loadPBETasks()
+        tasks = tasks + challenge_tasks
+
+    tasklist = []
+    for task in tasks:
+        if task.stringConstants==[] and task.request == arrow(tlist(tcharacter), tlist(tcharacter)):
+                inputs = [''.join(x[0]) for x, _ in task.examples[:max_num_ex]]
+                outputs = [''.join(y) for _, y in task.examples[:max_num_ex]]
+                tasklist.append( (inputs, outputs) )
+
+    return tasklist
+
 
 if __name__ == '__main__':
     from ROBUT import get_supervised_sample
@@ -80,12 +104,12 @@ if __name__ == '__main__':
     t = time.time()
     for i, (S, A) in enumerate(get_supervised_batchsize(fn, batchsize=2000)):
         assert len(S) == 2000
-        if i >= 20 - 1: break
+        if i >= 40 - 1: break
     tot = time.time() - t
     print(f"unparallelized average time for 20 batches: {tot/20} sec ", flush=True)
 
 
-    dataqueue = GenData(fn, n_processes=8, max_size=10000)
+    dataqueue = GenData(fn, n_processes=10, max_size=10000)
 
     print("waiting 5 seconds ...")
     time.sleep(5)
@@ -93,7 +117,7 @@ if __name__ == '__main__':
     t = time.time()
     for i, (S, A) in enumerate( dataqueue.batchIterator(batchsize=2000) ):
         assert len(S) == 2000
-        if i >= 20 - 1: break
+        if i >= 40 - 1: break
     tot = time.time() - t
     print(f"parallelized average time for 20 batches: {tot/20} sec ")
 
