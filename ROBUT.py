@@ -364,7 +364,7 @@ class GetToken2(Button):
     def f(self, x, t):
         # print (t[0])
         allz = re.finditer(t[0], x)
-        match = list(allz)[i]
+        match = list(allz)[self.i]
         return x[match.start():match.end()]
 
     def __call__(self, pstate):
@@ -474,7 +474,10 @@ class GetFirst2(Button):
 
     def f(self, string, t):
         xx = [string[x.start():x.end()] for x in list(re.finditer(t[0], string))]
-        return "".join(xx[:(i+1)])
+        # print("xx", xx)
+        # print("i", i)
+        # print(type(i))
+        return "".join(xx[:(self.i+1)])
 
     def __call__(self, pstate):
         if "GetFirst1" not in pstate.past_buttons[-1].name:

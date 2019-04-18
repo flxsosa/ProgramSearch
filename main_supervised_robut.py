@@ -73,7 +73,7 @@ import time
 
 from train_value_fun import train_value_fun
 
-from robut_data import get_supervised_batchsize, get_parallel_batchsize
+from robut_data import get_supervised_batchsize, GenData, makeTestdata
 
 def test_gsb():
     for i, (S, A) in enumerate(get_supervised_batchsize(get_supervised_sample, 200)):
@@ -83,7 +83,6 @@ def test_gsb():
 
 def train():
     print(f"is cuda available? {torch.cuda.is_available()}")
-
     agent = Agent(ALL_BUTTS, value_net=True)
 
     try:
@@ -99,7 +98,13 @@ def train():
     enum_t2 = 0
     print_time = 0
     if not hasattr(agent, 'train_iterations'): agent.train_iterations = 0
-    for i, (S, A) in enumerate(get_supervised_batchsize(get_supervised_sample, args.batchsize)):
+
+    if args.parallel:
+        dataqueue = GenData(get_supervised_sample, n_processes=args.n_processes, max_size=50000)
+
+    for i, (S, A) in enumerate(
+            dataqueue.batchIterator(batchsize=args.batchsize) if args.parallel else \
+            get_supervised_batchsize(get_supervised_sample, args.batchsize) ):
         enum_t = time.time()
         if agent.train_iterations >= args.train_iterations: break
         t = time.time()
@@ -131,28 +136,7 @@ def train():
         else: agent.train_iterations = 1
     agent.save(args.save_path)
 
-def makeTestdata(synth=True, challenge=False, max_num_ex=4):
-    import sys
-    import os
-    sys.path.append(os.path.abspath('./'))
-    sys.path.append(os.path.abspath('./ec'))
-    from makeTextTasks import makeTasks, loadPBETasks
-    from type import arrow, tlist, tcharacter
-    tasks = []
-    if synth:
-        tasks = makeTasks() 
-    if challenge:
-        challenge_tasks, _ = loadPBETasks()
-        tasks = tasks + challenge_tasks
 
-    tasklist = []
-    for task in tasks:
-        if task.stringConstants==[] and task.request == arrow(tlist(tcharacter), tlist(tcharacter)):
-                inputs = [''.join(x[0]) for x, _ in task.examples[:max_num_ex]]
-                outputs = [''.join(y) for _, y in task.examples[:max_num_ex]]
-                tasklist.append( (inputs, outputs) )
-
-    return tasklist
 
 def play_with_trained_model():
 
@@ -191,7 +175,11 @@ def test_get_rollouts():
     agent = Agent(ALL_BUTTS)
     agent.load(args.save_path)
     print("loaded model")
-    prog, inputs, outputs = generate_FIO(5)
+    #prog, inputs, outputs = generate_FIO(5)
+
+    inputs = ['aodklfj', 'aodklfj', 'aodklfj', 'aodklfj']
+    outputs = ['3', '3', '3', '3']
+
     env = ROBENV(inputs, outputs)
     traces = agent.get_rollouts([env], n_rollouts=1000, max_iter=30)
     num_hits = sum([t[-1].reward > 0 for t in traces ])
@@ -295,7 +283,7 @@ def test_on_real_data():
     from ROBUT import ROBENV
     print(f"is cuda available? {torch.cuda.is_available()}")
     agent = Agent(ALL_BUTTS, value_net=True)
-    agent.load(args.save_path)
+    agent.load(args.load_path)
     print("loaded model")
 
     tasklist = makeTestdata(synth=False, challenge=True, max_num_ex=4)
@@ -311,20 +299,63 @@ def test_on_real_data():
         env = ROBENV(inputs, outputs)
 
         print("BEAM SEARCH:")
-        beam, solutions = agent.beam_rollout(env, beam_size=1000, max_iter=30, use_value=False)
-        if len(solutions) > 0:
+        hit, solution, stats = agent.beam_rollout(env, beam_size=1000, max_iter=30, use_value=False)
+        if hit:
             print("beam search found solution:")
-            print(solutions[0].pstate.past_buttons)
+            print(solution.pstate.past_buttons)
             beam_solutions += 1
 
         print("OUR MODEL:")
-        solutions = agent.a_star_rollout(env, batch_size=1, verbose=True)
+        hit, solution, stats = agent.a_star_rollout(env, batch_size=1, verbose=True)
         print("OUR MODEL found solution:")
-        print(solutions[0].pstate.past_buttons)
+        print(solution.pstate.past_buttons)
         astar_solutions += 1
 
     print(f"beam solved {beam_solutions} out of {i} problems")
     print(f"a star solved {astar_solutions} out of {i} problems")
+
+def test_smc():
+    global beam
+    global solutions
+    from ROB import generate_FIO
+    from ROBUT import ROBENV
+    print(f"is cuda available? {torch.cuda.is_available()}")
+    agent = Agent(ALL_BUTTS, value_net=True)
+    agent.load(args.load_path)
+    print("loaded model")
+
+    tasklist = makeTestdata(synth=False, challenge=True, max_num_ex=4)
+    print("loaded data")
+    import random
+    random.shuffle(tasklist)
+
+    for inputs, outputs in tasklist:
+
+        #inputs = ['aodklfj', 'aodklfj', 'aodklfj', 'aodklfj']
+        #outputs = ['3', '3', '3', '3']
+
+
+        print("inputs:", inputs, sep='\n\t')
+        print("outputs", outputs, sep='\n\t')
+        #print("ground truth program:\n\t", prog.flatten())
+        env = ROBENV(inputs, outputs)
+
+        # print("BEAM SEARCH: (no value)")
+        # hit, solution, stats = agent.beam_rollout(env, beam_size=1000, max_iter=30, use_value=False)
+        # if len(solutions) > 0:
+        #     print("beam search found solution:")
+        #     print(solutions[0].pstate.past_buttons)
+
+        print("SMC MODEL:")
+        hit, solution, stats = agent.smc_rollout(env, max_beam_size=8192, max_iter=30, verbose=False)
+        # print("forward samp")
+        # hit, solution, stats = agent.forward_sample_solver(env, batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False)
+
+        if hit:
+            print("smt found solution:")
+            print(solution.pstate.past_buttons)
+        else: print("no solution found for that size")
+
 
 if __name__=='__main__':
     #test_gsb()
@@ -333,8 +364,9 @@ if __name__=='__main__':
     #play_with_trained_model()
     #test_get_rollouts()
     #test_beam()
-    test_a_star()
+    #test_a_star()
     #test_multistate_rollouts()
     #train_value_fun()
     #interact_beam()
     #test_on_real_data()
+    test_smc()

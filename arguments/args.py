@@ -24,6 +24,8 @@ batchsize = 4000
 
 train_iterations = 100000
 
+parallel = True
+n_processes = 8
 save_path = 'robut_model_new_prelim.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
 load_path = 'robut_model_new_prelim.p'
 #big means fatter ... 10 layers of 128 growth rate
@@ -41,4 +43,12 @@ kernel_size = 5
 
 n_rollouts = 40
 
-n_envs_per_rollout = 50
+n_envs_per_rollout = 25
+
+
+##test scaffold
+test_type = 'smc'
+use_value = False
+resultsfile = './results/forward_sample_alpha.p' #alpha means first try on saturday
+debug = False
+use_prev_value = False

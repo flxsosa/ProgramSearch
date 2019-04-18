@@ -1,0 +1,96 @@
+#plotting
+#plot_results.py
+import dill
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import time
+import math
+
+"""
+stats = {
+    'nodes_expanded': 0,
+    'policy_runs': 0,
+    'policy_gpu_runs': 0,
+    'value_runs': 0,
+    'value_gpu_runs': 0,
+    'start_time': time.time()
+    'end_time': 
+        }
+"""
+#SearchResult = namedtuple("SearchResult", "hit solution stats")
+
+
+def percent_solved(results, fn, x):
+    tot = 0
+    hits = 0
+    for IO, res in results.items():
+        if res.hit and fn(res.stats) <= x:
+            hits += 1
+        tot += 1
+    return float(hits)/tot
+
+def compute_x_axis(results_list, fn, title, granularity=200):
+    maximum = 0
+    for results in results_list:
+        for IO, res in results.items():
+            if res.hit and fn(res.stats) > maximum:
+                maximum = fn(res.stats)
+
+    mn = math.log(0.01) if title == 'Time' else math.log(1) #using title is a hack
+    mx = math.log(maximum)
+    rng = [ mn + (mx - mn)*i/granularity for i in range(0, granularity+1)]
+    return [ math.exp(i) for i in rng]
+
+
+def plot(file_list, legend_list, filename):
+
+    #load the files:
+    results_list = []
+    for file in file_list:
+        with open(file, 'rb') as h:
+            r = dill.load(h)
+            results_list.append(r)
+    
+    titles_fns = [
+        ('Nodes expanded', lambda stats: stats['nodes_expanded']),
+        ('Policy net runs', lambda stats: stats['policy_runs']),
+        ('Time', lambda stats: stats['end_time'] - stats['start_time']),
+        ('Value net runs', lambda stats: stats['value_runs'])
+            ]
+
+    fig, ax = plt.subplots(1, len(titles_fns), figsize=(6*len(titles_fns), 6))
+
+    for i, (title, fn) in enumerate(titles_fns):
+
+        x_axis = compute_x_axis(results_list, fn, title, granularity=200)
+        for results, legend in zip(results_list, legend_list):
+            y_axis = [percent_solved(results, fn, x) for x in x_axis]
+            ax[i].semilogx(x_axis, y_axis, label=legend, linewidth=2.0, linestyle='-', marker="o") #, c='C6')
+            ax[i].set_title(title)
+            ax[i].legend(loc='lower right')#'best')
+
+    savefile='plots/' + filename + str(time.time()) + '.eps'
+    plt.savefig(savefile)
+
+if __name__=='__main__':
+
+    file_list = ['./results/beam_alpha.p1555229962',
+                    './results/beam_withval_multiple_alpha.p1555370579',
+                    './results/beam_prev_val_multiple_alpha.p1555372128',
+                    './results/a_star_150k_alpha.p1555289034', #'./results/a_star_600k_alpha.p1555281742',
+                    './results/a_star_no_val_150k_alpha.p1555286946',#'./results/a_star_600k_noval_alpha.p1555278678',
+                    './results/a_star_prev_val_alpha.p1555386519',
+                    ]
+
+    legend_list = ['Beam, w/out value',
+                    'beam, w value',
+                    'beam, prev value',
+                    'a_star, w value',
+                    'a_star, w/out value',
+                    'a_star, prev value',
+                    ]
+
+    savefile = 'prev_val_plot_150k' #todo
+
+    plot(file_list, legend_list, savefile)
