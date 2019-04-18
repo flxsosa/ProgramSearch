@@ -86,48 +86,51 @@ class RobState:
             for j, char in enumerate(strr):
                 ret[i][j] = _CHARACTER.index(char) + 1
         return ret
+
+    def get_list_btns(self):
+        if len(self.past_buttons) == 0:
+            return np.array([0])
+        else:
+            return np.array([ALL_BUTTS.index(btn) + 1 for btn in self.past_buttons])
+
+    def get_last_btn_type(self):
+        last_butt_type = 0 if len(self.past_buttons) == 0 else ALL_BUTTS_TYPES.index(self.past_buttons[-1].__class__) + 1
+        return last_butt_type
         
-    def to_np(self, kind='full'):
-        assert kind in ['full', 'ablate_scratch']
-        if kind == 'full':
-            return self.to_np_full()
-        if kind == 'ablate_scratch':
-            return self.to_np_ablate_scratch()
+    def to_np(self, render_kind):
+        render_scratch = render_kind['render_scratch']
+        render_past_buttons = render_kind['render_past_buttons']
+        assert render_scratch in ['yes', 'no']
+        assert render_past_buttons in ['yes', 'no']
 
-    def to_np_ablate_scratch(self):
-        # have the last butt to have all button information
-        last_butt = 0 if len(self.past_buttons) == 0 else ALL_BUTTS.index(self.past_buttons[-1]) + 1
-
-        masks = [Button.str_masks_to_np_default() for _ in range(len(self.inputs))]
-
-        zero_scratch = np.zeros(shape = (len(self.scratch), max(_POSITION_K)))
-
-        masks = np.array(masks)
-        last_butt = np.array([last_butt])
-        return (self.str_to_np(self.inputs),
-                zero_scratch,
-                self.str_to_np(self.committed),
-                self.str_to_np(self.outputs),
-                masks,
-                last_butt,
-                )
-
-    def to_np_full(self):
-        last_butt = 0 if len(self.past_buttons) == 0 else ALL_BUTTS_TYPES.index(self.past_buttons[-1].__class__) + 1
-
+        # create all the useful informations and mask them out as needed
         if self.past_buttons == []:
             masks = [Button.str_masks_to_np_default() for _ in range(len(self.inputs))]
         else:
             masks = [self.past_buttons[-1].str_masks_to_np(str1, self) for str1 in self.scratch]
 
-        masks = np.array(masks)
-        last_butt = np.array([last_butt])
-        return (self.str_to_np(self.inputs),
-                self.str_to_np(self.scratch),
-                self.str_to_np(self.committed),
-                self.str_to_np(self.outputs),
-                masks,
-                last_butt,
+        rendered_inputs = self.str_to_np(self.inputs)
+        rendered_scratch = self.str_to_np(self.scratch)
+        rendered_committed = self.str_to_np(self.committed)
+        rendered_outputs = self.str_to_np(self.outputs)
+        rendered_masks = np.array(masks)
+        rendered_last_butt_type = self.get_last_btn_type()
+        rendered_past_buttons = self.get_list_btns() 
+
+        # start masking stuff off depend on parameters
+        if render_scratch == 'no':
+            rendered_scratch = np.zeros(shape = (len(self.scratch), max(_POSITION_K)))
+            rendered_masks = [Button.str_masks_to_np_default() for _ in range(len(self.inputs))]
+        if render_past_buttons == 'no':
+            rendered_past_buttons = np.array([0])
+
+        return (rendered_inputs,
+                rendered_scratch,
+                rendered_committed,
+                rendered_outputs,
+                rendered_masks,
+                rendered_last_butt_type,
+                rendered_past_buttons,
                 )
 
 # ===================== BUTTONS ======================
@@ -722,8 +725,9 @@ ALL_BUTTS = [x for butt_type in ALL_BUTTS_TYPES for x in butt_type.generate_butt
 
 class ROBENV:
 
-    def __init__(self, inputs, outputs, render_kind = 'full'):
-        assert render_kind in ['full', 'ablate_scratch']
+    def __init__(self, inputs, outputs, 
+                 render_kind={'render_scratch' : 'yes',
+                              'render_past_buttons' : 'no'}):
         self.inputs, self.outputs = inputs, outputs
         self.verbose = False
         self.render_kind = render_kind
@@ -731,7 +735,7 @@ class ROBENV:
     def reset(self):
         self.done = False
         self.pstate = RobState.new(self.inputs, self.outputs)
-        first_ob = self.pstate.to_np()
+        first_ob = self.pstate.to_np(self.render_kind)
         self.last_step = first_ob, 0.0, self.done
         return first_ob
 
@@ -797,18 +801,6 @@ def get_rollout(env, agent, max_iter):
         if done:
             break
     return trace
-
-def get_supervised_sample(n_ios=5):
-    from ROB import generate_FIO
-    
-    prog, inputs, outputs = generate_FIO(n_ios)
-    env = ROBENV(inputs, outputs)
-    repeat_agent = RepeatAgent(prog.flatten())
-    trace = get_rollout(env, repeat_agent, 30)
-
-    states = [x[0] for x in trace]
-    actions = [x[1] for x in trace]
-    return states, actions
 
 # ===================== UTILS ======================
 class ButtonSeqError(Exception):

@@ -494,6 +494,20 @@ def generate_FIO(n_ios, verbose=False):
     if verbose: print ("gneration failed retrying")
     return generate_FIO(n_ios)
 
+def get_supervised_sample(n_ios=5,
+                          render_kind={'render_scratch' : 'yes',
+                                       'render_past_buttons' : 'no'}):
+    
+    prog, inputs, outputs = generate_FIO(n_ios)
+    env = BUTT.ROBENV(inputs, outputs, render_kind)
+    repeat_agent = RepeatAgent(prog.flatten())
+    trace = get_rollout(env, repeat_agent, 30)
+
+    states = [x[0] for x in trace]
+    actions = [x[1] for x in trace]
+    return states, actions
+
+
 
 ################################### UTILS #################################
 # merge 2 constraint dictionaries together
@@ -795,14 +809,25 @@ def test13():
                             import pdb; pdb.set_trace()
 
 def test14():
-    for i in range(10000):
-        prog, inputs, outputs = generate_FIO(5)
-        for p in prog.flatten():
-            #print(p.__class__.__name__)
-            if p.__class__.__name__ == 'GetFrom': 
-                print(p)
-                print(prog)
-                #assert 0
+    print (' ================ our thing : normal render')
+    S, A = get_supervised_sample()
+    print ('scratch\n', S[-2][1])
+    print ('last btn type\n', S[-1][-2])
+    print ('past btns\n', S[-1][-1])
+
+    print (' ================ karel thing : render past buttons as well')
+    S, A = get_supervised_sample(render_kind={'render_scratch' : 'yes',
+                                              'render_past_buttons' : 'yes'})
+    print ('scratch\n', S[-2][1])
+    print ('last btn type\n', S[-1][-2])
+    print ('past btns\n', S[-1][-1])
+
+    print (' ================= robust fill thing : render past buttons but no scratch')
+    S, A = get_supervised_sample(render_kind={'render_scratch' : 'no',
+                                              'render_past_buttons' : 'yes'})
+    print ('scratch\n', S[-2][1])
+    print ('last btn type\n', S[-1][-2])
+    print ('past btns\n', S[-1][-1])
 
 def test15():
     pstate = RobState.new(["123hello123goodbye1234hola123231"],
@@ -837,8 +862,8 @@ if __name__ == '__main__':
     # # test10() crashes
     # test11()
     # test12()
-    test13()
-    # test14()
+    # test13()
+    test14()
     # test16()
 
 
