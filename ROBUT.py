@@ -44,8 +44,8 @@ N_IO = 5
 class RobState:
 
     @staticmethod
-    def crash_state_np():
-        return RobState.new(["" for _ in range(N_IO)], ["" for _ in range(N_IO)]).to_np()
+    def crash_state_np(render_kind):
+        return RobState.new(["" for _ in range(N_IO)], ["" for _ in range(N_IO)]).to_np(render_kind)
 
     @staticmethod
     def new(inputs, outputs):
@@ -763,7 +763,7 @@ class ROBENV:
                 print ("error ", e)
                 print(traceback.format_exc())
             self.done = True
-            self.last_step = RobState.crash_state_np(), -1.0, True 
+            self.last_step = RobState.crash_state_np(self.render_kind), -1.0, True 
             return self.last_step
 
         reward = 0.0 if self.pstate.committed != self.pstate.outputs else 1.0
