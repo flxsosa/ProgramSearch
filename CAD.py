@@ -14,6 +14,7 @@ from MCTS import MCTS
 from beamSearch import *
 from CNN import *
 
+import os
 import time
 import random
 
@@ -184,10 +185,6 @@ class Cuboid(CSG):
         return Cuboid(self.x0, self.y1, RESOLUTION - self.z0,
                       self.x1, self.y0, RESOLUTION - self.z1)
 
-# Cuboid(9,9,2,
-#        18,27,8).show()
-
-
 class Sphere(CSG):
     token = 'sphere'
     type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
@@ -235,8 +232,6 @@ class Sphere(CSG):
 
     def flipZ(self):
         return Sphere(self.x, self.y, RESOLUTION - self.z, self.r)
-
-Sphere(3,16,25,9).show()
 
 class Union(CSG):
     token = '+'
@@ -350,6 +345,143 @@ class Difference(CSG):
 dsl = DSL([Union, Difference, Cuboid, Sphere],
           lexicon=CSG.lexicon)
 
+
+
+def loadScad(path):
+    import re
+    
+    with open(path, "r") as handle:
+        source = handle.readlines()
+
+    def parse():
+        nonlocal source
+
+        while all( c.isspace() for c in source[0] ):
+            source.pop(0)
+
+        translate = re.match(r"\s*translate\(\[([^,]+), ([^,]+), ([^,]+)\]\)", source[0])
+        if translate:
+            displacement = tuple(float(translate.group(j)) for j in range(1,4) )
+            source[0] = source[0][translate.span()[1]:]
+            o = ("translate", displacement, parse())
+            return o
+
+        rotate = re.match(r"\s*rotate\(\[([^,]+), ([^,]+), ([^,]+)\]\)", source[0])
+        if rotate:
+            displacement = tuple(float(rotate.group(j)) for j in range(1,4) )
+            source[0] = source[0][rotate.span()[1]:]
+            o = ("rotate", displacement, parse())
+            return o
+
+        cuboid = re.match(r"\s*cube\(size = \[([^,]+), ([^,]+), ([^,]+)\], center = (true|false)\);", source[0])
+        if cuboid:
+            displacement = tuple(float(cuboid.group(j)) for j in range(1,4) )
+            source[0] = source[0][cuboid.span()[1]:]
+            return ("cuboid", displacement, cuboid.group(4) == "true")
+
+        sphere = re.match(r"\s*sphere\(r = ([^,]+), [^)]+\);", source[0])
+        if sphere:
+            r = float(sphere.group(1))
+            source[0] = source[0][sphere.span()[1]:]
+            o = ("sphere", r)
+            return o
+
+        cylinder = re.match(r"\s*cylinder\(h = ([^,]+), r1 = ([^,]+), r2 = ([^,]+), center = (true|false)[^)]+\);", source[0])
+        if cylinder:
+            h = float(cylinder.group(1))
+            r1 = float(cylinder.group(2))
+            r2 = float(cylinder.group(3))
+            assert r1 == r2
+            source[0] = source[0][cylinder.span()[1]:]
+            o = ("cylinder", h, r1, cylinder.group(4) == "true")
+            return o
+
+        union = re.match(r"\s*union\(\)\s*\{$", source[0])
+        if union:
+            source.pop(0)
+
+            elements = []
+            while True:
+                elements.append(parse())
+
+                while all( c.isspace() for c in source[0] ):
+                    source.pop(0)
+
+                if re.match(r"\s*\}$", source[0]):
+                    source.pop(0)
+                    break
+
+            o = tuple(["union"] + elements)
+            return o
+
+        difference = re.match(r"\s*difference\(\)\s*\{$", source[0])
+        if difference:
+            source.pop(0)
+
+            elements = []
+            while True:
+                elements.append(parse())
+
+                while all( c.isspace() for c in source[0] ):
+                    source.pop(0)
+
+                if re.match(r"\s*\}$", source[0]):
+                    source.pop(0)
+                    break
+
+            o = tuple(["difference"] + elements)
+            return o
+
+        intersection = re.match(r"\s*intersection\(\)\s*\{$", source[0])
+        if intersection:
+            source.pop(0)
+
+            elements = []
+            while True:
+                elements.append(parse())
+
+                while all( c.isspace() for c in source[0] ):
+                    source.pop(0)
+
+                if re.match(r"\s*\}$", source[0]):
+                    source.pop(0)
+                    break
+
+            o = tuple(["intersection"] + elements)
+            return o
+
+        print("could not parse this line:")
+        print(source[0])
+        assert False
+
+        
+        
+
+    o = parse()
+    while len(source) > 0 and all( c.isspace() for c in source[0] ):
+        source.pop(0)
+    if source:
+        print("had some leftover things to parse")
+        print(source)
+        assert False
+    return o
+
+import glob
+for f in glob.glob("data/CSG/**/*"):
+    print(f)
+    try:
+        print(loadScad(f))
+    except: print("FAIL")
+assert False
+
+            
+                
+            
+                                 
+        
+        
+
+        
 """Neural networks"""
 class ObjectEncoder(CNN):
     def __init__(self):
@@ -376,6 +508,53 @@ class SpecEncoder(CNN):
         super(SpecEncoder, self).__init__(channels=1,
                                           inputImageDimension=RESOLUTION)
 
+
+
+        
+class DepthEncoder(CNN):
+    def __init__(self):
+        super(DepthEncoder, self).__init__(channels=1,
+                                           inputImageDimension=RESOLUTION)
+
+class MultiviewEncoder(Module):
+    def __init__(self):
+        super(MultiviewEncoder, self).__init__()
+
+        # This will run six times
+        self.singleView = CNN(channels=1, inputImageDimension=RESOLUTION, flattenOutput=False)
+
+        self.mergeViews = CNN(channels=6*self.singleView.outputChannels)
+
+        self.outputDimensionality = self.mergeViews.outputDimensionality
+        
+        self.finalize()
+
+    def forward(self, v):
+        """Expects: either Bx6xRESOLUTIONxRESOLUTION or 6xRESOLUTIONxRESOLUTION"""
+        if isinstance(v, list): v = np.array(v)
+
+        v = self.device(self.tensor(v).float())
+
+        if len(v.shape) == 3:
+            squeeze = True
+            v = v.unsqueeze(0)
+        else:
+            squeeze = False
+
+        assert v.size(1) == 6
+        B = v.size(0)
+
+        # Run the single view encoder - but first we have to flatten batch/view
+        bv = self.singleView.encoder(v.view(B*6,1,RESOLUTION,RESOLUTION)).contiguous()
+        # reshape
+        bv = bv.view(B,6*self.singleView,RESOLUTION,RESOLUTION)
+        # Run through multiview encoder
+        y = self.mergeViews(bv)            
+
+        if squeeze: y = y.squeeze(0)
+
+        return y
+        
 
 class HeatMap(Module):
     def __init__(self):

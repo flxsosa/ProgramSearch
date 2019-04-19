@@ -13,6 +13,7 @@ class Flatten(nn.Module):
 
 class CNN(Module):
     def __init__(self, _=None, channels=1, layers=2,
+                 flattenOutput=True,
                  inputImageDimension=None, hiddenChannels=64, outputChannels=64):
         super(CNN, self).__init__()
         assert inputImageDimension is not None
@@ -34,9 +35,12 @@ class CNN(Module):
         self.encoder = nn.Sequential(*([conv_block(channels, hid_dim)] + \
                                        [conv_block(hid_dim, hid_dim) for _ in range(layers - 2) ] + \
                                        [conv_block(hid_dim, z_dim)] + \
-                                       [Flatten()]))
+                                       ([Flatten()] if flattenOutput else [])))
 
-        self.outputDimensionality = int(outputChannels*inputImageDimension*inputImageDimension/(4**layers))
+        if flattenOutput:
+            self.outputDimensionality = int(outputChannels*inputImageDimension*inputImageDimension/(4**layers))
+        else:
+            self.outputChannels = z_dim
         self.channels = channels
 
         self.finalize()
