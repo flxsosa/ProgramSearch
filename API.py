@@ -51,7 +51,20 @@ class DSL:
         operators: a list of classes that inherit from Program
         lexicon: (optionally) a list of symbols in the serialization of programs built from those operators
         """
+        if lexicon is None:
+            lexicon = []
+            for o in operators:
+                lexicon.append(o.token)
+                if o.type.isArrow:
+                    for a in o.type.arguments:
+                        if a.isInteger:
+                            for i in range(a.lower, a.upper + 1):
+                                lexicon.append(i)
+            lexicon = list(set(lexicon))
+            lexicon.sort(key=lambda z: (str(z.__class__),z))
+            
         self.lexicon = lexicon
+        print(self.lexicon)
         self.operators = operators
 
         self.tokenToOperator = {o.token: o

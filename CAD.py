@@ -28,8 +28,6 @@ import torch.nn.functional as F
 class BadCSG(Exception): pass
 
 class CSG(Program):
-    lexicon = ['+','-','t','c','r','tr','tc'] + list(range(RESOLUTION))
-
     def __init__(self):
         self._rendering = None
 
@@ -104,18 +102,18 @@ class CSG(Program):
         return maps
         
 
-    def show(self):
+    def show(self, resolution=None):
         """Open up a new window and show the CSG"""
         import matplotlib.pyplot as plot
         from mpl_toolkits.mplot3d import Axes3D
         columns = 2
         f = plot.figure()
 
-        maps = self.depthMaps(32)
+        maps = self.depthMaps()
 
         a = f.add_subplot(1, 1 + len(maps), 1,
                           projection='3d')
-        a.voxels(self.execute(), edgecolor='k')
+        a.voxels(self.render(resolution), edgecolor='k')
 
         for i,m in enumerate(maps):
             a = f.add_subplot(1, 1 + len(maps), 2 + i)
@@ -129,6 +127,69 @@ class CSG(Program):
                 
 # The type of CSG's
 tCSG = BaseType(CSG)
+
+class Cylinder(CSG):
+    token = 'cylinder'
+    type = arrow(integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 tCSG)
+
+    def __init__(self, r,
+                 x0, y0, z0,
+                 x1, y1, z1):
+        super(Cylinder, self).__init__()
+        self.r = r
+        self.x0 = x0
+        self.y0 = y0
+        self.z0 = z0
+        self.x1 = x1
+        self.y1 = y1
+        self.z1 = z1
+        self.p0 = np.array([x0,y0,z0])
+        self.p1 = np.array([x1,y1,z1])
+
+    def toTrace(self): return [self]
+
+    def serialize(self):
+        return (self.__class__.token,self.r,
+                self.x0,self.y0,self.z0,
+                self.x1,self.y1,self.z1)
+
+    def render(self,r=None):
+        r = r or RESOLUTION
+        X,Y,Z = np.indices((r,r,r))/r
+        p0 = self.p0/RESOLUTION
+        p1 = self.p1/RESOLUTION
+        v = p1 - p0
+        radius = self.r/RESOLUTION
+
+        # (q - p0).(p1 - p0) >= 0
+        # (q - p0).v >= 0
+        # q.v - p0.v >= 0
+        # q.v >= p0.v
+        qv = X*v[0] + Y*v[1] + Z*v[2]
+        firstCheck = qv >= np.dot(p0,v)
+        # (q - p1)*v <= 0
+        # q.v - p1.v <= 0
+        # q.v <= p1.v
+        secondCheck = qv <= np.dot(p1,v)
+
+        # qxv - p0xv
+        p0_x_v = np.cross(p0,v)
+        crossX = Y*v[2] - Z*v[1] - p0_x_v[0]
+        crossY = Z*v[0] - X*v[2] - p0_x_v[1]
+        crossZ = X*v[1] - Y*v[0] - p0_x_v[2]
+        normCross = crossX*crossX + crossY*crossY + crossZ*crossZ
+        thirdCheck = normCross < radius*radius*np.dot(v,v)
+        return 1.*(firstCheck&secondCheck&thirdCheck)
+
+    def __contains__(self, q):
+        if np.dot(q - self.p0, self.p1 - self.p0) >= 0 and np.dot(q - self.p1,self.p1 - self.p0) <= 0:
+            v1 = np.cross(q - self.p0, self.p1 - self.p0)
+            v2 = self.p1 - self.p0
+            return np.linalg.norm(v1)/np.linalg.norm(v2) < self.r
+        return False
 
 class Cuboid(CSG):
     token = 'cuboid'
@@ -342,9 +403,63 @@ class Difference(CSG):
         return np.clip(a - b,
                        0., 1.)
 
-dsl = DSL([Union, Difference, Cuboid, Sphere],
-          lexicon=CSG.lexicon)
+class Intersection(CSG):
+    token = '*'
+    type = arrow(tCSG, tCSG, tCSG)
+    
+    def __init__(self, a, b):
+        super(Difference, self).__init__()
+        self.a, self.b = a, b
 
+    def toTrace(self):
+        return self.a.toTrace() + self.b.toTrace() + [self]
+
+    def __str__(self):
+        return f"(- {self.a} {self.b})"
+        
+    def children(self): return [self.a, self.b]
+
+    def serialize(self):
+        return ('*',self.a,self.b)
+
+    def __eq__(self, o):
+        return isinstance(o, Intersection) and self.a == o.a and self.b == o.b
+
+    def __hash__(self):
+        return hash(('*', hash(self.a), hash(self.b)))
+    
+    def __contains__(self, p):
+        return (p in self.a) and (p in self.b)
+
+    def removeDeadCode(self):
+        a = self.a.removeDeadCode()
+        b = self.b.removeDeadCode()
+
+        self = Intersection(a,b)
+
+        me = self.render()
+        l = a.render()
+        r = b.render()
+        
+        if np.all(me <= 0.): raise BadCSG()
+        if np.all(me == l): return a
+        if np.all(me == r): return b
+        return self
+
+    def flipY(self): return Difference(self.a.flipY(),
+                                       self.b.flipY())
+    def flipX(self): return Difference(self.a.flipX(),
+                                       self.b.flipX())
+    def flipZ(self): return Difference(self.a.flipZ(),
+                                       self.b.flipZ())
+
+    def render(self,r):
+        a = 1.*self.a.render(r)
+        b = 1.*self.b.render(r)
+        return np.clip(a*b,
+                       0., 1.)
+
+dsl = DSL([Union, Difference, Intersection, Cuboid, Sphere, Cylinder])
 
 
 def loadScad(path):
@@ -464,6 +579,7 @@ def loadScad(path):
         print("had some leftover things to parse")
         print(source)
         assert False
+
     return o
 
 import glob
