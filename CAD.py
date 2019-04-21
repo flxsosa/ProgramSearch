@@ -14,6 +14,8 @@ from MCTS import MCTS
 from beamSearch import *
 from CNN import *
 
+import traceback
+import sys
 import os
 import time
 import random
@@ -26,6 +28,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class BadCSG(Exception): pass
+
+def discrete(c,cs):
+    "return the coordinate in cs which is closest to the true coordinate c"
+    return min(cs,key=lambda z: abs(z - c))
 
 class CSG(Program):
     def __init__(self):
@@ -44,6 +50,8 @@ class CSG(Program):
 
     def __repr__(self):
         return str(self)
+
+    def simplify(self): return self
 
     def __eq__(self,o):
         return self.serialize() == o.serialize()
@@ -149,10 +157,28 @@ class Cylinder(CSG):
         self.p0 = np.array([x0,y0,z0])
         self.p1 = np.array([x1,y1,z1])
 
+    def __str__(self):
+        return f"(cylinder r={self.r} p0={self.p0} p1={self.p1})"
+    
     def translate(self, x,y,z):
         return Cylinder(self.r,
                         self.x0 + x,self.y0 + y,self.z0 + z,
                         self.x1 + x,self.y1 + y,self.z1 + z)
+
+    def extent(self):
+        return np.stack([self.p0,self.p1]).min(0),np.stack([self.p0,self.p1]).max(0)
+    def scale(self,s):
+        return Cylinder(self.r*s,
+                        self.x0*s,self.y0*s,self.z0*s,
+                        self.x1*s,self.y1*s,self.z1*s)
+    def discrete(self, coordinates):
+        return Cylinder(discrete(self.r,coordinates),
+                        discrete(self.x0,coordinates),
+                        discrete(self.y0,coordinates),
+                        discrete(self.z0,coordinates),
+                        discrete(self.x1,coordinates),
+                        discrete(self.y1,coordinates),
+                        discrete(self.z1,coordinates))
 
     def toTrace(self): return [self]
 
@@ -196,6 +222,25 @@ class Cylinder(CSG):
             return np.linalg.norm(v1)/np.linalg.norm(v2) < self.r
         return False
 
+    def flipX(self):
+        return Cylinder(self.r,
+                        RESOLUTION - self.x0,
+                        self.y0,self.z0,
+                        RESOLUTION - self.x1,
+                        self.y1,self.z1)
+    def flipY(self):
+        return Cylinder(self.r,
+                        self.x0,
+                        RESOLUTION - self.y0,self.z0,
+                        self.x1,
+                        RESOLUTION - self.y1,self.z1)
+    def flipZ(self):
+        return Cylinder(self.r,
+                        self.x0,
+                        self.y0,RESOLUTION - self.z0,
+                        self.x1,
+                        self.y1,RESOLUTION - self.z1)
+
 class Cuboid(CSG):
     token = 'cuboid'
     type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
@@ -204,9 +249,9 @@ class Cuboid(CSG):
     
     def __init__(self, x0, y0, z0, x1, y1, z1):
         super(Cuboid, self).__init__()
-        if x1 <= x0: raise ParseFailure()
-        if y1 <= y0: raise ParseFailure()
-        if z1 <= z0: raise ParseFailure()
+        if x1 < x0: raise ParseFailure()
+        if y1 < y0: raise ParseFailure()
+        if z1 < z0: raise ParseFailure()
         self.x0 = x0
         self.y0 = y0
         self.z0 = z0
@@ -214,10 +259,30 @@ class Cuboid(CSG):
         self.y1 = y1
         self.z1 = z1
 
+    def removeDeadCode(self):
+        if self.x1 <= self.x0: return None
+        if self.y1 <= self.y0: return None
+        if self.z1 <= self.z0: return None
+        return self
+
     def translate(self,x,y,z):
         return Cuboid(
             self.x0 + x,self.y0 + y,self.z0 + z,
             self.x1 + x,self.y1 + y,self.z1 + z)
+
+    def extent(self):
+        return np.array([[self.x0,self.y0,self.z0],[self.x1,self.y1,self.z1]]).min(0), \
+            np.array([[self.x0,self.y0,self.z0],[self.x1,self.y1,self.z1]]).max(0)
+    def scale(self,s):
+        return Cuboid(self.x0*s,self.y0*s,self.z0*s,self.x1*s,self.y1*s,self.z1*s)
+    def discrete(self, coordinates):
+        return Cuboid(discrete(self.x0,coordinates),
+                      discrete(self.y0,coordinates),
+                      discrete(self.z0,coordinates),
+                      discrete(self.x1,coordinates),
+                      discrete(self.y1,coordinates),
+                      discrete(self.z1,coordinates))
+        
 
     def toTrace(self): return [self]
 
@@ -272,12 +337,12 @@ class Sphere(CSG):
     def toTrace(self): return [self]
 
     def translate(self,x,y,z):
-        return Sphere(self.r,self.x + x,self.y + y,self.z + z)
+#        print(f"translating sphere {self} by {(x,y,z)} ticket {Sphere(self.r,self.x + x,self.y + y,self.z + z)}")
+        return Sphere(self.x + x,self.y + y,self.z + z,self.r)
 
     def render(self,r=None):
         r = r or RESOLUTION
         x, y, z = np.indices((r,r,r))/float(r)
-        a = np.zeros((r,r,r))
 
         dx = (x - self.x/RESOLUTION)
         dy = (y - self.y/RESOLUTION)
@@ -285,6 +350,17 @@ class Sphere(CSG):
         distance2 = dx*dx + dy*dy + dz*dz
 
         return 1.*(distance2 <= (self.r/RESOLUTION)*(self.r/RESOLUTION))
+
+    def extent(self):
+        return np.array([self.x,self.y,self.z]) - self.r,\
+            np.array([self.x,self.y,self.z]) + self.r
+    def scale(self,s):
+        return Sphere(self.x*s,self.y*s,self.z*s,self.r*s)
+    def discrete(self,coordinates):
+        return Sphere(discrete(self.r,coordinates),
+                      discrete(self.x,coordinates),
+                      discrete(self.y,coordinates),
+                      discrete(self.z,coordinates))
         
     def __str__(self):
         return f"(sphere ({self.x}, {self.y}, {self.z}) {self.r})"
@@ -324,6 +400,17 @@ class Union(CSG):
     def __str__(self):
         return f"(+ {str(self.elements[0])} {str(self.elements[1])})"
 
+    def extent(self):
+        a = self.elements[0]
+        b = self.elements[1]
+        a1,a2 = a.extent()
+        b1,b2 = b.extent()
+        return np.stack([a1,b1]).min(0), np.stack([a2,b2]).max(0)
+    def scale(self,s):
+        return Union(*[e.scale(s) for e in self.elements])
+    def discrete(self,cs):
+        return Union(*[e.discrete(cs) for e in self.elements])
+
     def children(self): return self.elements
 
     def serialize(self):
@@ -341,6 +428,9 @@ class Union(CSG):
     def removeDeadCode(self):
         a = self.elements[0].removeDeadCode()
         b = self.elements[1].removeDeadCode()
+
+        if a is None: return b
+        if b is None: return a
 
         self = Union(a,b)
 
@@ -378,6 +468,17 @@ class Difference(CSG):
     def translate(self,*d):
         return Difference(self.a.translate(*d),self.b.translate(*d))
 
+    def extent(self):
+        a = self.a
+        b = self.b
+        a1,a2 = a.extent()
+        b1,b2 = b.extent()
+        return np.stack([a1,b1]).min(0), np.stack([a2,b2]).max(0)
+    def scale(self,s):
+        return Difference(self.a.scale(s), self.b.scale(s))
+    def discrete(self,cs):
+        return Difference(self.a.discrete(cs), self.b.discrete(cs))
+
     def __str__(self):
         return f"(- {self.a} {self.b})"
         
@@ -399,12 +500,15 @@ class Difference(CSG):
         a = self.a.removeDeadCode()
         b = self.b.removeDeadCode()
 
+        if a is None: return None
+        if b is None: return a
+
         self = Difference(a,b)
 
         me = self.render()
         l = a.render()
         r = b.render()
-        if np.all(l < r): raise BadCSG()
+        if np.all(l < r): return None
         if np.all(me == l): return a
         if np.all(me == r): return b
         return self
@@ -416,7 +520,7 @@ class Difference(CSG):
     def flipZ(self): return Difference(self.a.flipZ(),
                                        self.b.flipZ())
 
-    def render(self,r):
+    def render(self,r=None):
         a = 1.*self.a.render(r)
         b = 1.*self.b.render(r)
         return np.clip(a - b,
@@ -427,19 +531,30 @@ class Intersection(CSG):
     type = arrow(tCSG, tCSG, tCSG)
     
     def __init__(self, a, b):
-        super(Difference, self).__init__()
+        super(Intersection, self).__init__()
         self.a, self.b = a, b
 
     def toTrace(self):
         return self.a.toTrace() + self.b.toTrace() + [self]
 
     def __str__(self):
-        return f"(- {self.a} {self.b})"
+        return f"(* {self.a} {self.b})"
         
     def children(self): return [self.a, self.b]
 
     def translate(self,*d):
         return Intersection(self.a.translate(*d),self.b.translate(*d))
+
+    def extent(self):
+        a = self.a
+        b = self.b
+        a1,a2 = a.extent()
+        b1,b2 = b.extent()
+        return np.stack([a1,b1]).min(0), np.stack([a2,b2]).max(0)
+    def scale(self,s):
+        return Intersection(self.a.scale(s), self.b.scale(s))
+    def discrete(self,cs):
+        return Intersection(self.a.discrete(cs), self.b.discrete(cs))
 
     def serialize(self):
         return ('*',self.a,self.b)
@@ -457,25 +572,28 @@ class Intersection(CSG):
         a = self.a.removeDeadCode()
         b = self.b.removeDeadCode()
 
+        if a is None: return b
+        if b is None: return a
+
         self = Intersection(a,b)
 
         me = self.render()
         l = a.render()
         r = b.render()
         
-        if np.all(me <= 0.): raise BadCSG()
+        if np.all(me <= 0.): return None
         if np.all(me == l): return a
         if np.all(me == r): return b
         return self
 
-    def flipY(self): return Difference(self.a.flipY(),
-                                       self.b.flipY())
-    def flipX(self): return Difference(self.a.flipX(),
-                                       self.b.flipX())
-    def flipZ(self): return Difference(self.a.flipZ(),
-                                       self.b.flipZ())
+    def flipY(self): return Intersection(self.a.flipY(),
+                                         self.b.flipY())
+    def flipX(self): return Intersection(self.a.flipX(),
+                                         self.b.flipX())
+    def flipZ(self): return Intersection(self.a.flipZ(),
+                                         self.b.flipZ())
 
-    def render(self,r):
+    def render(self,r=None):
         a = 1.*self.a.render(r)
         b = 1.*self.b.render(r)
         return np.clip(a*b,
@@ -559,7 +677,7 @@ def loadScad(path):
                     break
 
             o = elements[0]
-            for e in elements[1]:
+            for e in elements[1:]:
                 o = Union(o,e)
             return o
         
@@ -596,8 +714,12 @@ def loadScad(path):
                     source.pop(0)
                     break
 
-            assert len(elements) == 2
-            return Intersection(*elements)
+            o = elements[0]
+            for e in elements[1:]:
+                o = Intersection(o,e)
+            return o
+            
+
 
         print("could not parse this line:")
         print(source[0])
@@ -620,8 +742,28 @@ import glob
 for f in glob.glob("data/CSG/**/*"):
     print(f)
     try:
-        print(loadScad(f))
-    except: print("FAIL")
+        scene = loadScad(f)
+        print("before translating")
+        print(scene.extent())
+        m,_ = scene.extent()
+        scene = scene.translate(-m[0],-m[1],-m[2])
+        print("after translation")
+        print(scene.extent())
+        _,m = scene.extent()
+        scene = scene.scale(RESOLUTION/m.max()).discrete(range(RESOLUTION))
+        print(scene.extent())
+        print("without that code")
+        scene = scene.removeDeadCode()
+        print(scene)
+        if scene is None:
+            print("no way of removing dead code")
+        else:
+            scene.show()
+        
+    except Exception as e:
+        print(traceback.format_exc())
+        print("FAIL",e)
+        sys.exit(0)
 assert False
 
             
