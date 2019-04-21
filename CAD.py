@@ -149,6 +149,11 @@ class Cylinder(CSG):
         self.p0 = np.array([x0,y0,z0])
         self.p1 = np.array([x1,y1,z1])
 
+    def translate(self, x,y,z):
+        return Cylinder(self.r,
+                        self.x0 + x,self.y0 + y,self.z0 + z,
+                        self.x1 + x,self.y1 + y,self.z1 + z)
+
     def toTrace(self): return [self]
 
     def serialize(self):
@@ -209,6 +214,11 @@ class Cuboid(CSG):
         self.y1 = y1
         self.z1 = z1
 
+    def translate(self,x,y,z):
+        return Cuboid(
+            self.x0 + x,self.y0 + y,self.z0 + z,
+            self.x1 + x,self.y1 + y,self.z1 + z)
+
     def toTrace(self): return [self]
 
     def render(self,r=None):
@@ -261,6 +271,9 @@ class Sphere(CSG):
 
     def toTrace(self): return [self]
 
+    def translate(self,x,y,z):
+        return Sphere(self.r,self.x + x,self.y + y,self.z + z)
+
     def render(self,r=None):
         r = r or RESOLUTION
         x, y, z = np.indices((r,r,r))/float(r)
@@ -301,6 +314,9 @@ class Union(CSG):
     def __init__(self, a, b):
         super(Union, self).__init__()
         self.elements = [a,b]
+
+    def translate(self,*d):
+        return Union(self.elements[0].translate(*d),self.elements[1].translate(*d))
 
     def toTrace(self):
         return self.elements[0].toTrace() + self.elements[1].toTrace() + [self]
@@ -358,6 +374,9 @@ class Difference(CSG):
 
     def toTrace(self):
         return self.a.toTrace() + self.b.toTrace() + [self]
+
+    def translate(self,*d):
+        return Difference(self.a.translate(*d),self.b.translate(*d))
 
     def __str__(self):
         return f"(- {self.a} {self.b})"
@@ -419,6 +438,9 @@ class Intersection(CSG):
         
     def children(self): return [self.a, self.b]
 
+    def translate(self,*d):
+        return Intersection(self.a.translate(*d),self.b.translate(*d))
+
     def serialize(self):
         return ('*',self.a,self.b)
 
@@ -478,28 +500,32 @@ def loadScad(path):
         if translate:
             displacement = tuple(float(translate.group(j)) for j in range(1,4) )
             source[0] = source[0][translate.span()[1]:]
-            o = ("translate", displacement, parse())
-            return o
+            return parse().translate(*displacement)
 
         rotate = re.match(r"\s*rotate\(\[([^,]+), ([^,]+), ([^,]+)\]\)", source[0])
         if rotate:
             displacement = tuple(float(rotate.group(j)) for j in range(1,4) )
             source[0] = source[0][rotate.span()[1]:]
-            o = ("rotate", displacement, parse())
+            #o = ("rotate", displacement, parse())
+            return parse()
             return o
 
         cuboid = re.match(r"\s*cube\(size = \[([^,]+), ([^,]+), ([^,]+)\], center = (true|false)\);", source[0])
         if cuboid:
             displacement = tuple(float(cuboid.group(j)) for j in range(1,4) )
             source[0] = source[0][cuboid.span()[1]:]
-            return ("cuboid", displacement, cuboid.group(4) == "true")
+            if cuboid.group(4) == "true": # centering
+                return Cuboid(-displacement[0]/2, -displacement[1]/2, -displacement[2]/2,
+                              displacement[0]/2, displacement[1]/2, displacement[2]/2)
+            else:
+                return Cuboid(0.,0.,0.,*displacement)
+                
 
         sphere = re.match(r"\s*sphere\(r = ([^,]+), [^)]+\);", source[0])
         if sphere:
             r = float(sphere.group(1))
             source[0] = source[0][sphere.span()[1]:]
-            o = ("sphere", r)
-            return o
+            return Sphere(r,0.,0.,0.)
 
         cylinder = re.match(r"\s*cylinder\(h = ([^,]+), r1 = ([^,]+), r2 = ([^,]+), center = (true|false)[^)]+\);", source[0])
         if cylinder:
@@ -508,8 +534,14 @@ def loadScad(path):
             r2 = float(cylinder.group(3))
             assert r1 == r2
             source[0] = source[0][cylinder.span()[1]:]
-            o = ("cylinder", h, r1, cylinder.group(4) == "true")
-            return o
+            if cylinder.group(4) == "true": # center
+                return Cylinder(r1,
+                                0.,0.,-h/2,
+                                0.,0., h/2)
+            else:
+                return Cylinder(r1,
+                                0.,0.,0.,
+                                0.,0.,h)
 
         union = re.match(r"\s*union\(\)\s*\{$", source[0])
         if union:
@@ -526,9 +558,11 @@ def loadScad(path):
                     source.pop(0)
                     break
 
-            o = tuple(["union"] + elements)
+            o = elements[0]
+            for e in elements[1]:
+                o = Union(o,e)
             return o
-
+        
         difference = re.match(r"\s*difference\(\)\s*\{$", source[0])
         if difference:
             source.pop(0)
@@ -544,8 +578,8 @@ def loadScad(path):
                     source.pop(0)
                     break
 
-            o = tuple(["difference"] + elements)
-            return o
+            assert len(elements) == 2
+            return Difference(*elements)
 
         intersection = re.match(r"\s*intersection\(\)\s*\{$", source[0])
         if intersection:
@@ -562,8 +596,8 @@ def loadScad(path):
                     source.pop(0)
                     break
 
-            o = tuple(["intersection"] + elements)
-            return o
+            assert len(elements) == 2
+            return Intersection(*elements)
 
         print("could not parse this line:")
         print(source[0])
