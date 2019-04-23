@@ -1223,9 +1223,9 @@ def testCSG(m, getProgram, timeout, export):
     print(f"One parent restriction?  {oneParent}")
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
-               SMC(m),
-        BeamSearch(m, criticCoefficient=1),
-                BeamSearch(m, criticCoefficient=0.),
+        #        SMC(m),
+        # BeamSearch(m, criticCoefficient=1),
+                # BeamSearch(m, criticCoefficient=0.),
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
@@ -1463,7 +1463,7 @@ if __name__ == "__main__":
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "critic":
-        with open("checkpoints/imitation.pickle","rb") as handle:
+        with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
         critic = A2C(m)
         def R(spec, program):
@@ -1493,7 +1493,11 @@ if __name__ == "__main__":
     elif arguments.mode == "test":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
+        if arguments.td:
+            dataGenerator = getTrainingData('CSG_data.p')
+        else:
+            dataGenerator = random3D
         testCSG(m,
-                getTrainingData('CSG_data.p'),
+                dataGenerator,
                 arguments.timeout,
                 export=f"figures/CAD_{arguments.maxShapes}_shapes.png")
