@@ -33,6 +33,29 @@ def discrete(c,cs):
     "return the coordinate in cs which is closest to the true coordinate c"
     return min(cs,key=lambda z: abs(z - c))
 
+def voxels2dm(vs):
+    r = vs.shape[0]
+    span = np.arange(0.,1.,1./r)
+
+    x, y, z = np.indices((r,r,r))/float(r)
+
+    maps = []
+
+    # collapsing Z (front)
+    ds = np.zeros((r,r,r))
+    ds[:,:,:] = span
+
+    maps.append(np.amax((vs*z), axis=2))
+
+    # collapsing Z (behind)
+    ds[:,:,:] = np.flip(span)
+    maps.append(np.amax((vs*np.flip(z,2)), axis=2))
+
+    return [m
+            for n,i in enumerate(np.indices((r,r,r))/float(r))
+            for m in [np.amax(vs * i, axis=n),
+                      np.amax(vs * np.flip(i,n), axis=n)] ]
+
 class CSG(Program):
     def __init__(self):
         self._rendering = None
@@ -84,32 +107,8 @@ class CSG(Program):
     def depthMaps(self, r=None):
         """Returns six depth maps"""
         r = r or RESOLUTION
-        vs = self.render(r=r)
-
-        span = np.arange(0.,1.,1./r)
-
-        x, y, z = np.indices((r,r,r))/float(r)
-        
-        maps = []
-
-        # collapsing Z (front)
-        ds = np.zeros((r,r,r))
-        ds[:,:,:] = span
-
-        maps.append(np.amax((vs*z), axis=2))
-
-        # collapsing Z (behind)
-        ds[:,:,:] = np.flip(span)
-        maps.append(np.amax((vs*np.flip(z,2)), axis=2))
-
-        maps = [m
-                for n,i in enumerate(np.indices((r,r,r))/float(r))
-                for m in [np.amax(vs * i, axis=n),
-                          np.amax(vs * np.flip(i,n), axis=n)] ]
-
-        return maps
-        
-
+        return voxels2dm(self.render(r=r))
+    
     def show(self, resolution=None):
         """Open up a new window and show the CSG"""
         import matplotlib.pyplot as plot
@@ -860,20 +859,24 @@ class SpecEncoder(CNN):
 
         
 class MultiviewEncoder(Module):
-    def __init__(self):
+    def __init__(self, nviews=6):
         super(MultiviewEncoder, self).__init__()
 
-        # This will run six times
-        self.singleView = CNN(channels=1, inputImageDimension=RESOLUTION, flattenOutput=False)
+        self.nviews = nviews
 
-        self.mergeViews = CNN(channels=6*self.singleView.outputChannels)
+        # This will run six times
+        layers = 2
+        self.singleView = CNN(channels=1, inputImageDimension=RESOLUTION, flattenOutput=False, layers=layers)
+
+        self.mergeViews = CNN(channels=nviews*self.singleView.outputChannels,
+                              inputImageDimension=RESOLUTION/(2**layers))
 
         self.outputDimensionality = self.mergeViews.outputDimensionality
         
         self.finalize()
 
     def forward(self, v):
-        """Expects: either Bx6xRESOLUTIONxRESOLUTION or 6xRESOLUTIONxRESOLUTION"""
+        """Expects: either Bx(nviews)xRESOLUTIONxRESOLUTION or (nviews)xRESOLUTIONxRESOLUTION"""
         if isinstance(v, list): v = np.array(v)
 
         v = self.device(self.tensor(v).float())
@@ -884,19 +887,66 @@ class MultiviewEncoder(Module):
         else:
             squeeze = False
 
-        assert v.size(1) == 6
+        assert v.size(1) == self.nviews
         B = v.size(0)
 
         # Run the single view encoder - but first we have to flatten batch/view
-        bv = self.singleView.encoder(v.view(B*6,1,RESOLUTION,RESOLUTION)).contiguous()
+        bv = self.singleView.encoder(v.view(B*self.nviews,1,RESOLUTION,RESOLUTION)).contiguous()
+        
         # reshape
-        bv = bv.view(B,6*self.singleView,RESOLUTION,RESOLUTION)
+        bv = bv.view(B,
+                     self.nviews*self.singleView.outputChannels,
+                     self.singleView.outputResolution,
+                     self.singleView.outputResolution)
         # Run through multiview encoder
         y = self.mergeViews(bv)            
 
         if squeeze: y = y.squeeze(0)
 
         return y
+
+class MultiviewSpec(Module):
+    def __init__(self):
+        super(MultiviewSpec, self).__init__()
+        self.encoder = MultiviewEncoder()
+        self.outputDimensionality = self.encoder.outputDimensionality
+        self.finalize()
+
+    def forward(self, v):
+        """v: either Bx(voxels) or (voxels)"""
+        if len(v.shape) == 4:
+            return self.encoder(np.array([ voxels2dm(v[b]) for b in range(v.shape[0])]))
+        elif len(v.shape) == 3:
+            return self.encoder(voxels2dm(v))
+        else:
+            assert False
+
+class MultiviewObject(Module):
+    def __init__(self):
+        super(MultiviewObject, self).__init__()
+        self.encoder = MultiviewEncoder(nviews=12)
+        self.outputDimensionality = self.encoder.outputDimensionality
+        self.finalize()
+
+    def forward(self, spec, obj):
+        if isinstance(spec, list):
+            # batching both along specs and objects
+            assert isinstance(obj, list)
+            B = len(spec)
+            assert len(obj) == B
+            spec = np.stack([ np.stack(voxels2dm(s)) for s in spec])
+            obj = np.stack([ np.stack(voxels2dm(o)) for o in obj])
+            return self.encoder(np.concatenate([spec,obj],1))
+        elif isinstance(obj, list): # batched - expect a single spec and multiple objects
+            spec = np.stack([voxels2dm(spec)])
+            spec = np.repeat(spec[np.newaxis,:,:],len(obj),axis=0)
+            obj = np.stack([ np.stack(voxels2dm(o)) for o in obj])
+            return self.encoder(np.concatenate([spec, obj],1))
+        else: # not batched
+            spec = np.stack([voxels2dm(spec)])
+            obj = np.stack([voxels2dm(obj)])
+            return self.encoder(np.stack([spec,obj]))
+        
 
 class HeatMap(Module):
     def __init__(self):
@@ -1272,6 +1322,7 @@ if __name__ == "__main__":
     parser.add_argument("--maxShapes", default=2,
                             type=int)
     parser.add_argument("--2d", default=False, action='store_true', dest='td')
+    parser.add_argument("--viewpoints", default=False, action='store_true', dest='viewpoints')
     parser.add_argument("--trainTime", default=None, type=float,
                         help="Time in hours to train the network")
     parser.add_argument("--attention", default=1, type=int,
@@ -1308,8 +1359,12 @@ if __name__ == "__main__":
     if arguments.mode == "imitation":
         if not arguments.td:
             dsl = dsl_3d
-            oe = CNN_3d(channels=2, inputImageDimension=RESOLUTION, channelsAsArguments=True)
-            se = CNN_3d(channels=1, inputImageDimension=RESOLUTION)
+            if not arguments.viewpoints:
+                oe = CNN_3d(channels=2, inputImageDimension=RESOLUTION, channelsAsArguments=True, layers=3)
+                se = CNN_3d(channels=1, inputImageDimension=RESOLUTION, layers=3)
+            else:
+                oe = MultiviewObject()
+                se = MultiviewSpec()
             training = random3D
         else:
             dsl = dsl_2d

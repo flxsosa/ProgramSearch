@@ -39,10 +39,12 @@ class CNN(Module):
                                        [conv_block(hid_dim, z_dim)] + \
                                        ([Flatten()] if flattenOutput else [])))
 
+        self.outputResolution = int(inputImageDimension/(2**layers))
         if flattenOutput:
-            self.outputDimensionality = int(outputChannels*inputImageDimension*inputImageDimension/(4**layers))
+            self.outputDimensionality = int(outputChannels*self.outputResolution*self.outputResolution)
         else:
             self.outputChannels = z_dim
+        
         self.channels = channels
 
         self.finalize()
@@ -59,10 +61,11 @@ class CNN(Module):
         else: # either [b,c,w,h] or [c,w,h]
             if len(v.shape) == 3: squeeze = 1
             elif len(v.shape) == 4: squeeze = 0
+            else: assert False
 
         v = self.tensor(v)
         for _ in range(squeeze): v = v.unsqueeze(0)
-        v = self.encoder(v.float())
+        v = self.encoder(self.device(v.float()))
         for _ in range(squeeze): v = v.squeeze(0)
         return v
 
