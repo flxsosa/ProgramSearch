@@ -54,7 +54,7 @@ class CSG(Program):
     def simplify(self): return self
 
     def __eq__(self,o):
-        return self.serialize() == o.serialize()
+        return isinstance(o,CSG) and self.serialize() == o.serialize()
 
     def __ne__(self, o): return not (self == o)
 
@@ -159,6 +159,11 @@ class Cylinder(CSG):
 
     def __str__(self):
         return f"(cylinder r={self.r} p0={self.p0} p1={self.p1})"
+
+    def rotate(self,rx,ry,rz):
+        
+        assert False
+    def children(self): return []
     
     def translate(self, x,y,z):
         return Cylinder(self.r,
@@ -599,7 +604,8 @@ class Intersection(CSG):
         return np.clip(a*b,
                        0., 1.)
 
-dsl = DSL([Union, Difference, Intersection, Cuboid, Sphere, Cylinder])
+dsl_3d = DSL([Union, Difference, Intersection, Cuboid, Sphere, Cylinder])
+dsl_2d = None # FIXME
 
 
 def loadScad(path):
@@ -624,9 +630,13 @@ def loadScad(path):
         if rotate:
             displacement = tuple(float(rotate.group(j)) for j in range(1,4) )
             source[0] = source[0][rotate.span()[1]:]
-            #o = ("rotate", displacement, parse())
-            return parse()
+            o = parse()
+            if "cylinder" in str(o):
+                print("rotation",displacement,o)
             return o
+            #o = ("rotate", displacement, parse())
+            
+            
 
         cuboid = re.match(r"\s*cube\(size = \[([^,]+), ([^,]+), ([^,]+)\], center = (true|false)\);", source[0])
         if cuboid:
@@ -653,10 +663,12 @@ def loadScad(path):
             assert r1 == r2
             source[0] = source[0][cylinder.span()[1]:]
             if cylinder.group(4) == "true": # center
+                print("centered cylinder")
                 return Cylinder(r1,
                                 0.,0.,-h/2,
                                 0.,0., h/2)
             else:
+                print("not centered cylinder")
                 return Cylinder(r1,
                                 0.,0.,0.,
                                 0.,0.,h)
@@ -738,44 +750,87 @@ def loadScad(path):
 
     return o
 
-import glob
-for f in glob.glob("data/CSG/**/*"):
-    print(f)
-    try:
-        scene = loadScad(f)
-        print("before translating")
-        print(scene.extent())
-        m,_ = scene.extent()
-        scene = scene.translate(-m[0],-m[1],-m[2])
-        print("after translation")
-        print(scene.extent())
-        _,m = scene.extent()
-        scene = scene.scale(RESOLUTION/m.max()).discrete(range(RESOLUTION))
-        print(scene.extent())
-        print("without that code")
-        scene = scene.removeDeadCode()
-        print(scene)
-        if scene is None:
-            print("no way of removing dead code")
-        else:
-            scene.show()
-        
-    except Exception as e:
-        print(traceback.format_exc())
-        print("FAIL",e)
-        sys.exit(0)
-assert False
 
-            
-                
-            
-                                 
-        
-        
+def loadScads():
+    s = loadScad("data/CSG/011/sketch_final.scad")
+    import glob
+    for f in glob.glob("data/CSG/011/sketch_final.scad"): # "data/CSG/**/*"
+        print(f)
+        try:
+            scene = loadScad(f)
+            print(scene)
 
+            print("before translating")
+            print(scene.extent())
+            m,_ = scene.extent()
+            scene = scene.translate(-m[0],-m[1],-m[2])
+            print("after translation")
+            print(scene.extent())
+            _,m = scene.extent()
+            scene = scene.scale(RESOLUTION/m.max()).discrete(range(RESOLUTION))
+            print(scene.extent())
+            print("without that code")
+            scene = scene.removeDeadCode()
+            print(scene)
+            if scene is None:
+                print("no way of removing dead code")
+            else:
+                scene.show()
+
+        except Exception as e:
+            print(traceback.format_exc())
+            print("FAIL",e)
+            sys.exit(0)
+    assert False
+
+def random3D():
+    cs = range(0, RESOLUTION, int(RESOLUTION/8))
+    def randomSpherical():
+        r = random.choice([4,8,12])
+        x = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+        y = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+        z = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+        return Sphere(x,y,z,r)
+    def randomCuboid():
+        def randomPair():
+            c0 = random.choice(cs)
+            c1 = random.choice([c for c in cs if c != c0 ])
+            return min(c0,c1),max(c0,c1)
+        x0,x1 = randomPair()
+        y0,y1 = randomPair()
+        z0,z1 = randomPair()
         
+        return Cuboid(x0,y0,z0,
+                      x1,y1,z1)
+    def randomCylinder():
+        r = random.choice([4,8,12])
+        l = random.choice([4,8,12,16,20])
+        # sample the center, aligned with the axis of the cylinder
+        a = random.choice([c for c in cs if c - l/2 >= 0 and c + l/2 < RESOLUTION ])
+        b = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+        c = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+
+        # oriented along z axis
+        if random.choice([False,False,True]):
+            p0 = [b,c, a - l/2]
+            p1 = [b,c, a + l/2]
+        elif random.choice([False,True]): # oriented along y axis
+            p0 = [b, a - l/2, c]
+            p1 = [b, a + l/2, c]
+        else: # oriented along x-axis
+            p0 = [a - l/2, b, c]
+            p1 = [a + l/2, b, c]
+
+        return Cylinder(*([r] + p0 + p1))
+
+    def randomShape():
+        return random.choice([randomSpherical,randomCuboid,randomCylinder])()
+
+    return randomShape()
+            
 """Neural networks"""
 class ObjectEncoder(CNN):
+    """Encodes a 2d object"""
     def __init__(self):
         super(ObjectEncoder, self).__init__(channels=2,
                                             inputImageDimension=RESOLUTION)
@@ -796,6 +851,7 @@ class ObjectEncoder(CNN):
         
 
 class SpecEncoder(CNN):
+    """Encodes a 2d spec"""
     def __init__(self):
         super(SpecEncoder, self).__init__(channels=1,
                                           inputImageDimension=RESOLUTION)
@@ -803,11 +859,6 @@ class SpecEncoder(CNN):
 
 
         
-class DepthEncoder(CNN):
-    def __init__(self):
-        super(DepthEncoder, self).__init__(channels=1,
-                                           inputImageDimension=RESOLUTION)
-
 class MultiviewEncoder(Module):
     def __init__(self):
         super(MultiviewEncoder, self).__init__()
@@ -846,7 +897,6 @@ class MultiviewEncoder(Module):
         if squeeze: y = y.squeeze(0)
 
         return y
-        
 
 class HeatMap(Module):
     def __init__(self):
@@ -923,7 +973,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
     
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None,
-                nudge=False, disjointUnion=True, translate=True):
+                nudge=False, translate=True):
     import matplotlib.pyplot as plot
 
     def translation(x,y,child):
@@ -981,11 +1031,6 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             if s is None:
                 s = o
             else:
-                if disjointUnion:
-                    if (o.render()*s.render()).sum() > 0.5: continue
-                    s = Union(s,o)
-                    continue
-                
                 if random.choice([True,False]):
                     new = Union(s,o)
                 elif True or random.choice([True,False]):
@@ -1154,7 +1199,7 @@ def makeTrainingData():
     startTime = time.time()
     while time.time() < startTime + 3600*5:
         n_samples += 1
-        program = randomScene(maxShapes=20, minShapes=5, disjointUnion=False, translate=False)
+        program = randomScene(maxShapes=20, minShapes=5, translate=False)
         size = len(program.toTrace())
         im = program.render()
         im = tuple( im[x,y] > 0.5
@@ -1226,6 +1271,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
     parser.add_argument("--maxShapes", default=2,
                             type=int)
+    parser.add_argument("--2d", default=False, action='store_true', dest='td')
     parser.add_argument("--trainTime", default=None, type=float,
                         help="Time in hours to train the network")
     parser.add_argument("--attention", default=1, type=int,
@@ -1237,9 +1283,8 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", default=5, type=float,
                         help="Test time maximum timeout")
     parser.add_argument("--nudge", default=False, action='store_true')
-    parser.add_argument("--oneParent", default=False, action='store_true')
+    parser.add_argument("--oneParent", default=True, action='store_true')
     parser.add_argument("--noTranslate", default=True, action='store_true')
-    parser.add_argument("--disjointUnion", default=False, action='store_true')
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
@@ -1248,12 +1293,12 @@ if __name__ == "__main__":
         startTime = time.time()
         ns = 50
         for _ in range(ns):
-            randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, disjointUnion=arguments.disjointUnion, nudge=arguments.nudge, translate=arguments.translate).execute()
+            randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate).execute()
         print(f"{ns/(time.time() - startTime)} (renders + samples)/second")
         for n in range(100):
             randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes,
                         minShapes=arguments.maxShapes,
-                        nudge=arguments.nudge, disjointUnion=arguments.disjointUnion, 
+                        nudge=arguments.nudge, 
                         translate=arguments.translate)
         import sys
         sys.exit(0)
@@ -1261,12 +1306,23 @@ if __name__ == "__main__":
             
 
     if arguments.mode == "imitation":
-        m = ProgramPointerNetwork(ObjectEncoder(), SpecEncoder(), dsl,
+        if not arguments.td:
+            dsl = dsl_3d
+            oe = CNN_3d(channels=2, inputImageDimension=RESOLUTION, channelsAsArguments=True)
+            se = CNN_3d(channels=1, inputImageDimension=RESOLUTION)
+            training = random3D
+        else:
+            dsl = dsl_2d
+            oe = ObjectEncoder()
+            se = SpecEncoder()
+            training = getTrainingData('CSG_data.p')
+            
+        m = ProgramPointerNetwork(oe, se, dsl,
                                   oneParent=arguments.oneParent,
                                   attentionRounds=arguments.attention,
                                   heads=arguments.heads,
                                   H=arguments.hidden)
-        trainCSG(m, getTrainingData('CSG_data.p'),
+        trainCSG(m, training,
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "critic":
@@ -1280,7 +1336,7 @@ if __name__ == "__main__":
                 if np.all((o.execute() > 0.5) == spec): return True
             return False
         critic.train(
-            lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate, disjointUnion=arguments.disjointUnion), 
+            lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate),
             R)
         
     elif arguments.mode == "heatMap":
@@ -1293,9 +1349,6 @@ if __name__ == "__main__":
         searchAlgorithm = BeamSearch(m, maximumLength=arguments.maxShapes*3 + 1)
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
         searchAlgorithm.train(getTrainingData('CSG_data.p'),
-                              # lambda: randomScene(maxShapes=arguments.maxShapes, nudge=arguments.nudge,
-                              #                     disjointUnion=arguments.disjointUnion,
-                              #                     translate=arguments.translate),
                               loss=loss,
                               policyOracle=lambda spec: spec.toTrace(),
                               timeout=1,
@@ -1304,6 +1357,6 @@ if __name__ == "__main__":
         with open(arguments.checkpoint,"rb") as handle:
             m = pickle.load(handle)
         testCSG(m,
-                getTrainingData('CSG_data.p'),#lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate, disjointUnion=arguments.disjointUnion),
+                getTrainingData('CSG_data.p'),
                 arguments.timeout,
                 export=f"figures/CAD_{arguments.maxShapes}_shapes.png")
