@@ -1,9 +1,34 @@
 import heapq
 
+import numpy as np
+
 import torch
 import torch.nn as nn
 
-   
+import math
+
+def rotationMatrix(x,y,z):
+    x = math.pi*x/180.
+    y = math.pi*y/180.
+    z = math.pi*z/180.
+    sx = math.sin(x)
+    cx = math.cos(x)
+    sz = math.sin(z)
+    cz = math.cos(z)
+    sy = math.sin(y)
+    cy = math.cos(y)
+    
+    rx = np.array([[1,0,0],
+                   [0,cx,-sx],
+                   [0,sx, cx]])
+    ry = np.array([[cy,0,sy],
+                   [0 ,1,0],
+                   [-sy,0,cy]])
+    rz = np.array([[cz,-sz,0],
+                   [sz,cz,0],
+                   [0,0,1]])
+    return rz@ry@rx
+
 class Module(nn.Module):
     """Wrapper over torch Module class that handles GPUs elegantly"""
     def __init__(self):

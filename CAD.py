@@ -109,27 +109,37 @@ class CSG(Program):
         r = r or RESOLUTION
         return voxels2dm(self.render(r=r))
     
-    def show(self, resolution=None):
+    def show(self, resolution=None, export=None):
         """Open up a new window and show the CSG"""
         import matplotlib.pyplot as plot
         from mpl_toolkits.mplot3d import Axes3D
         columns = 2
         f = plot.figure()
 
-        maps = self.depthMaps()
+        maps = self.depthMaps(resolution)
+        
 
-        a = f.add_subplot(1, 1 + len(maps), 1,
-                          projection='3d')
-        a.voxels(self.render(resolution), edgecolor='k')
+        a = f.add_subplot(1 + int(export is None), 1 + len(maps) if export is None else 1, 1,
+                          projection='3d')        
+            
+        a.voxels(self.render(RESOLUTION), edgecolor='k')
+
+        if export is not None:
+            plot.savefig(f"{export}_v.png")
+            f = plot.figure()
 
         for i,m in enumerate(maps):
-            a = f.add_subplot(1, 1 + len(maps), 2 + i)
+            a = f.add_subplot(1,
+                              len(maps) + (int(export is None)), 1 + i + int(export is None))
             a.imshow(1 - m, cmap='Greys',
                      vmin=0., vmax=1.)
             a.get_xaxis().set_visible(False)
             a.get_yaxis().set_visible(False)
         
-        plot.show()
+        if export is None:
+            plot.show()
+        else:
+            plot.savefig(f"{export}_d.png")
         
                 
 # The type of CSG's
@@ -160,8 +170,11 @@ class Cylinder(CSG):
         return f"(cylinder r={self.r} p0={self.p0} p1={self.p1})"
 
     def rotate(self,rx,ry,rz):
+        R = rotationMatrix(rx,ry,rz)
+        p0 = R@self.p0
+        p1 = R@self.p1
+        return Cylinder(*([self.r] + list(p0) + list(p1)))        
         
-        assert False
     def children(self): return []
     
     def translate(self, x,y,z):
@@ -274,6 +287,10 @@ class Cuboid(CSG):
             self.x0 + x,self.y0 + y,self.z0 + z,
             self.x1 + x,self.y1 + y,self.z1 + z)
 
+    def rotate(self,rx,ry,rz):
+        print("WARNING: ignoring rotation of cuboid by {(rx,ry,rz)}")
+        return self
+
     def extent(self):
         return np.array([[self.x0,self.y0,self.z0],[self.x1,self.y1,self.z1]]).min(0), \
             np.array([[self.x0,self.y0,self.z0],[self.x1,self.y1,self.z1]]).max(0)
@@ -341,8 +358,10 @@ class Sphere(CSG):
     def toTrace(self): return [self]
 
     def translate(self,x,y,z):
-#        print(f"translating sphere {self} by {(x,y,z)} ticket {Sphere(self.r,self.x + x,self.y + y,self.z + z)}")
         return Sphere(self.x + x,self.y + y,self.z + z,self.r)
+
+    def rotate(self,rx,ry,rz):
+        return self
 
     def render(self,r=None):
         r = r or RESOLUTION
@@ -630,9 +649,7 @@ def loadScad(path):
             displacement = tuple(float(rotate.group(j)) for j in range(1,4) )
             source[0] = source[0][rotate.span()[1]:]
             o = parse()
-            if "cylinder" in str(o):
-                print("rotation",displacement,o)
-            return o
+            return o.rotate(*placement)
             #o = ("rotate", displacement, parse())
             
             
@@ -758,6 +775,24 @@ def loadScads():
         try:
             scene = loadScad(f)
             print(scene)
+            assert isinstance(scene,Intersection)
+            boundingBox = scene.a
+            union = scene.b
+            assert isinstance(boundingBox,Cuboid)
+            assert isinstance(union,Union)
+            elements = []
+            while True:
+                elements.append(union.elements[1])
+                assert not isinstance(union.elements[1],Union)
+                union = union.elements[0]
+                if not isinstance(union,Union):
+                    elements.append(union)
+                    break                
+            
+            print("Loaded each of these elements:")
+            for e in elements:
+                print(e)
+            assert False
 
             print("before translating")
             print(scene.extent())
@@ -781,6 +816,7 @@ def loadScads():
             print("FAIL",e)
             sys.exit(0)
     assert False
+
 
 def random3D():
     cs = range(0, RESOLUTION, int(RESOLUTION/8))
@@ -1341,16 +1377,23 @@ if __name__ == "__main__":
     arguments.translate = not arguments.noTranslate
 
     if arguments.mode == "demo":
+        if arguments.td:
+            rs = lambda : randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate)
+        else:
+            rs = lambda : random3D()
         startTime = time.time()
         ns = 50
         for _ in range(ns):
-            randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate).execute()
+            rs().execute()
         print(f"{ns/(time.time() - startTime)} (renders + samples)/second")
         for n in range(100):
-            randomScene(export=f"/tmp/CAD_{n}.png",maxShapes=arguments.maxShapes,
-                        minShapes=arguments.maxShapes,
-                        nudge=arguments.nudge, 
-                        translate=arguments.translate)
+            s = rs()
+            if arguments.td:
+                plot.imshow(s.highresolution(256))
+                plot.savefig(f"/tmp/CAD_{n}_hr.png")
+            else:
+                s.show(export=f"/tmp/CAD_{n}_3d.png")
+
         import sys
         sys.exit(0)
         
