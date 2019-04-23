@@ -1318,7 +1318,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "")
     parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData","heatMap",
                                          "critic"])
-    parser.add_argument("--checkpoint", default="checkpoints/CSG.pickle")
+    parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--maxShapes", default=2,
                             type=int)
     parser.add_argument("--2d", default=False, action='store_true', dest='td')
@@ -1355,7 +1355,12 @@ if __name__ == "__main__":
         sys.exit(0)
         
             
-
+    if arguments.checkpoint is None:
+        arguments.checkpoint = f"checkpoints/{'2d' if arguments.td else '3d'}_{arguments.mode}"
+        if arguments.viewpoints:
+            arguments.checkpoint += "_viewpoints"
+        arguments.checkpoint += ".pickle"
+        print(f"Setting checkpointpath to {arguments.checkpoint}")
     if arguments.mode == "imitation":
         if not arguments.td:
             dsl = dsl_3d
