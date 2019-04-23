@@ -1316,6 +1316,8 @@ if __name__ == "__main__":
             oe = ObjectEncoder()
             se = SpecEncoder()
             training = getTrainingData('CSG_data.p')
+
+        print(f"CNN output dimensionalitys are {oe.outputDimensionality} & {se.outputDimensionality}")
             
         m = ProgramPointerNetwork(oe, se, dsl,
                                   oneParent=arguments.oneParent,
