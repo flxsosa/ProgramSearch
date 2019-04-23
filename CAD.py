@@ -818,7 +818,7 @@ def loadScads():
     assert False
 
 
-def random3D():
+def random3D(maxShapes=6,minShapes=1):
     cs = range(0, RESOLUTION, int(RESOLUTION/8))
     def randomSpherical():
         r = random.choice([4,8,12])
@@ -861,7 +861,39 @@ def random3D():
     def randomShape():
         return random.choice([randomSpherical,randomCuboid,randomCylinder])()
 
-    return randomShape()
+    while True:
+        s = None
+        numberOfShapes = 0
+        desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
+        for _ in range(desiredShapes):
+            o = randomShape()
+            if s is None:
+                s = o
+            else:
+                if random.choice([True,False]):
+                    new = Union(s,o)
+                elif True or random.choice([True,False]):
+                    new = Difference(s,o)
+                else:
+                    new = Difference(o,s)
+                # Change at least ten percent of the pixels
+                oldOn = s.render().sum()
+                newOn = new.render().sum()
+                pc = abs(oldOn - newOn)/oldOn
+                if pc < 0.1 or pc > 0.6:
+                    continue
+                s = new
+        try:
+            finalScene = s.removeDeadCode()
+            assert np.all(finalScene.render() == s.render())
+            s = finalScene
+            break
+        except BadCSG:
+            continue
+
+    return s
+
+    
             
 """Neural networks"""
 class ObjectEncoder(CNN):
