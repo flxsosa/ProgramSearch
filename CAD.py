@@ -847,7 +847,7 @@ def random3D(maxShapes=6,minShapes=1):
 
         # oriented along z axis
         if random.choice([False,False,True]):
-            p0 = [b,c, a - l//d2]
+            p0 = [b,c, a - l//2]
             p1 = [b,c, a + l//2]
         elif random.choice([False,True]): # oriented along y axis
             p0 = [b, a - l//2, c]
