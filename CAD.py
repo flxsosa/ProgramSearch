@@ -1229,6 +1229,18 @@ def testCSG(m, getProgram, timeout, export):
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
+    def exportProgram(program, path):
+        if program is None:
+            if arguments.td:
+                program = Difference(Circle(1,1,1),Circle(1,1,1))
+            else:
+                program = Difference(Sphere(1,1,1,1),Sphere(1,1,1,1))
+                
+        if programs.td:
+            saveMatrixAsImage(program.highresolution(256), path)
+        else:
+            program.show(path)            
+
     testResults = [[] for _ in solvers]
 
     os.system("mkdir data/test")
@@ -1238,7 +1250,8 @@ def testCSG(m, getProgram, timeout, export):
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
-        saveMatrixAsImage(spec.highresolution(256), "data/test/%03d.png"%ti)
+        
+        exportProgram(spec, "data/test/%03d.png"%ti)
         for n, solver in enumerate(solvers):
             print(f"Running solver {solver.name}")
             solver.maximumLength = len(ProgramGraph.fromRoot(spec).nodes) + 1
@@ -1253,11 +1266,11 @@ def testCSG(m, getProgram, timeout, export):
             if len(testSequence) > 0:
                 obs = testSequence[-1].program.objects()
                 if len(obs) == 0:
-                    bestProgram = np.zeros((256,256))
+                    bestProgram = None
                 else:
                     bestProgram = max(obs, key=lambda bp: bp.IoU(spec)).highresolution(256)
-                saveMatrixAsImage(bestProgram,
-                                  "data/test/%03d_%s.png"%(ti,solver.name))
+                exportProgram(bestProgram,
+                              "data/test/%03d_%s.png"%(ti,solver.name))
                 
 
     plotTestResults(testResults, timeout,
