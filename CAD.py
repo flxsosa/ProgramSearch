@@ -847,14 +847,14 @@ def random3D(maxShapes=6,minShapes=1):
 
         # oriented along z axis
         if random.choice([False,False,True]):
-            p0 = [b,c, a - l/2]
-            p1 = [b,c, a + l/2]
+            p0 = [b,c, a - l//d2]
+            p1 = [b,c, a + l//2]
         elif random.choice([False,True]): # oriented along y axis
-            p0 = [b, a - l/2, c]
-            p1 = [b, a + l/2, c]
+            p0 = [b, a - l//2, c]
+            p1 = [b, a + l//2, c]
         else: # oriented along x-axis
-            p0 = [a - l/2, b, c]
-            p1 = [a + l/2, b, c]
+            p0 = [a - l//2, b, c]
+            p1 = [a + l//2, b, c]
 
         return Cylinder(*([r] + p0 + p1))
 
