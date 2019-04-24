@@ -20,28 +20,22 @@ class A2C:
         self.model._distance = nn.Sequential(self.model._distance[:-1],
                                              nn.Softplus())
         self.model.cuda()
-        optimizer = torch.optim.Adam(self.model._distance.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
 
-        losses = []
+        value_losses = []
+        policy_losses = []
         lastUpdate = 0
         updateFrequency = 100
         
         while True:
             specs = [getSpec() for _ in range(self.outerBatch) ]
 
-            # for b,s in enumerate(specs):
-            #     print("Spec",b)
-            #     print(s)
-            #     print()
-
             t0 = time.time()
-            with torch.no_grad():
-                specEncodings = self.model.specEncoder(np.array([s.execute() for s in specs ]))
-                objectEncodings = ScopeEncoding(self.model)
-                trajectories = fs.batchedRollout(specs, self.innerBatch,
-                                                 objectEncodings=objectEncodings,
-                                                 specEncodings=specEncodings)
-            #print(f"THROUGHPUT {self.innerBatch*self.outerBatch/(time.time() - t0)} rollouts per second\t{time.time() - t0} seconds to get a batch of rollouts")
+            specEncodings = self.model.specEncoder(np.array([s.execute() for s in specs ]))
+            objectEncodings = ScopeEncoding(self.model)
+            trajectories = fs.batchedRollout(specs, self.innerBatch,
+                                             objectEncodings=objectEncodings,
+                                             specEncodings=specEncodings)
             gs = [ [ProgramGraph(t) for t in ts ]
                    for ts in trajectories ]
             # batchSuccess = 0
@@ -90,18 +84,45 @@ class A2C:
             distancePredictions = self.model.batchedDistance([oe for se,oe in distanceInput],
                                                              [se for se,oe in distanceInput])
             distanceTargets = self.model.tensor(valueTrainingTargets)
-            loss = binary_cross_entropy(-distancePredictions, distanceTargets)
+            value_loss = binary_cross_entropy(-distancePredictions, distanceTargets)
+
+            # REINFORCE objective
+            reinforcedLikelihoods = []
+            for si,(spec,ts) in enumerate(zip(specs, trajectories)):
+                usedTrajectories = set()
+                for ti,trajectory in enumerate(ts):
+                    if successes[si][ti] > 0.:
+                        if trajectory in usedTrajectories: continue
+                        
+                        usedTrajectories.add(trajectory)
+                        frequency = sum(tp == trajectory for tp in ts)
+                        
+                        ll = self.model.traceLogLikelihood(spec, trajectory,
+                                                           scopeEncoding=objectEncodings,
+                                                           specEncoding=specEncodings[si])[0]
+                        reinforcedLikelihoods.append(frequency*ll)
+            if reinforceTrainingData:
+                policy_loss = -sum(reinforcedLikelihoods)
+            else:
+                policy_loss = None
 
             self.model.zero_grad()
-            loss.backward()
+            if policy_loss is None:
+                value_loss.backward()
+            else:
+                (value_loss + policy_loss).backward()
+                policy_losses.append(policy_loss.cpu().data.item())
             optimizer.step()
-            losses.append(loss.cpu().data.item())
+            value_losses.append(value_loss.cpu().data.item())
             
             lastUpdate += 1
             
             if lastUpdate%updateFrequency == 1:
-                print(f"Average loss: {sum(losses)/len(losses)}")
-                losses = []
+                print(f"Average value loss: {sum(value_losses)/len(value_losses)}")
+                if policy_losses:
+                    print(f"Average policy loss: {sum(policy_losses)/len(policy_losses)}")
+                
+                policy_losses, value_losses = [], []
                 with open('checkpoints/critic.pickle','wb') as handle:
                     pickle.dump(self.model, handle)
 

@@ -818,7 +818,7 @@ def loadScads():
     assert False
 
 
-def random3D(maxShapes=6,minShapes=1):
+def random3D(maxShapes=13,minShapes=3):
     cs = range(0, RESOLUTION, int(RESOLUTION/8))
     def randomSpherical():
         r = random.choice([4,8,12])
