@@ -1239,7 +1239,7 @@ def testCSG(m, getProgram, timeout, export):
         if arguments.td:
             saveMatrixAsImage(program.highresolution(256), path)
         else:
-            program.show(path)            
+            program.show(export=path)            
 
     testResults = [[] for _ in solvers]
 
