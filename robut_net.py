@@ -119,6 +119,20 @@ class Model(nn.Module):
         self.button_embedding = ntorch.nn.Embedding(
                                 num_actions+1, args.button_embed_dim
                                     ).spec("batch", "h")
+
+        if args.encode_past_buttons:
+            self.past_button_embedding = ntorch.nn.Embedding(
+                                num_actions+1+1, args.past_button_embed_dim
+                                    ).spec("batch", "h")
+            self.rnn = ntorch.nn.LSTM(args.past_button_embed_dim,
+                            hidden_size=args.button_embed_dim,
+                            num_layers=1,
+                            batch_first=False,
+                            bidirectional=False
+                            ).spec("h", "pastButtons", "h") #idk if this works
+
+            #TODO
+
         self.fc = ntorch.nn.Linear(args.h_out+args.button_embed_dim, args.h_out)
         #pooling:
         if args.pooling == "max":
@@ -141,11 +155,18 @@ class Model(nn.Module):
 
         self.opt = torch.optim.Adam(self.parameters(), lr=0.001)
 
-    def forward(self, chars, masks, last_butts): 
+    def forward(self, chars, masks, last_butts, past_buttons): 
         x = self.encoder(chars, masks, last_butts)
         x = self.pooling(x)
 
-        lb_emb = self.button_embedding(last_butts)
+        if args.encode_past_buttons:
+            emb = self.past_button_embedding(past_buttons)
+            _, (lb_emb ,_) = self.rnn(emb) #TODO, guessing this is the right thing to output
+            lb_emb = lb_emb.sum("layers")
+            #import pdb; pdb.set_trace()
+        else:
+            lb_emb = self.button_embedding(last_butts)
+
         x = ntorch.cat([x, lb_emb], "h")
         x = self.fc(x).relu()
         x = self.action_decoder(x) #TODO, this may not exactly be enough? also, wrong name
@@ -155,11 +176,11 @@ class Model(nn.Module):
                 ) #TODO XXX FIXME DON"T LEAVE THIS
         return x
 
-    def learn_supervised(self, chars, masks, last_butts, targets):
+    def learn_supervised(self, chars, masks, last_butts, prev_buttons, targets):
         self.train()
         self.opt.zero_grad()
 
-        output_dists = self(chars, masks, last_butts)
+        output_dists = self(chars, masks, last_butts, prev_buttons)
         loss = self.lossfn(output_dists, targets)
         loss.backward()
         self.opt.step()
@@ -201,7 +222,8 @@ class Agent:
         last_butts will be batch (and the entries will be longs)
         """    
         #chars:
-        inputs, scratchs, committeds, outputs, masks, last_butts, _ = zip(*x)
+        inputs, scratchs, committeds, outputs, masks, last_butts, past_buttons = zip(*x)
+
 
         inputs = np.stack( [i for i in inputs])
         in_tensor = ntorch.tensor(inputs, ("batch", "Examples", "strLen"))
@@ -224,13 +246,25 @@ class Agent:
         masks = masks.transpose("batch", "Examples", "strLen", "inFeatures").float()
         
         last_butts = np.stack(last_butts)
-        print("last buts shape", last_butts.shape)
         last_butts = ntorch.tensor(last_butts, ("batch")).long()
 
+        if args.encode_past_buttons:
+            #import pdb; pdb.set_trace()
+            maxlen = max(len(p) for p in past_buttons)
+
+            PAD_VAL = len(self.actions) + 1
+            past_buttons = [ np.pad(p, (maxlen-len(p),0), 'constant', constant_values=(PAD_VAL,) ) for p in past_buttons] #TODO
+            past_buttons = np.stack(past_buttons, axis=1)
+            past_buttons = ntorch.tensor(past_buttons,("pastButtons", "batch"))
+            past_buttons.transpose("batch", "pastButtons")
+        else: 
+            past_buttons = None
+
         if self.use_cuda:
-            return chars.cuda(), masks.cuda(), last_butts.cuda()
+            return chars.cuda(), masks.cuda(), last_butts.cuda(), past_buttons.cuda() if past_buttons else past_buttons
         else:
-            return chars, masks, last_butts
+            return chars, masks, last_butts, past_buttons
+
 
     def actions_to_target(self, actions):
         indices = [self.idx[a.name] for a in actions] 
@@ -243,9 +277,9 @@ class Agent:
 
     def sample_actions(self, states):
         #assumes list of states, returns corresponding list of actions
-        chars, masks, last_butts = self.states_to_tensors(states)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
         
-        logits = self.nn.forward(chars, masks, last_butts)
+        logits = self.nn.forward(chars, masks, last_butts, past_buttons)
         dist = ntorch.distributions.Categorical(logits=logits, dim_logit="actions")
         sample = dist.sample()
         action_list = [self.idx_to_action[sample[{"batch":i}].item()] for i in range(sample.shape["batch"])]
@@ -259,8 +293,8 @@ class Agent:
     def best_actions(self, states):
         #assumes list of states, returns corresponding list of actions
         #TODO for top k actions, use _, argmax = logits.topk("actions", k)
-        chars, masks, last_butts = self.states_to_tensors(states)
-        logits = self.nn.forward(chars, masks, last_butts)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
+        logits = self.nn.forward(chars, masks, last_butts, past_buttons)
         _, argmax = logits.max('actions')
         action_list = [self.idx_to_action[argmax[{"batch":i}].item()] for i in range(argmax.shape["batch"])]
         return action_list
@@ -269,8 +303,8 @@ class Agent:
         #assumes list of states, returns list of lists of k actions
         #TODO for top k actions, use _, argmax = logits.topk("actions", k)
         # returns a tuple of button, score
-        chars, masks, last_butts = self.states_to_tensors(states)
-        logits = self.nn.forward(chars, masks, last_butts)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
+        logits = self.nn.forward(chars, masks, last_butts, past_buttons)
         #lls = logits.log_softmax("actions")
         lls = logits._new(
          F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
@@ -286,8 +320,8 @@ class Agent:
         #assumes list of states, returns list of lists of k actions
         #TODO for top k actions, use _, argmax = logits.topk("actions", k)
         # returns a tuple of button, score
-        chars, masks, last_butts = self.states_to_tensors(states)
-        logits = self.nn.forward(chars, masks, last_butts)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
+        logits = self.nn.forward(chars, masks, last_butts, past_buttons)
         #lls = logits.log_softmax("actions")
         lls = logits._new(
          F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
@@ -302,8 +336,8 @@ class Agent:
     def get_actions(self, states):
         #assumes list of states, returns list of lists of k actions, ordered correctly
         # returns a tuple of button, score
-        chars, masks, last_butts = self.states_to_tensors(states)
-        logits = self.nn.forward(chars, masks, last_butts)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
+        logits = self.nn.forward(chars, masks, last_butts, past_buttons)
         #lls = logits.log_softmax("actions")
         lls = logits._new(
          F.log_softmax(logits._tensor, dim=logits._schema.get("actions"))
@@ -317,22 +351,22 @@ class Agent:
     # not a symbolic state here
     # actions are 2, 3 instead of 0,1 index here
     def learn_supervised(self, states, actions):
-        chars, masks, last_butts = self.states_to_tensors(states)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
         targets = self.actions_to_target(actions)
-        loss = self.nn.learn_supervised(chars, masks, last_butts, targets)
+        loss = self.nn.learn_supervised(chars, masks, last_butts, past_buttons, targets)
         return loss
 
     def value_fun_optim_step(self, states, rewards):
-        chars, masks, last_butts = self.states_to_tensors(states)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
         targets = self.rewards_to_target(rewards)
         #print("TARGETS",targets.sum("batch").item())
-        loss = self.Vnn.learn_supervised(chars, masks, last_butts, targets)
+        loss = self.Vnn.learn_supervised(chars, masks, last_butts, past_buttons, targets)
         return loss
 
     def compute_values(self, states):
-        chars, masks, last_butts = self.states_to_tensors(states)
+        chars, masks, last_butts, past_buttons = self.states_to_tensors(states)
         #self.Vnn.eval()
-        output_dists = self.Vnn(chars, masks, last_butts)
+        output_dists = self.Vnn(chars, masks, last_butts, past_buttons)
         return output_dists
 
 
@@ -736,7 +770,7 @@ class Agent:
                         continue
 
                     new_beam.append(( e_new, action_ll[{"batch": i, "actions": idx}].item() ) )
-                    prev_vals.append( prev_val_ll[{"batch":i, "value":1}].item() )
+                    if use_prev_value: prev_vals.append( prev_val_ll[{"batch":i, "value":1}].item() )
                     new_beam_size += 1
 
                     # breaking condition for filter here FILTERING WITH JUST POLICY

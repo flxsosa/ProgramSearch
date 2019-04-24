@@ -27,9 +27,10 @@ def get_supervised_batchsize(fn, batchsize=200):
         else: assert 0, "uh oh, not a good place"
 
 class GenData:
-    def __init__(self, fn, n_processes=20, max_size=10000):
+    def __init__(self, fn, n_processes=20, max_size=100, batchsize=200):
         ##what needs to happen:
         def consumer(Q):
+            iterator = get_supervised_batchsize(fn, batchsize=batchsize)
             while True:
                 try:
                     # get a new message
@@ -37,7 +38,7 @@ class GenData:
                     #print(size)
                     if size < max_size:
                         # process the data
-                        ret = fn()
+                        ret = next(iterator)
                         Q.put( ret )
                 except ValueError as e:
                     print("I think you closed the thing while it was running, but that's okay")
@@ -57,8 +58,10 @@ class GenData:
             w.start()
         print("started parallel workers, ready to work!")
 
-    def batchIterator(self, batchsize=200):
-        yield from get_supervised_batchsize(self.Q.get, batchsize=batchsize) #is this a slow way of doing this??
+    def batchIterator(self):
+        while True:
+            yield self.Q.get()
+        #yield from get_supervised_batchsize(self.Q.get, batchsize=batchsize) #is this a slow way of doing this??
         
     def kill(self):
         #KILL stuff

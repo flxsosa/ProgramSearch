@@ -15,11 +15,11 @@ import torch
 import time
 from ROBUT import ALL_BUTTS
 from ROB import get_supervised_sample
+from robut_data import get_supervised_batchsize, GenData, makeTestdata
 
 def load_model():
     print(f"is cuda available? {torch.cuda.is_available()}")
     agent = Agent(ALL_BUTTS, value_net=True)
-    import pdb; pdb.set_trace()
     try:
         agent.load(args.load_path)
         print("loaded model")
@@ -30,17 +30,17 @@ def load_model():
     return agent
 
 
-def train(agent):
+def train_model_supervised(agent):
     enum_t2 = 0
     print_time = 0
     if not hasattr(agent, 'train_iterations'): agent.train_iterations = 0
 
     if args.parallel:
-        dataqueue = GenData(get_supervised_sample, n_processes=args.n_processes, max_size=50000)
+        dataqueue = GenData(lambda: get_supervised_sample(render_kind=args.render_kind), n_processes=args.n_processes, batchsize=args.batchsize, max_size=100)
 
     for i, (S, A) in enumerate(
-            dataqueue.batchIterator(batchsize=args.batchsize) if args.parallel else \
-            get_supervised_batchsize(get_supervised_sample, args.batchsize) ):
+            dataqueue.batchIterator() if args.parallel else \
+            get_supervised_batchsize(lambda: get_supervised_sample(render_kind=args.render_kind), batchsize=args.batchsize) ):
         enum_t = time.time()
         if agent.train_iterations >= args.train_iterations: break
         t = time.time()
@@ -56,10 +56,10 @@ def train(agent):
         t3 = t2
         if i%args.save_freq == 0 and i!=0:
             agent.save(args.save_path)
-            print("saved model")
+            print("saved model", flush=True)
         if i%args.test_freq == 0 and i!=0:  
             print("testing...")
-            S, A = get_supervised_sample()
+            S, A = get_supervised_sample(render_kind=args.render_kind)
             actions = agent.sample_actions(S)
             print("real actions:")
             print(A)
@@ -76,7 +76,8 @@ def rl_train(agent):
     from train_value_fun import train_value_fun
     if args.rl_mode == 'value only':
         train_value_fun(agent)
-    else: assert False
+    else:
+        assert False
 
 
 if __name__ == '__main__':
@@ -85,7 +86,7 @@ if __name__ == '__main__':
     #load model or create model
     agent = load_model()
     #train
-    train_model_supervised(agent)
+    #train_model_supervised(agent)
 
     #rl train, whatever that entails
     rl_train(agent)

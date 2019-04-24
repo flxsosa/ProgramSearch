@@ -1,7 +1,7 @@
 #learn_value_fun
 
-from ROBUT import ALL_BUTTS
-from ROB import get_supervised_sample
+from ROBUT import ALL_BUTTS, ROBENV
+from ROB import get_supervised_sample, generate_FIO
 from robut_net import Agent
 from load_args import args #requires
 import torch
@@ -38,7 +38,7 @@ def train_value_fun(agent, mode='unbiased'):
     for i in range(args.rl_iterations): #TODO
         envs = []
         for _ in range(args.n_envs_per_rollout):
-            prog, inputs, outputs = generate_FIO(5)
+            _, inputs, outputs = generate_FIO(5)
             env = ROBENV(inputs, outputs)
             envs.append(env)
             
@@ -56,7 +56,7 @@ def train_value_fun(agent, mode='unbiased'):
 
         if i%args.print_freq==0: 
             agent.save(args.save_path)
-            print("Model saved")
+            print("Model saved", flush=True)
 
 if __name__=='__main__':
     global traces
