@@ -54,6 +54,8 @@ n_envs_per_rollout = 25
 
 rl_iterations = 6000
 
+rl_mode = 'value_only'
+
 ##test scaffold
 test_type = 'smc'
 use_value = True

@@ -86,7 +86,7 @@ if __name__ == '__main__':
     #load model or create model
     agent = load_model()
     #train
-    #train_model_supervised(agent)
+    train_model_supervised(agent)
 
     #rl train, whatever that entails
     rl_train(agent)
