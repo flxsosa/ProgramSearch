@@ -1417,6 +1417,7 @@ if __name__ == "__main__":
     parser.add_argument("--nudge", default=False, action='store_true')
     parser.add_argument("--oneParent", default=True, action='store_true')
     parser.add_argument("--noTranslate", default=True, action='store_true')
+    parser.add_argument("--resume", default=False, action='store_true')
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
@@ -1466,12 +1467,17 @@ if __name__ == "__main__":
             training = getTrainingData('CSG_data.p')
 
         print(f"CNN output dimensionalitys are {oe.outputDimensionality} & {se.outputDimensionality}")
-            
-        m = ProgramPointerNetwork(oe, se, dsl,
-                                  oneParent=arguments.oneParent,
-                                  attentionRounds=arguments.attention,
-                                  heads=arguments.heads,
-                                  H=arguments.hidden)
+
+        if arguments.resume:
+            with open(arguments.checkpoint,"rb") as handle:
+                m = pickle.load(handle)
+            print(f"Resuming checkpoint {arguments.checkpoint}")
+        else:
+            m = ProgramPointerNetwork(oe, se, dsl,
+                                      oneParent=arguments.oneParent,
+                                      attentionRounds=arguments.attention,
+                                      heads=arguments.heads,
+                                      H=arguments.hidden)
         trainCSG(m, training,
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
