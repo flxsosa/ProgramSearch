@@ -1268,7 +1268,7 @@ def testCSG(m, getProgram, timeout, export):
                 if len(obs) == 0:
                     bestProgram = None
                 else:
-                    bestProgram = max(obs, key=lambda bp: bp.IoU(spec)).highresolution(256)
+                    bestProgram = max(obs, key=lambda bp: bp.IoU(spec))
                 exportProgram(bestProgram,
                               "data/test/%03d_%s.png"%(ti,solver.name))
                 
