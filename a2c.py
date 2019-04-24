@@ -16,10 +16,6 @@ class A2C:
     def train(self, checkpoint, getSpec, R):
         fs = ForwardSample(self.model)
 
-        # backward compatibility
-        self.model._distance = nn.Sequential(self.model._distance[:-1],
-                                             nn.Softplus())
-        self.model.cuda()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
 
         value_losses = []
@@ -123,8 +119,7 @@ class A2C:
                     print(f"Average policy loss: {sum(policy_losses)/len(policy_losses)}")
                 
                 policy_losses, value_losses = [], []
-                with open(checkpoint,'wb') as handle:
-                    pickle.dump(self.model, handle)
+                torch.save(self.model, checkpoint)
 
                 print("Live update of model predictions!")
                 k = 0

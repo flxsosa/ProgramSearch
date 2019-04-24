@@ -507,9 +507,14 @@ class ProgramPointerNetwork(Module):
             nn.Linear(H, 1),
             nn.Softplus())
 
-        self.selfAttention = nn.Sequential(
-            nn.Linear(objectEncoder.outputDimensionality, H),
-            MultiHeadAttention(heads, H, rounds=attentionRounds, residual=True))
+        
+
+        if attentionRounds > 0:
+            self.selfAttention = nn.Sequential(
+                nn.Linear(objectEncoder.outputDimensionality, H),
+                MultiHeadAttention(heads, H, rounds=attentionRounds, residual=True))
+        else:
+            self.selfAttention = nn.Linear(objectEncoder.outputDimensionality, H)
 
         self.H = H
         

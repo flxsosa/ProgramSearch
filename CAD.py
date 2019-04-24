@@ -1041,8 +1041,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
 
     if os.path.exists(checkpoint):
         print("Found checkpoint - going to do a demo, and then resume training")
-        with open(checkpoint,'rb') as handle:
-            hm = pickle.load(handle)
+        hm = torch.load(checkpoint)
         with torch.no_grad():
             ps = [data() for _ in range(B)]
             xs = hm.device(torch.tensor(np.array([p.execute() for p in ps ])).float())
@@ -1082,8 +1081,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
 
         if i%1000 == 1:
             print(l.data)
-            with open(checkpoint,'wb') as handle:
-                pickle.dump(hm,handle)
+            torch.save(hm, checkpoint)
         
     
 
@@ -1212,8 +1210,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
             print(f"\n\nAfter {iteration*B} training examples...\n\tTrace loss {sum(totalLosses)/len(totalLosses)}\t\tMove loss {sum(movedLosses)/len(movedLosses)}\n{iteration*B/(time.time() - startTime)} examples/sec\n{iteration/(time.time() - startTime)} grad steps/sec")
             totalLosses = []
             movedLosses = []
-            with open(checkpoint,"wb") as handle:
-                pickle.dump(m, handle)
+            torch.save(m, checkpoint)
 
 
 
@@ -1406,7 +1403,7 @@ if __name__ == "__main__":
     parser.add_argument("--viewpoints", default=False, action='store_true', dest='viewpoints')
     parser.add_argument("--trainTime", default=None, type=float,
                         help="Time in hours to train the network")
-    parser.add_argument("--attention", default=1, type=int,
+    parser.add_argument("--attention", default=0, type=int,
                         help="Number of rounds of self attention to perform upon objects in scope")
     parser.add_argument("--heads", default=2, type=int,
                         help="Number of attention heads")
@@ -1469,9 +1466,7 @@ if __name__ == "__main__":
         print(f"CNN output dimensionalitys are {oe.outputDimensionality} & {se.outputDimensionality}")
 
         if arguments.resume:
-            with open(arguments.checkpoint,"rb") as handle:
-                m = pickle.load(handle)
-                m.flatten_parameters()
+            m = torch.load(arguments.checkpoint)
             print(f"Resuming checkpoint {arguments.checkpoint}")
         else:
             m = ProgramPointerNetwork(oe, se, dsl,
@@ -1483,8 +1478,7 @@ if __name__ == "__main__":
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "critic":
-        with open(arguments.checkpoint,"rb") as handle:
-            m = pickle.load(handle)
+        m = torch.load(arguments.checkpoint)
         critic = A2C(m)
         def R(spec, program):
             if len(program) == 0 or len(program) > len(spec.toTrace()): return False
