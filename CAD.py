@@ -1236,7 +1236,7 @@ def testCSG(m, getProgram, timeout, export):
             else:
                 program = Difference(Sphere(1,1,1,1),Sphere(1,1,1,1))
                 
-        if programs.td:
+        if arguments.td:
             saveMatrixAsImage(program.highresolution(256), path)
         else:
             program.show(path)            
