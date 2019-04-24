@@ -1485,9 +1485,13 @@ if __name__ == "__main__":
             for o in program.objects():
                 if np.all((o.execute() > 0.5) == spec): return True
             return False
-        critic.train(
-            lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate),
-            R)
+        if arguments.td:
+            training = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate)
+        else:
+            training = lambda: random3D(maxShapes=7,minShapes=1)
+        critic.train(arguments.checkpoint,
+                     dataGenerator,
+                     R)
         
     elif arguments.mode == "heatMap":
         learnHeatMap()

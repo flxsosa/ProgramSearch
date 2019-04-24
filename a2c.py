@@ -13,7 +13,7 @@ class A2C:
         self.outerBatch = outerBatch
         self.innerBatch = innerBatch
 
-    def train(self, getSpec, R):
+    def train(self, checkpoint, getSpec, R):
         fs = ForwardSample(self.model)
 
         # backward compatibility
@@ -123,7 +123,7 @@ class A2C:
                     print(f"Average policy loss: {sum(policy_losses)/len(policy_losses)}")
                 
                 policy_losses, value_losses = [], []
-                with open('checkpoints/critic.pickle','wb') as handle:
+                with open(checkpoint,'wb') as handle:
                     pickle.dump(self.model, handle)
 
                 print("Live update of model predictions!")
