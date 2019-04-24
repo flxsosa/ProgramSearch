@@ -1490,7 +1490,7 @@ if __name__ == "__main__":
         else:
             training = lambda: random3D(maxShapes=7,minShapes=1)
         critic.train(arguments.checkpoint,
-                     dataGenerator,
+                     training,
                      R)
         
     elif arguments.mode == "heatMap":
