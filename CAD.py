@@ -1470,7 +1470,8 @@ if __name__ == "__main__":
 
         if arguments.resume:
             with open(arguments.checkpoint,"rb") as handle:
-                m = pickle.load(handle).flatten_parameters()
+                m = pickle.load(handle)
+                m.flatten_parameters()
             print(f"Resuming checkpoint {arguments.checkpoint}")
         else:
             m = ProgramPointerNetwork(oe, se, dsl,
