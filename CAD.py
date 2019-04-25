@@ -1446,6 +1446,8 @@ if __name__ == "__main__":
         arguments.checkpoint = f"checkpoints/{'2d' if arguments.td else '3d'}_{arguments.mode}"
         if arguments.viewpoints:
             arguments.checkpoint += "_viewpoints"
+        if arguments.attention > 0:
+            arguments.checkpoint += f"_attention{arguments.attention}_{arguments.heads}"
         arguments.checkpoint += ".pickle"
         print(f"Setting checkpointpath to {arguments.checkpoint}")
     if arguments.mode == "imitation":
