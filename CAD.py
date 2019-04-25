@@ -406,6 +406,97 @@ class Sphere(CSG):
     def flipZ(self):
         return Sphere(self.x, self.y, RESOLUTION - self.z, self.r)
 
+class TRectangle(CSG):
+    token = 'tr'
+    type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 tCSG)
+    
+    def __init__(self, x0, y0, x1, y1):
+        super(TRectangle, self).__init__()
+        if x1 <= x0: raise ParseFailure()
+        if y1 <= y0: raise ParseFailure()
+        self.x0 = x0
+        self.y0 = y0
+        self.x1 = x1
+        self.y1 = y1
+
+    def toTrace(self): return [self]
+
+    def heatMapTarget(self):
+        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
+        hm[self.x0,self.y0,0] = True
+        hm[self.x1,self.y1,1] = True
+        return hm
+
+    def __str__(self):
+        return f"(tr {self.x0} {self.y0} {self.x1} {self.y1})"
+
+    def children(self): return []
+
+    def __eq__(self, o):
+        return isinstance(o, TRectangle) and self.serialize() == o.serialize()
+
+    def __hash__(self):
+        return hash(self.serialize())
+
+    def serialize(self):
+        return (self.__class__.token, self.x0, self.y0, self.x1, self.y1)
+
+    def __contains__(self, p):
+        return p[0] >= self.x0 and p[1] >= self.y0 and \
+            p[0] < self.x1 and p[1] < self.y1
+
+    def flipX(self):
+        return TRectangle(RESOLUTION - self.x1, self.y0,
+                          RESOLUTION - self.x0, self.y1)
+
+    def flipY(self):
+        return TRectangle(self.x0, RESOLUTION - self.y1,
+				   self.x1, RESOLUTION - self.y0)
+
+class TCircle(CSG):
+    token = 'tc'
+    type = arrow(integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1),
+                 tCSG)
+    
+    def __init__(self, x,y,r):
+        super(TCircle, self).__init__()
+        self.r = r
+        self.x = x
+        self.y = y
+
+    def toTrace(self): return [self]
+
+    def heatMapTarget(self):
+        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
+        hm[self.x,self.y,2] = 1
+        return hm
+        
+    def __str__(self):
+        return f"(tc ({self.x}, {self.y}) {self.r})"
+
+    def children(self): return []
+
+    def __eq__(self, o):
+        return isinstance(o, TCircle) and self.serialize() == o.serialize()
+    def __hash__(self):
+        return hash(self.serialize())
+
+    def serialize(self):
+        return (self.__class__.token, self.x,self.y,self.r)
+
+    def __contains__(self, p):
+        return (p[0]-self.x)*(p[0]-self.x) + (p[1] - self.y)*(p[1] - self.y) <= self.r*self.r
+
+    def flipX(self):
+        return TCircle(RESOLUTION - self.x, self.y, self.r)
+
+    def flipY(self):
+        return TCircle(self.x, RESOLUTION - self.y, self.r)
+
 class Union(CSG):
     token = '+'
     type = arrow(tCSG, tCSG, tCSG)
@@ -623,7 +714,7 @@ class Intersection(CSG):
                        0., 1.)
 
 dsl_3d = DSL([Union, Difference, Intersection, Cuboid, Sphere, Cylinder])
-dsl_2d = None # FIXME
+dsl_2d = DSL([Union, Difference, Intersection, TRectangle, TCircle])
 
 
 def loadScad(path):
@@ -1197,7 +1288,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     movedLosses = []
     iteration = 0
 
-    B = 2
+    B = 16
 
     while trainTime is None or time.time() - startTime < trainTime:
         ss = [getProgram() for _ in range(B)]
