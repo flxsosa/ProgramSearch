@@ -40,8 +40,8 @@ class Module(nn.Module):
         if type(array) == torch.Tensor: return self.device(array)
         return self.device(torch.tensor(array))
     def device(self, t):
+        if t.dtype == torch.float64: t = t.float()
         if self.use_cuda: return t.cuda()
-        if t.dtype == torch.float64: return t.float()
         return t
     def finalize(self):
         if self.use_cuda: self.cuda()
