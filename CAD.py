@@ -1510,8 +1510,7 @@ if __name__ == "__main__":
                               timeout=1,
                               exitIterations=-1)
     elif arguments.mode == "test":
-        with open(arguments.checkpoint,"rb") as handle:
-            m = pickle.load(handle)
+        m = torch.load(arguments.checkpoint)
         if arguments.td:
             dataGenerator = getTrainingData('CSG_data.p')
         else:
