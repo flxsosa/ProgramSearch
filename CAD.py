@@ -443,6 +443,14 @@ class TRectangle(CSG):
     def serialize(self):
         return (self.__class__.token, self.x0, self.y0, self.x1, self.y1)
 
+    def render(self,r=None):
+        r = r or RESOLUTION
+        a = np.zeros((r,r))
+        a[int(self.x0*r/RESOLUTION):int(self.x1*r/RESOLUTION),
+          int(self.y0*r/RESOLUTION):int(self.y1*r/RESOLUTION)] = 1
+        return a
+
+
     def __contains__(self, p):
         return p[0] >= self.x0 and p[1] >= self.y0 and \
             p[0] < self.x1 and p[1] < self.y1
@@ -496,6 +504,16 @@ class TCircle(CSG):
 
     def flipY(self):
         return TCircle(self.x, RESOLUTION - self.y, self.r)
+
+    def render(self,r=None):
+        r = r or RESOLUTION
+        x, y = np.indices((r,r))/float(r)
+
+        dx = (x - self.x/RESOLUTION)
+        dy = (y - self.y/RESOLUTION)
+        distance2 = dx*dx + dy*dy
+
+        return 1.*(distance2 <= (self.r/RESOLUTION)*(self.r/RESOLUTION))
 
 class Union(CSG):
     token = '+'
@@ -1039,7 +1057,7 @@ class MultiviewEncoder(Module):
         """Expects: either Bx(nviews)xRESOLUTIONxRESOLUTION or (nviews)xRESOLUTIONxRESOLUTION"""
         if isinstance(v, list): v = np.array(v)
 
-        v = self.device(self.tensor(v).float())
+        v = self.tensor(v)
 
         if len(v.shape) == 3:
             squeeze = True
