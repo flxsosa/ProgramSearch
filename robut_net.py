@@ -79,7 +79,7 @@ class Encoder(nn.Module):
             in_channels=4*args.char_embed_dim+7,
             out_channels=args.column_encoding_dim,
             kernel_size=(args.kernel_size),
-            padding=(args.kernel_size-1)/2).spec("inFeatures", "strLen", "E")
+            padding=int((args.kernel_size-1)/2)).spec("inFeatures", "strLen", "E")
         else: assert 0
 
         print("WARNING: there are only 7 masks?? Change this in robut_net.py")
