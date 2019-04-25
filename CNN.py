@@ -16,7 +16,8 @@ class Flatten(nn.Module):
 class CNN(Module):
     def __init__(self, _=None, channels=1, layers=2,
                  flattenOutput=True,
-                 inputImageDimension=None, hiddenChannels=64, outputChannels=64):
+                 inputImageDimension=None, hiddenChannels=64, outputChannels=64,
+                 mp=2):
         super(CNN, self).__init__()
         assert inputImageDimension is not None
         assert layers > 1
@@ -26,7 +27,7 @@ class CNN(Module):
                 nn.ReLU(),
                 nn.Conv2d(out_channels, out_channels, 3, padding=1),
                 nn.ReLU(),
-                nn.MaxPool2d(2))
+                nn.MaxPool2d(mp))
 
         self.inputImageDimension = inputImageDimension
 
@@ -39,7 +40,7 @@ class CNN(Module):
                                        [conv_block(hid_dim, z_dim)] + \
                                        ([Flatten()] if flattenOutput else [])))
 
-        self.outputResolution = int(inputImageDimension/(2**layers))
+        self.outputResolution = int(inputImageDimension/(mp**layers))
         if flattenOutput:
             self.outputDimensionality = int(outputChannels*self.outputResolution*self.outputResolution)
         else:
@@ -74,7 +75,8 @@ class CNN_3d(Module):
     def __init__(self, _=None, channels=1, layers=2,
                  flattenOutput=True,
                  inputImageDimension=None, hiddenChannels=64, outputChannels=64,
-                 channelsAsArguments=False):
+                 channelsAsArguments=False,
+                 mp=2):
         super(CNN_3d, self).__init__()
         assert inputImageDimension is not None
         assert layers > 1
@@ -84,7 +86,7 @@ class CNN_3d(Module):
                 nn.ReLU(),
                 nn.Conv3d(out_channels, out_channels, 3, padding=1),
                 nn.ReLU(),
-                nn.MaxPool3d(2))
+                nn.MaxPool3d(mp))
 
         self.inputImageDimension = inputImageDimension
 
@@ -100,7 +102,7 @@ class CNN_3d(Module):
                                        ([Flatten()] if flattenOutput else [])))
 
         if flattenOutput:
-            self.outputDimensionality = int(outputChannels*inputImageDimension**3/(8**layers))
+            self.outputDimensionality = int(outputChannels*inputImageDimension**3/((mp**3)**layers))
         else:
             self.outputChannels = z_dim
         self.channels = channels

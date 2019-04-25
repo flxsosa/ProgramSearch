@@ -937,7 +937,8 @@ class MultiviewEncoder(Module):
         self.singleView = CNN(channels=1, inputImageDimension=RESOLUTION, flattenOutput=False, layers=layers)
 
         self.mergeViews = CNN(channels=nviews*self.singleView.outputChannels,
-                              inputImageDimension=RESOLUTION/(2**layers))
+                              inputImageDimension=self.singleView.outputResolution,
+                              mp=1) # do not max pool while merging views
 
         self.outputDimensionality = self.mergeViews.outputDimensionality
         
@@ -1407,7 +1408,7 @@ if __name__ == "__main__":
                         help="Number of rounds of self attention to perform upon objects in scope")
     parser.add_argument("--heads", default=2, type=int,
                         help="Number of attention heads")
-    parser.add_argument("--hidden", "-H", type=int, default=256,
+    parser.add_argument("--hidden", "-H", type=int, default=512,
                         help="Size of hidden layers")
     parser.add_argument("--timeout", default=5, type=float,
                         help="Test time maximum timeout")
@@ -1451,8 +1452,8 @@ if __name__ == "__main__":
         if not arguments.td:
             dsl = dsl_3d
             if not arguments.viewpoints:
-                oe = CNN_3d(channels=2, inputImageDimension=RESOLUTION, channelsAsArguments=True, layers=3)
-                se = CNN_3d(channels=1, inputImageDimension=RESOLUTION, layers=3)
+                oe = CNN_3d(channels=2, inputImageDimension=RESOLUTION, channelsAsArguments=True, layers=2)
+                se = CNN_3d(channels=1, inputImageDimension=RESOLUTION, layers=2)
             else:
                 oe = MultiviewObject()
                 se = MultiviewSpec()
