@@ -22,12 +22,14 @@ class CNN(Module):
         assert inputImageDimension is not None
         assert layers > 1
         def conv_block(in_channels, out_channels, p=True):
-            return nn.Sequential(
+            module = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, 3, padding=1),
                 nn.ReLU(),
                 nn.Conv2d(out_channels, out_channels, 3, padding=1),
-                nn.ReLU(),
-                nn.MaxPool2d(mp))
+                nn.ReLU())
+            if mp > 1:
+                module = nn.Sequential(module, nn.MaxPool2d(mp))
+            return module
 
         self.inputImageDimension = inputImageDimension
 
@@ -51,25 +53,31 @@ class CNN(Module):
         self.finalize()
         
     def forward(self, v):
-        if isinstance(v, list): v = np.array(v)
-        if self.channels == 1: # input is either BxWxH or WxH
-            if len(v.shape) == 2: squeeze = 2
-            elif len(v.shape) == 3:
-                # insert channel
-                v = self.encoder(self.device(self.tensor(v).float()).unsqueeze(1))
-                return v
-            else: assert False
-        else: # either [b,c,w,h] or [c,w,h]
-            if len(v.shape) == 3: squeeze = 1
-            elif len(v.shape) == 4: squeeze = 0
-            else: assert False
+        if isinstance(v, list): assert False # deprecated
 
         v = self.tensor(v)
-        for _ in range(squeeze): v = v.unsqueeze(0)
-        v = self.encoder(self.device(v.float()))
-        for _ in range(squeeze): v = v.squeeze(0)
-        return v
 
+        def Y():
+            nonlocal v
+            if self.channels == 1: # input is either BxWxH or WxH
+                if len(v.shape) == 2:
+                    return self.encoder(v.unsqueeze(0).unsqueeze(0)).squeeze(0)
+                elif len(v.shape) == 3:
+                    # insert channel
+                    v = self.encoder(v.unsqueeze(1))
+                    return v
+                else: assert False
+            else: # either [b,c,w,h] or [c,w,h]
+                if len(v.shape) == 3:
+                    return self.encoder(v.unsqueeze(0)).squeeze(0)
+                elif len(v.shape) == 4:
+                    return self.encoder(v)
+                else: assert False
+
+        y = Y()
+        # print(f"y = {y.shape}")
+        return y
+                
 
 class CNN_3d(Module):
     def __init__(self, _=None, channels=1, layers=2,
@@ -81,12 +89,14 @@ class CNN_3d(Module):
         assert inputImageDimension is not None
         assert layers > 1
         def conv_block(in_channels, out_channels, p=True):
-            return nn.Sequential(
+            module = nn.Sequential(
                 nn.Conv3d(in_channels, out_channels, 3, padding=1),
                 nn.ReLU(),
                 nn.Conv3d(out_channels, out_channels, 3, padding=1),
-                nn.ReLU(),
-                nn.MaxPool3d(mp))
+                nn.ReLU())
+            if mp > 1:
+                module = nn.Sequential(module, nn.MaxPool3d(mp))
+            return module                
 
         self.inputImageDimension = inputImageDimension
 
@@ -99,7 +109,8 @@ class CNN_3d(Module):
         self.encoder = nn.Sequential(*([conv_block(channels, hid_dim)] + \
                                        [conv_block(hid_dim, hid_dim) for _ in range(layers - 2) ] + \
                                        [conv_block(hid_dim, z_dim)] + \
-                                       ([Flatten()] if flattenOutput else [])))
+                                       ([Flatten()] if flattenOutput else [])
+        ))
 
         if flattenOutput:
             self.outputDimensionality = int(outputChannels*inputImageDimension**3/((mp**3)**layers))
@@ -109,41 +120,56 @@ class CNN_3d(Module):
 
         self.finalize()
 
+    def packChannels(self, channels):
+        assert len(channels) == self.channels
+
+        channels = [ self.tensor(c) for c in channels ]
+        assert all( c.shape == channels[0].shape
+                    for c in channels[1:] )
+        
+        x = torch.stack(channels, 0)
+
+        # not batching
+        if len(x.shape) == 4: return x
+        # batching
+        assert len(x.shape) == 5
+        return x.permute(1,0,2,3,4)
+
     def forward(self, *vs):
         if not self.channelsAsArguments:
             assert len(vs) == 1
-            v = vs[0]
+            v = self.tensor(vs[0])
         else:
-            v = np.stack([ np.array(v) if isinstance(v, list) else v
-                           for v in vs], 0)
-            # v: CxBxwlh | Cxwlh
-            if len(v.shape) == 4: # need to insert batch
-                v = np.expand_dim(v, 0)
-            elif len(v.shape) == 5: # need to exchange batch and channel
-                v = np.swapaxes(v,0,1)
-            else:
-                assert False
-                
-        if isinstance(v, list): v = np.array(v)
-        if self.channels == 1: # input is either BxWxHxL or WxHxL
-            if len(v.shape) == 3:
-                # insert both channel and batch
-                v = self.device(self.tensor(v).float()).unsqueeze(0).unsqueeze(0)
-                # remove batch dimension
-                return self.encoder(v).squeeze(0)            
-            elif len(v.shape) == 4:
-                # insert channel
-                v = self.encoder(self.device(self.tensor(v).float()).unsqueeze(1))
-                return v
-            else: assert False
-        else: # either [b,c,w,h,l] or [c,w,h,l]
-            if len(v.shape) == 4:
-                v = self.tensor(v).unsqueeze(0) # insert batch
-                return self.encoder(self.device(v.float())).squeeze(0)
-            elif len(v.shape) == 5:
-                return self.encoder(self.device(self.tensor(v).float()))
-            else:
-                assert False
+            v = self.packChannels(vs)
+
+        # print(f"CNN running on {v.shape}, channels={self.channels}")
+
+        def Y():
+            nonlocal v
+            if self.channels == 1: # input is either BxWxHxL or WxHxL
+                if len(v.shape) == 3:
+                    # insert both channel and batch
+                    v = v.unsqueeze(0).unsqueeze(0)
+                    # remove batch dimension
+                    return self.encoder(v).squeeze(0)            
+                elif len(v.shape) == 4:
+                    # insert channel
+                    return self.encoder(v.unsqueeze(1))
+                else: assert False
+            else: # either [b,c,w,h,l] or [c,w,h,l]
+                if len(v.shape) == 4:
+                    v = self.tensor(v).unsqueeze(0) # insert batch
+                    return self.encoder(v).squeeze(0)
+                elif len(v.shape) == 5:
+                    return self.encoder(v)
+                else:
+                    assert False
+
+        y = Y()
+        # print(f"output has shape {y.shape}")
+        # print()
+        return y
+        
 
 class ResidualCNNBlock(Module):
     def __init__(self, c, w=3, l=1):

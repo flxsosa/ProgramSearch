@@ -36,12 +36,21 @@ class Module(nn.Module):
         self.use_cuda = torch.cuda.is_available()
 
     def tensor(self, array):
+        """Convert something to a tensor if it is not already a tensor (does nothing otherwise), and then moves to device"""
+        if type(array) == torch.Tensor: return self.device(array)
         return self.device(torch.tensor(array))
     def device(self, t):
         if self.use_cuda: return t.cuda()
-        else: return t
+        if t.dtype == torch.float64: return t.float()
+        return t
     def finalize(self):
         if self.use_cuda: self.cuda()
+
+class IdentityLayer(Module):
+    def __init__(self):
+        super(IdentityLayer, self).__init__()
+        self.finalize()
+    def forward(self, x): return x
 
 class LayerNorm(Module):
     "Adapted from http://nlp.seas.harvard.edu/2018/04/03/attention.html"

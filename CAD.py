@@ -1197,7 +1197,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     movedLosses = []
     iteration = 0
 
-    B = 16
+    B = 2
 
     while trainTime is None or time.time() - startTime < trainTime:
         ss = [getProgram() for _ in range(B)]
@@ -1454,8 +1454,13 @@ if __name__ == "__main__":
         if not arguments.td:
             dsl = dsl_3d
             if not arguments.viewpoints:
-                oe = CNN_3d(channels=2, inputImageDimension=RESOLUTION, channelsAsArguments=True, layers=2)
-                se = CNN_3d(channels=1, inputImageDimension=RESOLUTION, layers=2)
+                oe = CNN_3d(channels=2, channelsAsArguments=True,
+                            hiddenChannels=32, outputChannels=32,
+                            inputImageDimension=RESOLUTION,
+                            layers=2)
+                se = CNN_3d(channels=1, inputImageDimension=RESOLUTION,
+                            hiddenChannels=32, outputChannels=32,
+                            layers=2)
             else:
                 oe = MultiviewObject()
                 se = MultiviewSpec()
