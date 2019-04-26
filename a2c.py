@@ -8,7 +8,7 @@ import numpy as np
 
 
 class A2C:
-    def __init__(self, model, outerBatch=8, innerBatch=16):
+    def __init__(self, model, outerBatch=2, innerBatch=16):
         self.model = model
         self.outerBatch = outerBatch
         self.innerBatch = innerBatch
