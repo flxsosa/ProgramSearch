@@ -1626,7 +1626,7 @@ if __name__ == "__main__":
                               timeout=1,
                               exitIterations=-1)
     elif arguments.mode == "test":
-        m = torch.load(arguments.checkpoint)
+        m = load_checkpoint(arguments.checkpoint)
         if arguments.td:
             dataGenerator = getTrainingData('CSG_data.p')
         else:

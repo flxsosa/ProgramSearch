@@ -126,3 +126,8 @@ def binary_cross_entropy(y,t, epsilon=10**-10):
     return -(correctYes*log_yes_probability + correctNo*log_no_probability).sum()/B
 
     
+def load_checkpoint(fn):
+    """wrapper over torch.load which places checkpoints on the CPU if a GPU is not available"""
+    if torch.cuda.is_available(): return torch.load(fn)
+    else: return torch.load(fn, map_location='cpu')
+    

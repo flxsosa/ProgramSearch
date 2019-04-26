@@ -181,3 +181,14 @@ class ResidualCNNBlock(Module):
         self.finalize()
     def forward(self, x):
         return self.nonlinearity(x + self.model(x))
+
+class ResidualCNNBlock_3d(Module):
+    def __init__(self, c, w=3, l=1):
+        super(ResidualCNNBlock_3d, self).__init__()
+        self.model = nn.Sequential(*[ layer
+                                      for _ in range(l)
+                                      for layer in [nn.Conv3d(c, c, 3, padding=1), nn.ReLU()] ])
+        self.nonlinearity = nn.ReLU()
+        self.finalize()
+    def forward(self, x):
+        return self.nonlinearity(x + self.model(x))

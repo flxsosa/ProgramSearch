@@ -586,7 +586,7 @@ class ProgramPointerNetwork(Module):
         else:
             oes = None
             
-        serialized = self.decoder.batchedSample(hs, oes, numberOfObjects)
+        serialized = self.decoder.batchedSample(hs, numberOfObjects, objectEncodings=oes)
         samples = []
         
         for b, nextLineOfCode in enumerate(serialized):
