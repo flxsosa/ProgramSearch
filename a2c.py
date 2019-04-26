@@ -88,9 +88,9 @@ class A2C:
                 usedTrajectories = set()
                 for ti,trajectory in enumerate(ts):
                     if successes[si][ti] > 0.:
-                        if trajectory in usedTrajectories: continue
+                        if tuple(trajectory) in usedTrajectories: continue
                         
-                        usedTrajectories.add(trajectory)
+                        usedTrajectories.add(tuple(trajectory))
                         frequency = sum(tp == trajectory for tp in ts)
                         
                         ll = self.model.traceLogLikelihood(spec, trajectory,
