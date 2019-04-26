@@ -97,7 +97,7 @@ class A2C:
                                                            scopeEncoding=objectEncodings,
                                                            specEncoding=specEncodings[si])[0]
                         reinforcedLikelihoods.append(frequency*ll)
-            if reinforceTrainingData:
+            if reinforcedLikelihoods:
                 policy_loss = -sum(reinforcedLikelihoods)
             else:
                 policy_loss = None
