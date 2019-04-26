@@ -130,4 +130,22 @@ def load_checkpoint(fn):
     """wrapper over torch.load which places checkpoints on the CPU if a GPU is not available"""
     if torch.cuda.is_available(): return torch.load(fn)
     else: return torch.load(fn, map_location='cpu')
+
+class PointerDictionary:
+    def __init__(self):
+        """dict-like object that uses pointer equality. O(N) access."""
+        self.d = []
+
+    def __contains__(self,o):
+        return any( op is o for op,_ in self.d  )
+    def __getitem__(self,o):
+        for op,v in self.d:
+            if o is op: return v
+        raise KeyError(o)
+    def __delitem__(self,k):
+        if not (k in self): raise KeyError(o)
+        self.d = [(kp,v) for kp,v in self.d if not (kp is k) ]
+    def __setitem__(self,k,v):
+        if k in self: del self[k]
+        self.d.append((k,v))
     

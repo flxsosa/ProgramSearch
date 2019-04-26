@@ -86,6 +86,8 @@ class A2C:
             reinforcedLikelihoods = []
             for si,(spec,ts) in enumerate(zip(specs, trajectories)):
                 usedTrajectories = set()
+                successfulTrajectories = sum(successes[si][ti] > 0.
+                                             for ti in range(len(ts)) )
                 for ti,trajectory in enumerate(ts):
                     if successes[si][ti] > 0.:
                         if tuple(trajectory) in usedTrajectories: continue
@@ -96,7 +98,13 @@ class A2C:
                         ll = self.model.traceLogLikelihood(spec, trajectory,
                                                            scopeEncoding=objectEncodings,
                                                            specEncoding=specEncodings[si])[0]
-                        reinforcedLikelihoods.append(frequency*ll)
+                        reinforcedLikelihoods.append(ll*(frequency/successfulTrajectories))
+                if successfulTrajectories == 0:
+                    # mix imitation with REINFORCE
+                    ll = self.model.traceLogLikelihood(spec, spec.toTrace(),
+                                                       scopeEncoding=objectEncodings,
+                                                       specEncoding=specEncodings[si])[0]
+                    reinforcedLikelihoods.append(ll)
             if reinforcedLikelihoods:
                 policy_loss = -sum(reinforcedLikelihoods)
             else:
