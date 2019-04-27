@@ -7,7 +7,7 @@ import time
 class SMC(Solver):
     def __init__(self, model, _=None,
                  maximumLength=8,
-                 initialParticles=100, exponentialGrowthFactor=2,
+                 initialParticles=20, exponentialGrowthFactor=2,
                  criticCoefficient=1.):
         self.maximumLength = maximumLength
         self.initialParticles = initialParticles
