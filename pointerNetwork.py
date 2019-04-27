@@ -277,7 +277,7 @@ class LineDecoder(Module):
                 if encodedInputs is not None:
                     # Sample the next pointer
                     a = self.pointerAttention(h.unsqueeze(0),
-                                              encodedInputs=None, pointerBounds=[],
+                                              pointerBounds=[],
                                               objectKeys=objectKeys).squeeze(0)
                     next_symbol = Pointer(torch.multinomial(a.exp(),1)[0].data.item())
                 else:
@@ -616,11 +616,12 @@ class ProgramPointerNetwork(Module):
         """
         objectsInScope = list(graph.objects(oneParent=self.oneParent))
         oe = objectEncodings.encoding(spec, objectsInScope)
+        objectKeys = self.decoder.getKeys(oe,None)
         h0 = self.initialHidden(oe, specEncoding)
 
         samples = []
         for _ in range(n_samples):
-            nextLineOfCode = self.decoder.sample(h0, oe)
+            nextLineOfCode = self.decoder.sample(h0, oe, objectKeys=objectKeys)
             if nextLineOfCode is None: continue
             nextLineOfCode = [objectsInScope[t.i] if isinstance(t, Pointer) else t
                               for t in nextLineOfCode ]
