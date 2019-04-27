@@ -1634,7 +1634,8 @@ if __name__ == "__main__":
         if arguments.td:
             dataGenerator = getTrainingData('CSG_data.p')
         else:
-            dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes)
+            dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes,
+                                              minShapes=arguments.minShapes)
         testCSG(m,
                 dataGenerator,
                 arguments.timeout,
