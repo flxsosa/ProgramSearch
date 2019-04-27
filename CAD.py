@@ -70,6 +70,37 @@ class CSG(Program):
             hm = np.logical_or(hm,c.heatMapTarget())
         return hm
 
+    def scad(self,fn=None):
+        cylindrical = """
+module cylindrical(a, b, r) {
+
+    dir = b-a;
+    h   = norm(dir);
+    if(dir[0] == 0 && dir[1] == 0) {
+        // no transformation necessary
+        cylinder(r=r, h=h);
+    }
+    else {
+        w  = dir / h;
+        u0 = cross(w, [0,0,1]);
+        u  = u0 / norm(u0);
+        v0 = cross(w, u);
+        v  = v0 / norm(v0);
+        multmatrix(m=[[u[0], v[0], w[0], a[0]],
+                      [u[1], v[1], w[1], a[1]],
+                      [u[2], v[2], w[2], a[2]],
+                      [0,    0,    0,    1]])
+        cylinder(r=r, h=h);
+    }
+} 
+"""
+        source = f"translate([{-RESOLUTION//2},{-RESOLUTION//2},{-RESOLUTION//2}])"
+        source = "%s {\n%s\n}\n"%(source,self._scad())
+        source = f"{cylindrical}\n{source}"
+        if fn is None: return source
+        with open(fn,"w") as handle:
+            handle.write(source)
+        return source
 
     def __repr__(self):
         return str(self)
@@ -165,6 +196,9 @@ class Cylinder(CSG):
         self.z1 = z1
         self.p0 = np.array([x0,y0,z0])
         self.p1 = np.array([x1,y1,z1])
+
+    def _scad(self):
+        return f"cylindrical([{self.x0}, {self.y0}, {self.z0}], [{self.x1}, {self.y1}, {self.z1}], {self.r});"
 
     def __str__(self):
         return f"(cylinder r={self.r} p0={self.p0} p1={self.p1})"
@@ -291,6 +325,12 @@ class Cuboid(CSG):
         print("WARNING: ignoring rotation of cuboid by {(rx,ry,rz)}")
         return self
 
+    def _scad(self):
+        s = f"translate([{self.x0}, {self.y0}, {self.z0}])"
+        s += f" cube(size=[{self.x1 - self.x0}, {self.y1 - self.y0}, {self.z1 - self.z0}]);"
+        return s
+        
+
     def extent(self):
         return np.array([[self.x0,self.y0,self.z0],[self.x1,self.y1,self.z1]]).min(0), \
             np.array([[self.x0,self.y0,self.z0],[self.x1,self.y1,self.z1]]).max(0)
@@ -356,6 +396,9 @@ class Sphere(CSG):
         self.z = z
 
     def toTrace(self): return [self]
+
+    def _scad(self):
+        return f"translate([{self.x}, {self.y}, {self.z}])" + f" sphere(r={self.r});"
 
     def translate(self,x,y,z):
         return Sphere(self.x + x,self.y + y,self.z + z,self.r)
@@ -532,6 +575,9 @@ class Union(CSG):
     def __str__(self):
         return f"(+ {str(self.elements[0])} {str(self.elements[1])})"
 
+    def _scad(self):
+        return "union() {\n" + self.elements[0]._scad() + "\n" + self.elements[1]._scad() + "\n}"
+
     def extent(self):
         a = self.elements[0]
         b = self.elements[1]
@@ -596,6 +642,9 @@ class Difference(CSG):
 
     def toTrace(self):
         return self.a.toTrace() + self.b.toTrace() + [self]
+
+    def _scad(self):
+        return "difference() {\n" + self.a._scad() + "\n" + self.b._scad() + "\n}"
 
     def translate(self,*d):
         return Difference(self.a.translate(*d),self.b.translate(*d))
@@ -671,6 +720,9 @@ class Intersection(CSG):
 
     def __str__(self):
         return f"(* {self.a} {self.b})"
+
+    def _scad(self):
+        return "intersection() {\n" + self.a._scad() + "\n" + self.b._scad() + "\n}"
         
     def children(self): return [self.a, self.b]
 
@@ -1513,8 +1565,6 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--maxShapes", default=20,
                             type=int)
-    parser.add_argument("--minShapes", default=2,
-                            type=int)
     parser.add_argument("--2d", default=False, action='store_true', dest='td')
     parser.add_argument("--viewpoints", default=False, action='store_true', dest='viewpoints')
     parser.add_argument("--trainTime", default=None, type=float,
@@ -1536,10 +1586,11 @@ if __name__ == "__main__":
     arguments.translate = not arguments.noTranslate
 
     if arguments.mode == "demo":
+        os.system("mkdir demo")
         if arguments.td:
             rs = lambda : randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate)
         else:
-            rs = lambda : random3D()
+            rs = lambda : random3D(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         startTime = time.time()
         ns = 50
         for _ in range(ns):
@@ -1549,9 +1600,10 @@ if __name__ == "__main__":
             s = rs()
             if arguments.td:
                 plot.imshow(s.highresolution(256))
-                plot.savefig(f"/tmp/CAD_{n}_hr.png")
+                plot.savefig(f"demo/CAD_{n}_hr.png")
             else:
-                s.show(export=f"/tmp/CAD_{n}_3d.png")
+                s.show(export=f"demo/CAD_{n}_3d.png")
+            s.scad(f"demo/CAD_{n}_model.scad")
 
         import sys
         sys.exit(0)
@@ -1612,7 +1664,7 @@ if __name__ == "__main__":
         if arguments.td:
             training = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate)
         else:
-            training = lambda: random3D(maxShapes=7,minShapes=1)
+            training = lambda: random3D(maxShapes=arguments.maxShapes,minShapes=arguments.maxShapes)
         critic.train(arguments.checkpoint,
                      training,
                      R)
