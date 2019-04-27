@@ -1511,7 +1511,9 @@ if __name__ == "__main__":
     parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData","heatMap",
                                          "critic"])
     parser.add_argument("--checkpoint", default=None)
-    parser.add_argument("--maxShapes", default=2,
+    parser.add_argument("--maxShapes", default=20,
+                            type=int)
+    parser.add_argument("--minShapes", default=2,
                             type=int)
     parser.add_argument("--2d", default=False, action='store_true', dest='td')
     parser.add_argument("--viewpoints", default=False, action='store_true', dest='viewpoints')
