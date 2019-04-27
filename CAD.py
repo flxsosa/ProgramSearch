@@ -1631,7 +1631,7 @@ if __name__ == "__main__":
             else:
                 oe = MultiviewObject()
                 se = MultiviewSpec()
-            training = random3D
+            training = lambda : random3D(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         else:
             dsl = dsl_2d
             oe = ObjectEncoder()
@@ -1689,7 +1689,7 @@ if __name__ == "__main__":
             dataGenerator = getTrainingData('CSG_data.p')
         else:
             dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes,
-                                              minShapes=arguments.minShapes)
+                                              minShapes=arguments.maxShapes)
         testCSG(m,
                 dataGenerator,
                 arguments.timeout,
