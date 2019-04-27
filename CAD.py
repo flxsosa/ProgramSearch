@@ -1330,7 +1330,7 @@ def testCSG(m, getProgram, timeout, export):
     print(f"One parent restriction?  {oneParent}")
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
-        #        SMC(m),
+               SMC(m),
         # BeamSearch(m, criticCoefficient=1),
                 # BeamSearch(m, criticCoefficient=0.),
                ForwardSample(m, maximumLength=18)]
@@ -1359,6 +1359,8 @@ def testCSG(m, getProgram, timeout, export):
         print()
         
         exportProgram(spec, "data/test/%03d.png"%ti)
+        with open("data/test/%03_spec.pickle"%ti,"wb") as handle:
+            pickle.dump(spec, handle)
         for n, solver in enumerate(solvers):
             print(f"Running solver {solver.name}")
             solver.maximumLength = len(ProgramGraph.fromRoot(spec).nodes) + 1
@@ -1376,6 +1378,8 @@ def testCSG(m, getProgram, timeout, export):
                     bestProgram = None
                 else:
                     bestProgram = max(obs, key=lambda bp: bp.IoU(spec))
+                with open("data/test/%03_%s.pickle"%(ti,solver.name),"wb") as handle:
+                    pickle.dump(bestProgram, handle)
                 exportProgram(bestProgram,
                               "data/test/%03d_%s.png"%(ti,solver.name))
                 
@@ -1630,7 +1634,7 @@ if __name__ == "__main__":
         if arguments.td:
             dataGenerator = getTrainingData('CSG_data.p')
         else:
-            dataGenerator = random3D
+            dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes)
         testCSG(m,
                 dataGenerator,
                 arguments.timeout,
