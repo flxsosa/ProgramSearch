@@ -113,7 +113,7 @@ def showMatrixAsImage(*m):
 
 NEGATIVEINFINITY = float('-inf')
 
-def binary_cross_entropy(y,t, epsilon=10**-10):
+def binary_cross_entropy(y,t, epsilon=10**-10, average=True):
     """y: tensor of size B, elements <= 0. each element is a log probability.
     t: tensor of size B, elements in [0,1]. intended target.
     returns: 1/B * - \sum_b t*y + (1 - t)*(log(1 - e^y + epsilon))"""
@@ -125,13 +125,21 @@ def binary_cross_entropy(y,t, epsilon=10**-10):
     assert torch.all(log_no_probability <= 0.)
     correctYes = t
     correctNo = 1 - t
-    return -(correctYes*log_yes_probability + correctNo*log_no_probability).sum()/B
+    ce = -(correctYes*log_yes_probability + correctNo*log_no_probability).sum()
+    if average: ce = ce/B
+    return ce
 
     
 def load_checkpoint(fn):
     """wrapper over torch.load which places checkpoints on the CPU if a GPU is not available"""
-    if torch.cuda.is_available(): return torch.load(fn)
-    else: return torch.load(fn, map_location='cpu')
+    print(f"Loading checkpoint {fn}. cuda? {torch.cuda.is_available()}")
+    m = torch.load(fn, map_location=torch.device('cpu'))
+    print(f"loaded {m}")
+    if torch.cuda.is_available():
+        print(f"moving to GPU...")
+        m.cuda()
+        print(f"{m} has been moved!")
+    return m
 
 class PointerDictionary:
     def __init__(self):

@@ -1251,7 +1251,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
     
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None,
-                nudge=False, translate=True):
+                nudge=False, translate=False):
     import matplotlib.pyplot as plot
 
     def translation(x,y,child):
@@ -1493,7 +1493,7 @@ def makeTrainingData():
     startTime = time.time()
     while time.time() < startTime + 3600*5:
         n_samples += 1
-        program = randomScene(maxShapes=20, minShapes=5, translate=False)
+        program = randomScene(maxShapes=20, minShapes=5)
         size = len(program.toTrace())
         im = program.render()
         im = tuple( im[x,y] > 0.5
@@ -1662,7 +1662,7 @@ if __name__ == "__main__":
                 if np.all((o.execute() > 0.5) == spec): return True
             return False
         if arguments.td:
-            training = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate)
+            training = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         else:
             training = lambda: random3D(maxShapes=arguments.maxShapes,minShapes=arguments.maxShapes)
         critic.train(arguments.checkpoint,

@@ -70,7 +70,7 @@ class SMC(Solver):
                 objectEncodings.registerObjects([(o,spec) for o in newObjects])
 
                 for t,f in sampleFrequency:
-                    if f:
+                    if f or True:
                         self._report(ProgramGraph(t))
 
                 # Convert trajectories to particles

@@ -8,7 +8,7 @@ import numpy as np
 
 
 class A2C:
-    def __init__(self, model, outerBatch=2, innerBatch=16):
+    def __init__(self, model, outerBatch=1, innerBatch=8):
         self.model = model
         self.outerBatch = outerBatch
         self.innerBatch = innerBatch
@@ -80,7 +80,7 @@ class A2C:
             distancePredictions = self.model.batchedDistance([oe for se,oe in distanceInput],
                                                              [se for se,oe in distanceInput])
             distanceTargets = self.model.tensor(valueTrainingTargets)
-            value_loss = binary_cross_entropy(-distancePredictions, distanceTargets)
+            value_loss = binary_cross_entropy(-distancePredictions, distanceTargets, average=False)
 
             # REINFORCE objective
             reinforcedLikelihoods = []
@@ -106,7 +106,7 @@ class A2C:
                                                        specEncoding=specEncodings[si])[0]
                     reinforcedLikelihoods.append(ll)
             if reinforcedLikelihoods:
-                policy_loss = -sum(reinforcedLikelihoods)
+                policy_loss = -sum(reinforcedLikelihoods)/len(reinforcedLikelihoods)
             else:
                 policy_loss = None
 
