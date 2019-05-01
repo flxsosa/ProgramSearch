@@ -7,17 +7,25 @@ import torch.nn as nn
 
 class HeatEncoder(Module):
     def __init__(self, input_channels, hidden_channels, output_channels,
+                 downsample=1,
                  layers=3):
         super(HeatEncoder, self).__init__()
 
+        if downsample == 1:
+            preprocess = nn.Sequential(nn.Conv3d(input_channels, hidden_channels, 3, padding=1), nn.ReLU())
+        else:
+            preprocess = nn.Sequential(nn.Conv3d(input_channels, hidden_channels, 3, padding=1), nn.ReLU(),
+                                       nn.MaxPool3d(downsample))
+
         self.model = nn.Sequential(
             # preprocess
-            nn.Sequential(nn.Conv3d(input_channels, hidden_channels, 3, padding=1), nn.ReLU()),
+            preprocess,
             # Highway
             nn.Sequential(*[ResidualCNNBlock_3d(hidden_channels)
                                        for _ in range(layers - 2) ]),
             # post process
-            nn.Conv3d(hidden_channels, output_channels, 3, padding=1)
+            nn.Conv3d(hidden_channels, output_channels, 3, padding=1),
+            nn.ReLU()
         )
         self.finalize()
 
@@ -49,11 +57,13 @@ class HeatLogSoftmax(Module):
         return x
         
 class HeatNetwork(Module):
-    def __init__(self, resolution=32,maxObjects=5):
+    def __init__(self, resolution=32, hotResolution=16, maxObjects=5):
         super(HeatNetwork, self).__init__()
 
         self.maxObjects = maxObjects
         self.resolution = resolution
+        self.downsample = resolution//hotResolution
+        self.hotResolution = hotResolution
 
         self.heatMaps = ["cuboid1","cuboid2"] + \
                         ["spherical"] + \
@@ -112,6 +122,7 @@ class HeatNetwork(Module):
             ("cylinder2_hsm",HeatLogSoftmax())]))
         
         self.encoder = HeatEncoder(input_channels=self.inputChannels,
+                                   downsample=resolution//hotResolution,
                                    hidden_channels=32,
                                    output_channels=self.outputChannels)
         self.finalize()
@@ -137,27 +148,42 @@ class HeatNetwork(Module):
 
         if line[0] == 'cuboid':
             outputSequence.append([(self.shapePredictor, self.shape2index[line[0]],
-                                    line[1], line[2], line[3])])
+                                    line[1]//self.downsample,
+                                    line[2]//self.downsample,
+                                    line[3]//self.downsample)])
             outputSequence.append([(self.cuboid2, 0,
-                                    line[4], line[5], line[6])])
+                                    line[4]//self.downsample,
+                                    line[5]//self.downsample,
+                                    line[6]//self.downsample)])
             x1 = np.copy(x)
             x1[self.inputHeat["cuboid1"],line[1],line[2],line[3]] = 1.
             inputSequence.append(x1)
         if line[0] == 'cylinder':
             outputSequence.append([(self.shapePredictor, self.shape2index[line[0]],
-                                    line[2], line[3], line[4])])
+                                    line[2]//self.downsample,
+                                    line[3]//self.downsample,
+                                    line[4]//self.downsample)])
             outputSequence.append([(self.cylinder2, 0,
-                                    line[5], line[6], line[7]),
+                                    line[5]//self.downsample,
+                                    line[6]//self.downsample,
+                                    line[7]//self.downsample),
                                    (self.cylindricalRadius,
-                                    self.cylindricalRadii.index(line[1]), line[5], line[6], line[7])])
+                                    self.cylindricalRadii.index(line[1]),
+                                    line[5]//self.downsample,
+                                    line[6]//self.downsample,
+                                    line[7]//self.downsample)])
             x1 = np.copy(x)
             x1[self.inputHeat["cylinder1"],line[2],line[3],line[4]] = 1.
             inputSequence.append(x1)
         if line[0] == 'sphere':
             outputSequence.append([(self.shapePredictor, self.shape2index[line[0]],
-                                    line[1], line[2], line[3]),
+                                    line[1]//self.downsample,
+                                    line[2]//self.downsample,
+                                    line[3]//self.downsample),
                                    (self.sphericalRadius, self.sphericalRadii.index(line[4]),
-                                   line[1], line[2], line[3])])
+                                    line[1]//self.downsample,
+                                    line[2]//self.downsample,
+                                    line[3]//self.downsample)])
             
         assert len(inputSequence) == len(outputSequence)
 
@@ -212,19 +238,19 @@ class HeatNetwork(Module):
     def sample(self, spec, objects):
         x = self.initialInput(spec, objects)
         heat = self.encoder(self.tensor(x).unsqueeze(0))
-        objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.resolution*self.resolution*self.resolution*len(self.shape2index)).exp()
+        objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.hotResolution*self.hotResolution*self.hotResolution*len(self.shape2index)).exp()
         i = torch.multinomial(objectPrediction,1).data.item()
 
         def index2position(index):
-            V = self.resolution*self.resolution*self.resolution
+            V = self.hotResolution*self.hotResolution*self.hotResolution
             c = index//V
             index = index%V
-            x = index//(self.resolution**2)
-            index = index%(self.resolution**2)
-            y = index//(self.resolution)
-            index = index%(self.resolution)
+            x = index//(self.hotResolution**2)
+            index = index%(self.hotResolution**2)
+            y = index//(self.hotResolution)
+            index = index%(self.hotResolution)
             z = index
-            return c,x,y,z
+            return c,x*self.downsample,y*self.downsample,z*self.downsample
 
         shape,x,y,z = index2position(i)
         shape = self.index2shape[shape]
@@ -247,7 +273,7 @@ class HeatNetwork(Module):
         
 if __name__ == "__main__":
     from CAD import *
-    m = HeatNetwork(32)
+    m = HeatNetwork(32,hotResolution=8)
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     while True:
         def randomShape():
