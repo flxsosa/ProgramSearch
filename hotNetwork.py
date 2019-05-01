@@ -124,6 +124,7 @@ class HeatNetwork(Module):
         self.encoder = HeatEncoder(input_channels=self.inputChannels,
                                    downsample=resolution//hotResolution,
                                    hidden_channels=32,
+                                   layers=4,
                                    output_channels=self.outputChannels)
         self.finalize()
 
