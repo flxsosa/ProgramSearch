@@ -279,6 +279,7 @@ if __name__ == "__main__":
     from CAD import *
     m = HeatNetwork(32,hotResolution=8)
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
+    losses = []
     while True:
         def randomShape():
             return random3D(maxShapes=1,minShapes=1)
@@ -292,8 +293,10 @@ if __name__ == "__main__":
         (-batched).backward()
         optimizer.step()
         L = -batched.data.item()
-        print(L)
-        if L < 3.:
+        losses.append(L)
+        if len(losses) > 100:
+            print(sum(losses)/len(losses))
+            losses = []
             for spec, objects,_ in triples:
                 print(spec, objects, m.sample(spec, objects))
 

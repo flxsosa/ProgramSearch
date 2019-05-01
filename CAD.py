@@ -1021,8 +1021,7 @@ def random3D(maxShapes=13,minShapes=3):
         return Cylinder(*([r] + p0 + p1))
 
     def randomShape():
-        return random.choice([randomSpherical# ,randomCuboid,randomCylinder
-        ])()
+        return random.choice([randomSpherical,randomCuboid,randomCylinder])()
 
     while True:
         s = None
