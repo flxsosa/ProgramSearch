@@ -27,8 +27,8 @@ def test_on_real_data():
     print("loaded model")
 
     tasklist = makeTestdata(synth=True, challenge=True, max_num_ex=4)
-    import random
-    random.shuffle(tasklist)
+    #import random
+    #random.shuffle(tasklist)
 
     if test_args.debug:
         tasklist = tasklist[:3]
@@ -75,6 +75,11 @@ def test_on_real_data():
             print("hit!")
         results[ ( tuple(inputs), tuple(outputs) ) ] = SearchResult(hit, solution, stats)
 
+        #prelim results
+        with open(filename, 'wb') as savefile:
+            dill.dump(results, savefile)
+        print("prelim results file saved at", filename)
+
     print(f"{test_args.test_type} solved {n_solutions} out of {i+1} problems")
     return results
 
@@ -97,6 +102,12 @@ if __name__ == '__main__':
     print("debug,", test_args.debug)
     print("use_prev_value", test_args.use_prev_value)
 
+
+
+    timestr = str(int(time.time()))
+    filename = test_args.resultsfile + timestr
+
+
     #load model
 
     #test model on dataset, depending on type of search.
@@ -109,8 +120,7 @@ if __name__ == '__main__':
     results = test_on_real_data()
 
     #save results 
-    timestr = str(int(time.time()))
-    filename = test_args.resultsfile + timestr
+
     with open(filename, 'wb') as savefile:
         dill.dump(results, savefile)
         print("results file saved at", filename)

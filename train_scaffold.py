@@ -82,6 +82,8 @@ def rl_train(agent):
 
 if __name__ == '__main__':
     #print some args stuff
+    import sys
+    print(sys.version)
 
     #load model or create model
     agent = load_model()
