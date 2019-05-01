@@ -269,7 +269,7 @@ class HeatNetwork(Module):
             heat = self.cuboid2(self.encoder(self.tensor(x1).unsqueeze(0))).squeeze(0).squeeze(0)
             i = torch.multinomial(heat.exp().view(-1),1).data.item()
             _,x1,y1,z1 = index2position(i)
-            return Cuboid(x0,y0,z0,
+            return Cuboid(x,y,z,
                           x1,y1,z1)
         if shape == "cylinder":
             x1 = np.copy(x0)
@@ -285,7 +285,7 @@ class HeatNetwork(Module):
             i = torch.multinomial(self.cylinder2(heat).exp().view(-1),1).data.item()
             _,x1,y1,z1 = index2position(i)
             return Cylinder(r,
-                            x0,y0,z0,
+                            x,y,z,
                             x1,y1,z1)
         return shape
             
