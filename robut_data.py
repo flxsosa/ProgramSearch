@@ -74,7 +74,7 @@ class GenData:
                 print("killed a worker")
                 continue
 
-def makeTestdata(synth=True, challenge=False, max_num_ex=4):
+def makeTestdata(synth=True, challenge=False, max_num_ex=4, include_const=False):
     import sys
     import os
     sys.path.append(os.path.abspath('./'))
@@ -90,40 +90,43 @@ def makeTestdata(synth=True, challenge=False, max_num_ex=4):
 
     tasklist = []
     for task in tasks:
-        if task.stringConstants==[] and task.request == arrow(tlist(tcharacter), tlist(tcharacter)):
-                inputs = [''.join(x[0]) for x, _ in task.examples[:max_num_ex]]
-                outputs = [''.join(y) for _, y in task.examples[:max_num_ex]]
-                tasklist.append( (inputs, outputs) )
+        if task.request == arrow(tlist(tcharacter), tlist(tcharacter)):
+            if include_const: 
+                if not task.stringConstants==[]: continue
+            inputs = [''.join(x[0]) for x, _ in task.examples[:max_num_ex]]
+            outputs = [''.join(y) for _, y in task.examples[:max_num_ex]]
+            tasklist.append( (inputs, outputs) )
 
     return tasklist
 
 
 if __name__ == '__main__':
-    from ROBUT import get_supervised_sample
-    import time
+    tasks = makeTestdata(synth=True, challenge=True, max_num_ex=4)
+    # from ROBUT import get_supervised_sample
+    # import time
 
-    fn = get_supervised_sample
-    print("normal, unparallelized:")
-    t = time.time()
-    for i, (S, A) in enumerate(get_supervised_batchsize(fn, batchsize=2000)):
-        assert len(S) == 2000
-        if i >= 40 - 1: break
-    tot = time.time() - t
-    print(f"unparallelized average time for 20 batches: {tot/20} sec ", flush=True)
+    # fn = get_supervised_sample
+    # print("normal, unparallelized:")
+    # t = time.time()
+    # for i, (S, A) in enumerate(get_supervised_batchsize(fn, batchsize=2000)):
+    #     assert len(S) == 2000
+    #     if i >= 40 - 1: break
+    # tot = time.time() - t
+    # print(f"unparallelized average time for 20 batches: {tot/20} sec ", flush=True)
 
 
-    dataqueue = GenData(fn, n_processes=10, max_size=10000)
+    # dataqueue = GenData(fn, n_processes=10, max_size=10000)
 
-    print("waiting 5 seconds ...")
-    time.sleep(5)
+    # print("waiting 5 seconds ...")
+    # time.sleep(5)
 
-    t = time.time()
-    for i, (S, A) in enumerate( dataqueue.batchIterator(batchsize=2000) ):
-        assert len(S) == 2000
-        if i >= 40 - 1: break
-    tot = time.time() - t
-    print(f"parallelized average time for 20 batches: {tot/20} sec ")
+    # t = time.time()
+    # for i, (S, A) in enumerate( dataqueue.batchIterator(batchsize=2000) ):
+    #     assert len(S) == 2000
+    #     if i >= 40 - 1: break
+    # tot = time.time() - t
+    # print(f"parallelized average time for 20 batches: {tot/20} sec ")
 
-    dataqueue.kill()
+    # dataqueue.kill()
 
 
