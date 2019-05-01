@@ -237,8 +237,8 @@ class HeatNetwork(Module):
         return L
 
     def sample(self, spec, objects):
-        x = self.initialInput(spec, objects)
-        heat = self.encoder(self.tensor(x).unsqueeze(0))
+        x0 = self.initialInput(spec, objects)
+        heat = self.encoder(self.tensor(x0).unsqueeze(0))
         objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.hotResolution*self.hotResolution*self.hotResolution*len(self.shape2index)).exp()
         i = torch.multinomial(objectPrediction,1).data.item()
 
@@ -263,6 +263,30 @@ class HeatNetwork(Module):
             r = torch.multinomial(r,1).data.item()
             r = self.sphericalRadii[r]
             return Sphere(x,y,z,r)
+        if shape == "cuboid":
+            x1 = np.copy(x0)
+            x1[self.inputHeat["cuboid1"],x,y,z] = 1.
+            heat = self.cuboid2(self.encoder(self.tensor(x1).unsqueeze(0))).squeeze(0).squeeze(0)
+            i = torch.multinomial(heat.view(-1),1).data.item()
+            _,x1,y1,z1 = index2position(i)
+            return Cuboid(x0,y0,z0,
+                          x1,y1,z1)
+        if shape == "cylinder":
+            x1 = np.copy(x0)
+            x1[self.inputHeat["cylinder1"],x,y,z] = 1.
+            heat = self.encoder(self.tensor(x1).unsqueeze(0))
+            r = self.cylindricalRadius(heat).squeeze(0)[:,
+                                                      x//self.downsample,
+                                                      y//self.downsample,
+                                                      z//self.downsample].exp()
+            r = torch.multinomial(r,1).data.item()
+            r = self.cylindricalRadii[r]
+
+            i = torch.multinomial(self.cylinder2(heat).exp().view(-1),1).data.item()
+            _,x1,y1,z1 = index2position(i)
+            return Cylinder(r,
+                            x0,y0,z0,
+                            x1,y1,z1)
         return shape
             
             
