@@ -67,6 +67,7 @@ class HeatNetwork(Module):
         self.shape2index = {"cuboid": 0,
                             "cylinder": 1,
                             "sphere": 2}
+        self.index2shape = {v:k for k,v in self.shape2index.items() }
 
         self.inputHeat = {"cuboid1": 1 + maxObjects,
                           "cylinder1": 2 + maxObjects}
@@ -226,7 +227,7 @@ class HeatNetwork(Module):
             return c,x,y,z
 
         shape,x,y,z = index2position(i)
-        shape = self.shape2index[shape]
+        shape = self.index2shape[shape]
         if shape == "sphere":
             radiusPrediction = self.sphericalRadius(heat).squeeze(0)[:,x,y,z].exp()
             r = torch.multinomial(radiusProduction,1).data.item()
