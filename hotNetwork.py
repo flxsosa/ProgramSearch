@@ -229,8 +229,8 @@ class HeatNetwork(Module):
         shape,x,y,z = index2position(i)
         shape = self.index2shape[shape]
         if shape == "sphere":
-            radiusPrediction = self.sphericalRadius(heat).squeeze(0)[:,x,y,z].exp()
-            r = torch.multinomial(radiusProduction,1).data.item()
+            r = self.sphericalRadius(heat).squeeze(0)[:,x,y,z].exp()
+            r = torch.multinomial(r,1).data.item()
             r = self.sphericalRadii[r]
             return Sphere(x,y,z,r)
         return shape
