@@ -267,7 +267,7 @@ class HeatNetwork(Module):
             x1 = np.copy(x0)
             x1[self.inputHeat["cuboid1"],x,y,z] = 1.
             heat = self.cuboid2(self.encoder(self.tensor(x1).unsqueeze(0))).squeeze(0).squeeze(0)
-            i = torch.multinomial(heat.view(-1),1).data.item()
+            i = torch.multinomial(heat.exp().view(-1),1).data.item()
             _,x1,y1,z1 = index2position(i)
             return Cuboid(x0,y0,z0,
                           x1,y1,z1)
