@@ -4,6 +4,7 @@ import numpy as np
 
 from API import *
 
+
 from a2c import *
 from randomSolver import *
 from pointerNetwork import *
@@ -1088,52 +1089,78 @@ class SpecEncoder(CNN):
 
         
 class MultiviewEncoder(Module):
-    def __init__(self, nviews=6):
+    def __init__(self, H=512,
+                 nchannels=1):
         super(MultiviewEncoder, self).__init__()
 
-        self.nviews = nviews
+        self.nviews = 6
+        self.nchannels = nchannels
 
         # This will run six times
         layers = 2
-        self.singleView = CNN(channels=1, inputImageDimension=RESOLUTION, flattenOutput=False, layers=layers)
+        self.singleView = CNN(channels=self.nchannels, inputImageDimension=RESOLUTION, flattenOutput=False, layers=layers)
 
-        self.mergeViews = CNN(channels=nviews*self.singleView.outputChannels,
+        self.mergeViews = CNN(channels=2*self.singleView.outputChannels,
                               inputImageDimension=self.singleView.outputResolution,
                               mp=1) # do not max pool while merging views
-
-        self.outputDimensionality = self.mergeViews.outputDimensionality
+        self.flatten = nn.Sequential(nn.Linear(self.mergeViews.outputDimensionality*3, H),
+                                     nn.ReLU(),
+                                     nn.Linear(H,H))
+        
+        self.outputDimensionality = H
         
         self.finalize()
 
     def forward(self, v):
-        """Expects: either Bx(nviews)xRESOLUTIONxRESOLUTION or (nviews)xRESOLUTIONxRESOLUTION"""
-        if isinstance(v, list): v = np.array(v)
-
+        """Expects: Bx6x(nchannels)xRESOLUTIONxRESOLUTION. Returns: BxH"""
         v = self.tensor(v)
 
-        if len(v.shape) == 3:
-            squeeze = True
-            v = v.unsqueeze(0)
-        else:
-            squeeze = False
-
-        assert v.size(1) == self.nviews
+        assert v.size(2) == self.nchannels
+        assert v.size(1) == 6
         B = v.size(0)
 
         # Run the single view encoder - but first we have to flatten batch/view
-        bv = self.singleView.encoder(v.view(B*self.nviews,1,RESOLUTION,RESOLUTION)).contiguous()
-        
-        # reshape
-        bv = bv.view(B,
-                     self.nviews*self.singleView.outputChannels,
-                     self.singleView.outputResolution,
-                     self.singleView.outputResolution)
-        # Run through multiview encoder
-        y = self.mergeViews(bv)            
+        reshaped = v.view(B*6,self.nchannels,RESOLUTION,RESOLUTION)
+        bv = self.singleView.encoder(reshaped)
+        # bv: [6B, self.singleView.outputChannels, r,r]
+        bv = bv.view(B,6,
+                     self.singleView.outputChannels,
+                     self.singleView.outputResolution, self.singleView.outputResolution).contiguous()
 
-        if squeeze: y = y.squeeze(0)
+
+
+        
+        # Merge the parallel views
+        merged = \
+          self.mergeViews.encoder(bv.view(B*3,2*self.singleView.outputChannels,
+                                          self.singleView.outputResolution, self.singleView.outputResolution))
+        # ys = []
+        # for b in range(B):
+        #     predictions = [] # 6 predictions - one for each view
+        #     for viewing in range(6):
+        #         prediction = self.singleView.encoder(v[b, viewing].unsqueeze(0)).squeeze(0)
+        #         difference = prediction - bv[b,viewing]
+        #         assert torch.all(difference.abs() < 0.0001)
+        #         predictions.append(prediction)
+        #     mergeInput = [torch.cat([predictions[0],predictions[1]]),
+        #                   torch.cat([predictions[2],predictions[3]]),
+        #                   torch.cat([predictions[4],predictions[5]])]
+        #     MERGE = []
+        #     for i,mi in enumerate(mergeInput):
+        #         mo = self.mergeViews.encoder(mi.unsqueeze(0)).squeeze(0)
+        #         MERGE.append(mo)
+        #         y = merged[3*b + i]
+        #         assert torch.all( (y - mo).abs() < 0.0001)
+        #     yf = self.flatten(torch.cat(MERGE))
+        #     print(yf.shape)
+        #     ys.append(yf.unsqueeze(0))
+        merged = merged.view(B,-1)
+        y = self.flatten(merged)
+        
+        # assert torch.all( (torch.cat(ys) - y).abs() < 0.001 )
 
         return y
+
 
 class MultiviewSpec(Module):
     def __init__(self):
@@ -1145,16 +1172,18 @@ class MultiviewSpec(Module):
     def forward(self, v):
         """v: either Bx(voxels) or (voxels)"""
         if len(v.shape) == 4:
-            return self.encoder(np.array([ voxels2dm(v[b]) for b in range(v.shape[0])]))
+            v = self.tensor(np.array([ voxels2dm(v[b]) for b in range(v.shape[0])]))
+            return self.encoder(v.unsqueeze(2))
         elif len(v.shape) == 3:
-            return self.encoder(voxels2dm(v))
+            v = self.tensor(voxels2dm(v))
+            return self.encoder(v.unsqueeze(0).unsqueeze(2)).unsqueeze(0)
         else:
             assert False
 
 class MultiviewObject(Module):
     def __init__(self):
         super(MultiviewObject, self).__init__()
-        self.encoder = MultiviewEncoder(nviews=12)
+        self.encoder = MultiviewEncoder(nchannels=2)
         self.outputDimensionality = self.encoder.outputDimensionality
         self.finalize()
 
@@ -1164,18 +1193,18 @@ class MultiviewObject(Module):
             assert isinstance(obj, list)
             B = len(spec)
             assert len(obj) == B
-            spec = np.stack([ np.stack(voxels2dm(s)) for s in spec])
-            obj = np.stack([ np.stack(voxels2dm(o)) for o in obj])
-            return self.encoder(np.concatenate([spec,obj],1))
+            spec = self.tensor(np.stack([ np.stack(voxels2dm(s)) for s in spec])).unsqueeze(2)
+            obj = self.tensor(np.stack([ np.stack(voxels2dm(o)) for o in obj])).unsqueeze(2)
+            return self.encoder(torch.cat([spec,obj],2))
         elif isinstance(obj, list): # batched - expect a single spec and multiple objects
             spec = np.stack([voxels2dm(spec)])
-            spec = np.repeat(spec[np.newaxis,:,:],len(obj),axis=0)
-            obj = np.stack([ np.stack(voxels2dm(o)) for o in obj])
-            return self.encoder(np.concatenate([spec, obj],1))
+            spec = self.tensor(np.repeat(spec[np.newaxis,:,:],len(obj),axis=0)).unsqueeze(2)
+            obj = self.tensor(np.stack([ np.stack(voxels2dm(o)) for o in obj])).unsqueeze(2)
+            return self.encoder(torch.cat([spec,obj],2))
         else: # not batched
-            spec = np.stack([voxels2dm(spec)])
-            obj = np.stack([voxels2dm(obj)])
-            return self.encoder(np.stack([spec,obj]))
+            spec = self.tensor(np.stack([voxels2dm(spec)])).unsqueeze(0).unsqueeze(2)
+            obj = self.tensor(np.stack([voxels2dm(obj)])).unsqueeze(0).unsqueeze(2)
+            return self.encoder(torch.cat([spec,obj],2)).squeeze(0)
         
 
 class HeatMap(Module):
@@ -1556,8 +1585,6 @@ def getTrainingData(path):
 
     return getData
         
-    
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
