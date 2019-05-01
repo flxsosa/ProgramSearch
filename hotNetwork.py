@@ -115,7 +115,7 @@ class HeatNetwork(Module):
                                    output_channels=self.outputChannels)
         self.finalize()
 
-    def initialInput(self, spec, objects, line):
+    def initialInput(self, spec, objects):
         x0 = np.zeros((1 + self.maxObjects, self.resolution, self.resolution, self.resolution))
         x0[0] = spec.execute()
         for n,o in enumerate(objects): x0[n + 1] = o.execute()
@@ -125,7 +125,7 @@ class HeatNetwork(Module):
 
     def line2io(self, spec, objects, line):
         """Returns [inputArrays], [(head, *index)]"""
-        x = self.initialInput(spec, objects, line)
+        x = self.initialInput(spec, objects)
         
         # inputSequence: list of CNN inputs
         inputSequence = [x]
@@ -209,7 +209,7 @@ class HeatNetwork(Module):
         return L
 
     def sample(self, spec, objects):
-        x = self.initialInput(spec, objects, line)
+        x = self.initialInput(spec, objects)
         heat = self.encoder(self.tensor(x).unsqueeze(0))
         objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.resolution*self.resolution*self.resolution*len(self.shape2index)).exp()
         i = torch.multinomial(objectPrediction,1).data.item()
