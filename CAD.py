@@ -4,6 +4,7 @@ import numpy as np
 
 from API import *
 
+
 from a2c import *
 from randomSolver import *
 from pointerNetwork import *
@@ -1583,8 +1584,6 @@ def getTrainingData(path):
 
     return getData
         
-    
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
