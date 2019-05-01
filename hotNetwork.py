@@ -225,7 +225,7 @@ class HeatNetwork(Module):
             z = index
             return c,x,y,z
 
-        shape,x,y,z = index2position(index)
+        shape,x,y,z = index2position(i)
         shape = self.shape2index[shape]
         if shape == "sphere":
             radiusPrediction = self.sphericalRadius(heat).squeeze(0)[:,x,y,z].exp()
