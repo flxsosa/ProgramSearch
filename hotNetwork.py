@@ -113,6 +113,7 @@ class HeatNetwork(Module):
         self.encoder = HeatEncoder(input_channels=self.inputChannels,
                                    hidden_channels=32,
                                    output_channels=self.outputChannels)
+        self.finalize()
 
     def initialInput(self, spec, objects, line):
         x0 = np.zeros((1 + self.maxObjects, self.resolution, self.resolution, self.resolution))
