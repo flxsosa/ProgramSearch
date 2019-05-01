@@ -211,8 +211,32 @@ class HeatNetwork(Module):
     def sample(self, spec, objects):
         x = self.initialInput(spec, objects, line)
         heat = self.encoder(self.tensor(x).unsqueeze(0))
-        objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.resolution*self.resolution*len(self.shape2index)).exp()
-        torch.multinomial(objectPrediction,1)
+        objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.resolution*self.resolution*self.resolution*len(self.shape2index)).exp()
+        i = torch.multinomial(objectPrediction,1).data.item()
+
+        def index2position(index):
+            V = self.resolution*self.resolution*self.resolution
+            c = index//V
+            index = index%V
+            x = index//(self.resolution**2)
+            index = index%(self.resolution**2)
+            y = index//(self.resolution)
+            index = index%(self.resolution)
+            z = index
+            return c,x,y,z
+
+        shape,x,y,z = index2position(index)
+        shape = self.shape2index[shape]
+        if shape == "sphere":
+            radiusPrediction = self.sphericalRadius(heat).squeeze(0)[:,x,y,z].exp()
+            r = torch.multinomial(radiusProduction,1).data.item()
+            r = self.sphericalRadii[r]
+            return Sphere(x,y,z,r)
+        return shape
+            
+            
+            
+
         
             
             
@@ -236,7 +260,11 @@ if __name__ == "__main__":
         batched = m.batchedLogLikelihood(triples)
         (-batched).backward()
         optimizer.step()
-        print(batched.data.item())
+        L = -batched.data.item()
+        print(L)
+        if L < 3.:
+            for spec, objects,_ in triples:
+                print(spec, objects, m.sample(spec, objects))
 
         
             
