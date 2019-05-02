@@ -149,7 +149,7 @@ class HeatNetwork(Module):
 
     def initialInput(self, spec, objects):
         x0 = np.zeros((1 + self.maxObjects, self.resolution, self.resolution, self.resolution))
-        x0[0] = spec.execute()
+        x0[0] = spec.execute() if isinstance(spec,CSG) else spec
         for n,o in enumerate(objects): x0[n + 1] = o.execute()
         x = np.zeros((self.inputChannels, self.resolution, self.resolution, self.resolution))
         x[:x0.shape[0],:,:,:] = x0
@@ -388,4 +388,4 @@ if __name__ == "__main__":
             losses = []
             for p in programs:
                 print(p)
-                print(m.rollout(p.execute(),maxMoves=len(p.toTrace()) + 1))
+                print(m.rollout(p,maxMoves=len(p.toTrace()) + 1))
