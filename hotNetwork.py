@@ -132,6 +132,13 @@ class HeatNetwork(Module):
                                      nn.Linear(self.outputChannels*(hotResolution*hotResolution*hotResolution),
                                                len(self.command2index)),
                                      nn.LogSoftmax(dim=-1))
+        self._value = nn.Sequential(Flatten(),
+                                    nn.Linear(self.outputChannels*(hotResolution*hotResolution*hotResolution),
+                                              256),
+                                    nn.ReLU(),
+                                    nn.Linear(256,1),
+                                    nn.Softplus(),
+                                    NegationModule())
         
         self.encoder = HeatEncoder(input_channels=self.inputChannels,
                                    downsample=resolution//hotResolution,
@@ -345,9 +352,12 @@ class HeatNetwork(Module):
         while maxMoves is None or maxMoves < moves:
             moves += 1
 
+            print("spec is",spec,"and objects are",objects)
             action = self.sample(spec, objects)
+            print("sampled action",action)
             if action is None: return objects
             objects = [o for o in objects if o not in action.children() ] + [action]
+            print("the objects are now",objects)
         return objects            
             
                                     

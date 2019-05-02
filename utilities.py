@@ -55,6 +55,11 @@ class Flatten(Module):
         self.finalize()
     def forward(self,x):
         return x.view(x.size(0), -1)
+class NegationModule(Module):
+    def __init__(self):
+        super(NegationModule, self).__init__()
+        self.finalize()
+    def forward(self,x): return -x
 
 class IdentityLayer(Module):
     def __init__(self):
