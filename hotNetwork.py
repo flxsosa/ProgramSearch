@@ -291,9 +291,13 @@ class HeatNetwork(Module):
         command = self.index2command[torch.multinomial(self.command(heat).squeeze(0).exp(),1).data.item()]
         if command == "STOP": return None
         if command[0] == "UNION":
-            return Union(objects[command[1]], objects[command[2]])
+            try:
+                return Union(objects[command[1]], objects[command[2]])
+            except: return None
         if command[0] == "DIFFERENCE":
-            return Difference(objects[command[1]], objects[command[2]])
+            try:
+                return Difference(objects[command[1]], objects[command[2]])
+            except: return None
         
         
         objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.hotResolution*self.hotResolution*self.hotResolution*len(self.shape2index)).exp()
