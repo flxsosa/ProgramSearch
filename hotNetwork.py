@@ -57,7 +57,7 @@ class HeatLogSoftmax(Module):
         return x
         
 class HeatNetwork(Module):
-    def __init__(self, resolution=32, hotResolution=16, maxObjects=5):
+    def __init__(self, resolution=32, hotResolution=16, maxObjects=4):
         super(HeatNetwork, self).__init__()
 
         self.maxObjects = maxObjects
@@ -120,6 +120,18 @@ class HeatNetwork(Module):
                        1, # cylinder2
                        1)), # 1x1x1 convolution
             ("cylinder2_hsm",HeatLogSoftmax())]))
+
+        commands = {"STOP","DRAW"}
+        for n1 in range(maxObjects):
+            for n2 in range(maxObjects):
+                if n1 < n2: commands.append(("UNION",n1,n2))
+                if n1 != n2: commands.append(("DIFFERENCE",n1,n2))
+        self.command2index = {k: n for n,k in enumerate(commands) }
+        self.index2command = {v:k for k,v in self.command2index.items() }
+        self.command = nn.Sequential(Flatten(),
+                                     nn.Linear(self.outputChannels*(hotResolution*hotResolution*hotResolution),
+                                               len(self.command2index)),
+                                     nn.LogSoftmax(dim=-1))
         
         self.encoder = HeatEncoder(input_channels=self.inputChannels,
                                    downsample=resolution//hotResolution,
@@ -145,10 +157,25 @@ class HeatNetwork(Module):
         # outputSequence: for each CNN input, list of (head, *indices)
         outputSequence = []
 
+        if line is None:
+            outputSequence.append([(self.command, self.command2index["STOP"])])
+            return inputSequence, outputSequence
+        
         line = line.serialize()
 
+        if line[0] == '+':
+            n1 = objects.index(line[1])
+            n2 = objects.index(line[2])
+            n1,n2 = min(n1,n2),max(n1,n2)
+            outputSequence.append([(self.command, self.command2index[("UNION",n1,n2)])])
+        if line[0] == '-':
+            n1 = objects.index(line[1])
+            n2 = objects.index(line[2])
+            outputSequence.append([(self.command, self.command2index[("DIFFERENCE",n1,n2)])])
+
         if line[0] == 'cuboid':
-            outputSequence.append([(self.shapePredictor, self.shape2index[line[0]],
+            outputSequence.append([(self.command, self.command2index["DRAW"]),
+                                   (self.shapePredictor, self.shape2index[line[0]],
                                     line[1]//self.downsample,
                                     line[2]//self.downsample,
                                     line[3]//self.downsample)])
@@ -160,7 +187,8 @@ class HeatNetwork(Module):
             x1[self.inputHeat["cuboid1"],line[1],line[2],line[3]] = 1.
             inputSequence.append(x1)
         if line[0] == 'cylinder':
-            outputSequence.append([(self.shapePredictor, self.shape2index[line[0]],
+            outputSequence.append([(self.command, self.command2index["DRAW"]),
+                                   (self.shapePredictor, self.shape2index[line[0]],
                                     line[2]//self.downsample,
                                     line[3]//self.downsample,
                                     line[4]//self.downsample)])
@@ -177,7 +205,8 @@ class HeatNetwork(Module):
             x1[self.inputHeat["cylinder1"],line[2],line[3],line[4]] = 1.
             inputSequence.append(x1)
         if line[0] == 'sphere':
-            outputSequence.append([(self.shapePredictor, self.shape2index[line[0]],
+            outputSequence.append([(self.command, self.command2index["DRAW"]),
+                                   (self.shapePredictor, self.shape2index[line[0]],
                                     line[1]//self.downsample,
                                     line[2]//self.downsample,
                                     line[3]//self.downsample),
@@ -189,6 +218,19 @@ class HeatNetwork(Module):
         assert len(inputSequence) == len(outputSequence)
 
         return inputSequence, outputSequence
+
+    def batchedProgramLikelihood(self, batch):
+        """batch: [program]"""
+        specs = batch
+        triples = []
+        for p in batch:
+            objects = [] # stuff in scope
+            for action in p.toTrace():
+                triples.append((p,objects,action))
+                objects = [o for o in objects if o not in action.children() ] + [action]
+            triples.append((p,objects,None))
+        return self.batchedLogLikelihood(triples)
+        
 
     def batchedLogLikelihood(self, batch):
         """batch: [(spec, objects, line)]"""
@@ -239,6 +281,14 @@ class HeatNetwork(Module):
     def sample(self, spec, objects):
         x0 = self.initialInput(spec, objects)
         heat = self.encoder(self.tensor(x0).unsqueeze(0))
+        command = self.index2command[torch.multinomial(self.command(heat).squeeze(0).exp(),1).data.item()]
+        if command == "STOP": return None
+        if command[0] == "UNION":
+            return Union(objects[command[1]], objects[command[2]])
+        if command[0] == "DIFFERENCE":
+            return Difference(objects[command[1]], objects[command[2]])
+        
+        
         objectPrediction = self.shapePredictor(heat).squeeze(0).contiguous().view(self.hotResolution*self.hotResolution*self.hotResolution*len(self.shape2index)).exp()
         i = torch.multinomial(objectPrediction,1).data.item()
 
@@ -288,12 +338,17 @@ class HeatNetwork(Module):
                             x,y,z,
                             x1,y1,z1)
         return shape
-            
-            
-            
 
-        
-            
+    def rollout(self, spec, maxMoves=None):
+        objects = []
+        moves = 0
+        while maxMoves is None or maxMoves < moves:
+            moves += 1
+
+            action = self.sample(spec, objects)
+            if action is None: return objects
+            objects = [o for o in objects if o not in action.children() ] + [action]
+        return objects            
             
                                     
                     
@@ -310,10 +365,10 @@ if __name__ == "__main__":
         def randomTriple():
             s = randomShape()
             return (s,[],s)
-        triples = [randomTriple() for _ in range(3) ]
+        programs = [random3D(maxShapes=4,minShapes=1) for _ in range(8) ]
 
         m.zero_grad()
-        batched = m.batchedLogLikelihood(triples)
+        batched = m.batchedProgramLikelihood(programs)
         (-batched).backward()
         optimizer.step()
         L = -batched.data.item()
@@ -321,10 +376,6 @@ if __name__ == "__main__":
         if len(losses) > 100:
             print(sum(losses)/len(losses))
             losses = []
-            for spec, objects,_ in triples:
-                print(spec, objects, m.sample(spec, objects))
-
-        
-            
-    m.batchedLogLikelihood([(Sphere(1,1,1,4),[Sphere(1,1,1,4)],
-                             Cuboid(1,2,1,2,2,2))])
+            for p in programs:
+                print(p)
+                print(m.rollout(p.execute(),maxMoves=len(p.toTrace()) + 1))

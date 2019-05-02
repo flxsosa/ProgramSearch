@@ -49,6 +49,13 @@ class Module(nn.Module):
     def finalize(self):
         if self.use_cuda: self.cuda()
 
+class Flatten(Module):
+    def __init__(self):
+        super(Flatten, self).__init__()
+        self.finalize()
+    def forward(self,x):
+        return x.view(x.size(0), -1)
+
 class IdentityLayer(Module):
     def __init__(self):
         super(IdentityLayer, self).__init__()
