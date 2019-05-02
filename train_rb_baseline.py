@@ -27,11 +27,11 @@ import string
 LOAD_PATH = './models/rb_baseline.p'
 SAVE_PATH = './models/rb_baseline.p'
 ITERATIONS = 50000
-BATCHSIZE = 4
+BATCHSIZE = 32
 
-PRINT_FREQ = 1
-TEST_FREQ = 1
-SAVE_FREQ = 10
+PRINT_FREQ = 20
+TEST_FREQ = 100
+SAVE_FREQ = 20
 
 DEBUG = True
 

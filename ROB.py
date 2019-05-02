@@ -36,7 +36,7 @@ from ROBUT import RepeatAgent, get_rollout, ALL_BUTTS, RobState, apply_fs
 
 import ROBUT as BUTT
 
-MAX_LEN = 8
+MAX_LEN = 5
 
 class P:
     
