@@ -352,12 +352,11 @@ class HeatNetwork(Module):
         while maxMoves is None or moves < maxMoves:
             moves += 1
 
-            print("spec is",spec,"and objects are",objects)
             action = self.sample(spec, objects)
-            print("sampled action",action)
             if action is None: return objects
             objects = [o for o in objects if o not in action.children() ] + [action]
-            print("the objects are now",objects)
+            if len(objects) > self.maxObjects: break
+            
         return objects            
             
                                     
@@ -384,7 +383,7 @@ if __name__ == "__main__":
         L = -batched.data.item()
         losses.append(L)
         if len(losses) > 100:
-            print(sum(losses)/len(losses))
+            print("Average loss:",sum(losses)/len(losses))
             losses = []
             for p in programs:
                 print(p)
