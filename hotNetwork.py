@@ -349,7 +349,7 @@ class HeatNetwork(Module):
     def rollout(self, spec, maxMoves=None):
         objects = []
         moves = 0
-        while maxMoves is None or maxMoves < moves:
+        while maxMoves is None or moves < maxMoves:
             moves += 1
 
             print("spec is",spec,"and objects are",objects)
