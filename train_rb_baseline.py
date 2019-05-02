@@ -3,11 +3,11 @@
 
 """
 TODO:
-- [ ] write scaffolding
+- [X] write scaffolding
+- [X] test that it runs and trains
+
 - [ ] allow env to be part of beam/forward sample process
 - [ ] optimize beam
-
-- [ ] have an agent? idk why , so probably not
 
 - [ ] testing code
 """
@@ -27,7 +27,7 @@ import string
 LOAD_PATH = './models/rb_baseline.p'
 SAVE_PATH = './models/rb_baseline.p'
 ITERATIONS = 50000
-BATCHSIZE = 16
+BATCHSIZE = 4
 
 PRINT_FREQ = 1
 TEST_FREQ = 1
@@ -98,7 +98,8 @@ def train_model_supervised(model):
             print("saved model", flush=True)
         if i%TEST_FREQ == 0 and i!=0:  
             print("testing...")
-            specs, As = generate_rb_data(1)  if not DEBUG else debug_data[0][0], debug_data[1][0]
+            specs, As = generate_rb_data(1)  if not DEBUG else debug_data[0][:1], debug_data[1][:1]
+            print("TESTING SPEC:", specs)
             actions = model.sample(specs, n_samples=1)
             print("real actions:")
             print(As)
