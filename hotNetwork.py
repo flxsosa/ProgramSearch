@@ -121,7 +121,7 @@ class HeatNetwork(Module):
                        1)), # 1x1x1 convolution
             ("cylinder2_hsm",HeatLogSoftmax())]))
 
-        commands = {"STOP","DRAW"}
+        commands = ["STOP","DRAW"]
         for n1 in range(maxObjects):
             for n2 in range(maxObjects):
                 if n1 < n2: commands.append(("UNION",n1,n2))
@@ -368,7 +368,7 @@ if __name__ == "__main__":
         programs = [random3D(maxShapes=4,minShapes=1) for _ in range(8) ]
 
         m.zero_grad()
-        batched = m.batchedProgramLikelihood(programs)
+        batched = m.batchedProgramLikelihood(programs)/sum(1 + len(p.toTrace()) for p in programs )
         (-batched).backward()
         optimizer.step()
         L = -batched.data.item()
