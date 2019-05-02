@@ -301,9 +301,9 @@ class Cuboid(CSG):
     
     def __init__(self, x0, y0, z0, x1, y1, z1):
         super(Cuboid, self).__init__()
-        if x1 < x0: raise ParseFailure()
-        if y1 < y0: raise ParseFailure()
-        if z1 < z0: raise ParseFailure()
+        # if x1 < x0: raise ParseFailure()
+        # if y1 < y0: raise ParseFailure()
+        # if z1 < z0: raise ParseFailure()
         self.x0 = x0
         self.y0 = y0
         self.z0 = z0
@@ -458,8 +458,8 @@ class TRectangle(CSG):
     
     def __init__(self, x0, y0, x1, y1):
         super(TRectangle, self).__init__()
-        if x1 <= x0: raise ParseFailure()
-        if y1 <= y0: raise ParseFailure()
+        # if x1 <= x0: raise ParseFailure()
+        # if y1 <= y0: raise ParseFailure()
         self.x0 = x0
         self.y0 = y0
         self.x1 = x1
