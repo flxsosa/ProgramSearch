@@ -301,9 +301,9 @@ class Cuboid(CSG):
     
     def __init__(self, x0, y0, z0, x1, y1, z1):
         super(Cuboid, self).__init__()
-        # if x1 < x0: raise ParseFailure()
-        # if y1 < y0: raise ParseFailure()
-        # if z1 < z0: raise ParseFailure()
+        if x1 < x0: raise ParseFailure()
+        if y1 < y0: raise ParseFailure()
+        if z1 < z0: raise ParseFailure()
         self.x0 = x0
         self.y0 = y0
         self.z0 = z0
@@ -458,8 +458,8 @@ class TRectangle(CSG):
     
     def __init__(self, x0, y0, x1, y1):
         super(TRectangle, self).__init__()
-        # if x1 <= x0: raise ParseFailure()
-        # if y1 <= y0: raise ParseFailure()
+        if x1 <= x0: raise ParseFailure()
+        if y1 <= y0: raise ParseFailure()
         self.x0 = x0
         self.y0 = y0
         self.x1 = x1
@@ -1000,23 +1000,27 @@ def random3D(maxShapes=13,minShapes=3):
         return Cuboid(x0,y0,z0,
                       x1,y1,z1)
     def randomCylinder():
-        r = random.choice([4,8,12])
-        l = random.choice([4,8,12,16,20])
-        # sample the center, aligned with the axis of the cylinder
-        a = random.choice([c for c in cs if c - l/2 >= 0 and c + l/2 < RESOLUTION ])
-        b = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
-        c = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+        if random.random() < 0.7: # axis aligned
+            r = random.choice([4,8,12])
+            l = random.choice([4,8,12,16,20])
+            # sample the center, aligned with the axis of the cylinder
+            a = random.choice([c for c in cs if c - l/2 >= 0 and c + l/2 < RESOLUTION ])
+            b = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+            c = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
 
-        # oriented along z axis
-        if random.choice([False,False,True]):
-            p0 = [b,c, a - l//2]
-            p1 = [b,c, a + l//2]
-        elif random.choice([False,True]): # oriented along y axis
-            p0 = [b, a - l//2, c]
-            p1 = [b, a + l//2, c]
-        else: # oriented along x-axis
-            p0 = [a - l//2, b, c]
-            p1 = [a + l//2, b, c]
+            # oriented along z axis
+            if random.choice([False,False,True]):
+                p0 = [b,c, a - l//2]
+                p1 = [b,c, a + l//2]
+            elif random.choice([False,True]): # oriented along y axis
+                p0 = [b, a - l//2, c]
+                p1 = [b, a + l//2, c]
+            else: # oriented along x-axis
+                p0 = [a - l//2, b, c]
+                p1 = [a + l//2, b, c]
+        else: # random 45 angle
+            return randomCylinder()
+            
 
         return Cylinder(*([r] + p0 + p1))
 

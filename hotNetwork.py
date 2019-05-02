@@ -236,6 +236,7 @@ class HeatNetwork(Module):
                 triples.append((p,objects,action))
                 objects = [o for o in objects if o not in action.children() ] + [action]
             triples.append((p,objects,None))
+        for t in triples: print(t)
         return self.batchedLogLikelihood(triples)
         
 
