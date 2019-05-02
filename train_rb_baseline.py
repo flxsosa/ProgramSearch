@@ -8,7 +8,6 @@ TODO:
 
 - [ ] allow env to be part of beam/forward sample process
 - [ ] optimize beam
-
 - [ ] testing code
 """
 #from robut_net import Agent

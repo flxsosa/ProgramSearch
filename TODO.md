@@ -4,11 +4,14 @@
 - [X] test generation of multiple const
 	- [ ] determine correct distribution for constant
 - [X] test '-' and space delims
+
 - [ ] finetune RL
 - [ ] single network, value and policy head
 - [ ] train with these new fixes on GCP
 
 - [ ] do proper robustfill baseline
+	- [X] start training
+	test:
 	- [ ] refactor beam
 	- [ ] throw out invalid progs as they go
 
