@@ -36,6 +36,8 @@ from ROBUT import RepeatAgent, get_rollout, ALL_BUTTS, RobState, apply_fs
 
 import ROBUT as BUTT
 
+MAX_LEN = 5
+
 class P:
     
     """
@@ -203,7 +205,8 @@ class GetSpan:
 class ConstStr:
     @staticmethod
     def generate():
-        c = pre.create(".").sample()
+        l = random.choice(list(range(1, MAX_LEN)))
+        c = pre.create("."*l).sample()
         return ConstStr(c)
 
     def __init__(self, c):
@@ -214,7 +217,13 @@ class ConstStr:
         raise NotImplementedError
 
     def flatten(self):
-        return [BUTT.Const(self.c)]
+
+        r  = [BUTT.Const(self.c[0])]
+        for const in self.c[1:]:
+            r.append( BUTT.Commit() )
+            r.append( BUTT.Const(const) )
+
+        return r
 
     def __str__(self):
         return "ConstStr "+str((self.c))
@@ -792,7 +801,6 @@ def test12():
 def test13():
     for i in range(100000):
         print (i)
-        prog, inputs, outputs = generate_FIO(5)
         env = BUTT.ROBENV(inputs, outputs)
         repeat_agent = BUTT.RepeatAgent(prog.flatten())
         trace = get_rollout(env, repeat_agent, 30)
@@ -849,6 +857,31 @@ def test16():
     obs = [x[0] for x in trace]
     print (obs[-1])
 
+def test17():
+    for i in range(100000):
+        print (i)
+        prog, inputs, outputs = generate_FIO(5)
+        print(inputs)
+        print(outputs)
+        p = prog.flatten()
+        print(p)
+        print("len:", len(p))
+        print('\n')
+        env = BUTT.ROBENV(inputs, outputs)
+        repeat_agent = BUTT.RepeatAgent(prog.flatten())
+        trace = get_rollout(env, repeat_agent, 30)
+
+        str_obs = [str(x[0]) for x in trace]
+        if len(str_obs) != len(set(str_obs)):
+            for i in range(len(trace)):
+                for j in range(len(trace)):
+                    if i != j:
+                        if str(trace[i][0]) == str(trace[j][0]):
+                            print ("collision across ")
+                            print (i)
+                            print (j)
+                            import pdb; pdb.set_trace()
+
 if __name__ == '__main__':
     # test1()
     # test2()
@@ -863,7 +896,7 @@ if __name__ == '__main__':
     # test11()
     # test12()
     # test13()
-    test14()
+    # test14()
     # test16()
-
+    test17()
 

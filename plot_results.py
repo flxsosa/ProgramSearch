@@ -103,7 +103,7 @@ if __name__=='__main__':
                     './results/a_star_noscratch.p1556130303',
                     './results/smc_val_noscratch.p1556173737',
                     './results/sample_noscratch.p1556111283'
-                    ]
+                ]
 
     legend_list = [
                     'SMC',
