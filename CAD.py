@@ -65,6 +65,12 @@ class CSG(Program):
         self._rendering = None
         for c in self.children(): c.clearRendering()
 
+    def simplifications(self):
+        """removes a single thing from the tree"""
+        if True:
+            return 
+        yield 
+
     def heatMapTarget(self):
         hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
         for c in self.children():
@@ -79,7 +85,7 @@ module cylindrical(a, b, r) {
     h   = norm(dir);
     if(dir[0] == 0 && dir[1] == 0) {
         // no transformation necessary
-        cylinder(r=r, h=h);
+        cylinder(r=r, h=h, $fn = 60);
     }
     else {
         w  = dir / h;
@@ -91,7 +97,7 @@ module cylindrical(a, b, r) {
                       [u[1], v[1], w[1], a[1]],
                       [u[2], v[2], w[2], a[2]],
                       [0,    0,    0,    1]])
-        cylinder(r=r, h=h);
+        cylinder(r=r, h=h, $fn = 60);
     }
 } 
 """
@@ -116,24 +122,18 @@ module cylindrical(a, b, r) {
     def __hash__(self): return hash(self.serialize())
 
     def execute(self):
-        if self._rendering is None: self._rendering = self.render()
-        return self._rendering
+        return self.render()
+
+    def render(self,r=None):
+        resolution = r or RESOLUTION
+        if self._rendering is None or self._rendering[0] != resolution:
+            self._rendering = (resolution,self._render(resolution))
+        return self._rendering[1]
 
     def IoU(self, other):
         if isinstance(other, CSG): other = other.execute()
         return (self.execute()*other).sum()/(self.execute() + other - self.execute()*other).sum()
     
-    def render(self, r=None):
-        r = r or RESOLUTION
-        
-        a = np.zeros((r,r,r))
-        for x in range(r):
-            for y in range(r):
-                for z in range(r):
-                    if (RESOLUTION*x/r, RESOLUTION*y/r, RESOLUTION*z/r) in self:
-                        a[x,y,z] = 1
-        return a
-
     def removeDeadCode(self): return self
 
     def depthMaps(self, r=None):
@@ -171,7 +171,24 @@ module cylindrical(a, b, r) {
         if export is None:
             plot.show()
         else:
-            plot.savefig(f"{export}_d.png")
+            return 
+            #plot.savefig(f"{export}_d.png")
+
+    def removeCodeNotChangingProjections(self):
+        while True:
+            current = np.array(voxels2dm(self.render()))
+            bad = False
+            for child in self.simplifications():
+                new = np.array(voxels2dm(child.render()))
+                if np.sum(np.abs(new - current)) <= 0.0001:
+                    bad = True
+                    self = child
+                    break
+            if not bad: return self
+                
+            
+        
+        
         
                 
 # The type of CSG's
@@ -239,7 +256,7 @@ class Cylinder(CSG):
                 self.x0,self.y0,self.z0,
                 self.x1,self.y1,self.z1)
 
-    def render(self,r=None):
+    def _render(self,r=None):
         r = r or RESOLUTION
         X,Y,Z = np.indices((r,r,r))/r
         p0 = self.p0/RESOLUTION
@@ -348,7 +365,7 @@ class Cuboid(CSG):
 
     def toTrace(self): return [self]
 
-    def render(self,r=None):
+    def _render(self,r=None):
         r = r or RESOLUTION
 
         a = np.zeros((r,r,r))
@@ -399,7 +416,7 @@ class Sphere(CSG):
     def toTrace(self): return [self]
 
     def _scad(self):
-        return f"translate([{self.x}, {self.y}, {self.z}])" + f" sphere(r={self.r});"
+        return f"translate([{self.x}, {self.y}, {self.z}])" + f" sphere(r={self.r}, $fn = 60);"
 
     def translate(self,x,y,z):
         return Sphere(self.x + x,self.y + y,self.z + z,self.r)
@@ -407,7 +424,7 @@ class Sphere(CSG):
     def rotate(self,rx,ry,rz):
         return self
 
-    def render(self,r=None):
+    def _render(self,r=None):
         r = r or RESOLUTION
         x, y, z = np.indices((r,r,r))/float(r)
 
@@ -487,7 +504,7 @@ class TRectangle(CSG):
     def serialize(self):
         return (self.__class__.token, self.x0, self.y0, self.x1, self.y1)
 
-    def render(self,r=None):
+    def _render(self,r=None):
         r = r or RESOLUTION
         a = np.zeros((r,r))
         a[int(self.x0*r/RESOLUTION):int(self.x1*r/RESOLUTION),
@@ -549,7 +566,7 @@ class TCircle(CSG):
     def flipY(self):
         return TCircle(self.x, RESOLUTION - self.y, self.r)
 
-    def render(self,r=None):
+    def _render(self,r=None):
         r = r or RESOLUTION
         x, y = np.indices((r,r))/float(r)
 
@@ -569,6 +586,14 @@ class Union(CSG):
 
     def translate(self,*d):
         return Union(self.elements[0].translate(*d),self.elements[1].translate(*d))
+
+    def simplifications(self):
+        for a in self.elements[0].simplifications():
+            yield Union(a,self.elements[1])
+        for b in self.elements[1].simplifications():
+            yield Union(self.elements[0],b)
+        yield self.elements[0]
+        yield self.elements[1]
 
     def toTrace(self):
         return self.elements[0].toTrace() + self.elements[1].toTrace() + [self]
@@ -627,7 +652,7 @@ class Union(CSG):
     def flipZ(self): return Union(self.elements[0].flipZ(),
                                   self.elements[1].flipZ())
 
-    def render(self,r=None):
+    def _render(self,r=None):
         r = r or RESOLUTION
         a = 1.*(self.elements[0].render(r))
         b = 1.*(self.elements[1].render(r))
@@ -640,7 +665,13 @@ class Difference(CSG):
     def __init__(self, a, b):
         super(Difference, self).__init__()
         self.a, self.b = a, b
-
+    def simplifications(self):
+        for a in self.a.simplifications():
+            yield Difference(a,self.b)
+        for b in self.b.simplifications():
+            yield Difference(self.a,b)
+        yield self.a
+        
     def toTrace(self):
         return self.a.toTrace() + self.b.toTrace() + [self]
 
@@ -702,7 +733,7 @@ class Difference(CSG):
     def flipZ(self): return Difference(self.a.flipZ(),
                                        self.b.flipZ())
 
-    def render(self,r=None):
+    def _render(self,r=None):
         a = 1.*self.a.render(r)
         b = 1.*self.b.render(r)
         return np.clip(a - b,
@@ -715,6 +746,14 @@ class Intersection(CSG):
     def __init__(self, a, b):
         super(Intersection, self).__init__()
         self.a, self.b = a, b
+    def simplifications(self):
+        yield self.a
+        yield self.b
+        for a in self.a.simplifications():
+            yield Intersection(a,self.b)
+        for b in self.b.simplifications():
+            yield Intersection(self.a,b)
+        
 
     def toTrace(self):
         return self.a.toTrace() + self.b.toTrace() + [self]
@@ -778,7 +817,7 @@ class Intersection(CSG):
     def flipZ(self): return Intersection(self.a.flipZ(),
                                          self.b.flipZ())
 
-    def render(self,r=None):
+    def _render(self,r=None):
         a = 1.*self.a.render(r)
         b = 1.*self.b.render(r)
         return np.clip(a*b,
@@ -1004,7 +1043,8 @@ def random3D(maxShapes=13,minShapes=3):
             r = random.choice([4,8,12])
             l = random.choice([4,8,12,16,20])
             # sample the center, aligned with the axis of the cylinder
-            a = random.choice([c for c in cs if c - l/2 >= 0 and c + l/2 < RESOLUTION ])
+            a = random.choice([c for c in range(RESOLUTION)
+                               if c - l/2 >= 0 and c + l/2 < RESOLUTION and c + l//2 in cs and c - l//2 in cs ])
             b = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
             c = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
 
@@ -1018,14 +1058,59 @@ def random3D(maxShapes=13,minShapes=3):
             else: # oriented along x-axis
                 p0 = [a - l//2, b, c]
                 p1 = [a + l//2, b, c]
-        else: # random 45 angle
-            return randomCylinder()
+        elif random.random() < 0.5: # random 45 angle, in axis-aligned plane
+            while True:
+                r = random.choice([4,8,12])
+                rd = r/(2**0.5)
+                l = random.choice([4,8,12,16,20])
+                axisCoordinates = [c for c in range(RESOLUTION)
+                                   if c - l/2 - rd >= 0 and c + l/2 + rd <= RESOLUTION - 1 and c + l//2 in cs and c - l//2 in cs ]
+                if axisCoordinates: break
+                
+            # sample the center, aligned with the axis of the cylinder
+            a = random.choice(axisCoordinates)
+            b = random.choice(axisCoordinates)
+            c = random.choice([c for c in cs if c - r >= 0 and c + r < RESOLUTION ])
+
+            yo = random.choice([1,-1])
+
+            if True or random.random() < 0.33: # constant Z
+                p0 = [a - l//2,b - yo*l//2,c]
+                p1 = [a + l//2,b + yo*l//2,c]
+                #(cylinder r=12 p0=[ 6 26 12] p1=[26  6 12])
+            elif random.random() < 0.5: # constant Y
+                p0 = [a - l//2,c,b - yo*l//2]
+                p1 = [a + l//2,c,b + yo*l//2]
+            else: # constant X
+                p0 = [c,a - l//2,b - yo*l//2]
+                p1 = [c,a + l//2,b + yo*l//2]
+        else: # random 45 angle, not axis aligned
+            while True:
+                r = random.choice([4,8,12])
+                rd = r/(2**0.5)
+                l = random.choice([4,8,12,16,20])
+                axisCoordinates = [c for c in range(RESOLUTION)
+                                   if c - l/2 - rd >= 0 and c + l/2 + rd <= RESOLUTION - 1 and c + l//2 in cs and c - l//2 in cs ]
+                if axisCoordinates: break
+                
+            # sample the center, aligned with the axis of the cylinder
+            a = random.choice(axisCoordinates)
+            b = random.choice(axisCoordinates)
+            c = random.choice(axisCoordinates)
+
+            yo = random.choice([1,-1])
+            zo = random.choice([1,-1])
+            p0 = [a - l//2,b - yo*l//2,c - zo*l//2]
+            p1 = [a + l//2,b + yo*l//2,c + zo*l//2]
+            
             
 
         return Cylinder(*([r] + p0 + p1))
 
     def randomShape():
-        return random.choice([randomSpherical,randomCuboid,randomCylinder])()
+        if random.random() < 0.15: return randomSpherical()
+        if random.choice([True,False]): return randomCylinder()
+        return randomCuboid()
 
     while True:
         s = None
@@ -1036,12 +1121,10 @@ def random3D(maxShapes=13,minShapes=3):
             if s is None:
                 s = o
             else:
-                if random.choice([True,False]):
+                if random.random() < 0.7:
                     new = Union(s,o)
-                elif True or random.choice([True,False]):
-                    new = Difference(s,o)
                 else:
-                    new = Difference(o,s)
+                    new = Difference(s,o)
                 # Change at least ten percent of the pixels
                 oldOn = s.render().sum()
                 newOn = new.render().sum()
@@ -1052,6 +1135,7 @@ def random3D(maxShapes=13,minShapes=3):
         try:
             finalScene = s.removeDeadCode()
             assert np.all(finalScene.render() == s.render())
+            finalScene = finalScene.removeCodeNotChangingProjections()
             s = finalScene
             break
         except BadCSG:
@@ -1635,6 +1719,7 @@ if __name__ == "__main__":
                 plot.savefig(f"demo/CAD_{n}_hr.png")
             else:
                 s.show(export=f"demo/CAD_{n}_3d.png")
+                print(s)
             s.scad(f"demo/CAD_{n}_model.scad")
 
         import sys
