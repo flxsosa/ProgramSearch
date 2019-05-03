@@ -16,7 +16,7 @@ end-piece -> ball | ring | square
 # the basic unit in math where things are created
 L = 16
 # the scale factor, so we can actually see it in image
-C = 4
+C = 20
 
 # ========================= RENDERABLE PRIMITIVES =======================
 
@@ -42,7 +42,7 @@ class Shape:
 class Circ(Shape):
 
     def __init__(self, x, y, r):
-        self.x, self.y, self.r = x, y, r//2
+        self.x, self.y, self.r = x, y, r/2
 
     def is_in(self, xx, yy):
         # scale xx, yy back down to math space
@@ -101,19 +101,29 @@ class Subtract(Shape):
         return self.S1.is_in(xx, yy) and (not self.S2.is_in(xx, yy))
 
 # =========================== TOOL GENERATION ============================
+HEAD_SIZES = [1,2,3,4,5,6,7,8]
+ORIENTS = [0,1,2,3]
+STICK_W = [1, 2]
+STICK_H = [3,4,5,6,7,8,9,10,11]
+
 def gen_tool():
     loc_choices = range(L//4, 3*L//4)
     tool_x, tool_y = random.choice(loc_choices), random.choice(loc_choices)
     # handle info
-    w = random.choice([1,2])
-    h = w + random.choice([4,5,6,7,8])
-    a = random.choice([0,1,2,3])
+    w = random.choice(STICK_W)
+    h = w + random.choice(STICK_H)
+    a = random.choice(ORIENTS)
 
     head1_loc, head2_loc =  get_attached((tool_x, tool_y), h, a)
     stick = Rect(tool_x, tool_y,w,h,a)
     head1 = gen_head(jiggle(head1_loc))
     head2 = gen_head(jiggle(head2_loc))
-    return stick + head1 + head2
+
+    # one head or two heads
+    if random.random() < 0.5:
+        return stick + head1 + head2
+    else:
+        return stick + head1
 
 # add in bit variability to attachments
 def jiggle(loc):
@@ -134,48 +144,58 @@ def get_attached(loc, h, a):
     if a == 3:
         xy1 = loc_x + h / 2, loc_y + h / 2
         xy2 = loc_x - h / 2, loc_y - h / 2
-    xy1 = (int(xy1[0]), int(xy1[1]))
-    xy2 = (int(xy2[0]), int(xy2[1]))
+    # xy1 = (int(xy1[0]), int(xy1[1]))
+    # xy2 = (int(xy2[0]), int(xy2[1]))
     return random.choice([(xy1, xy2),(xy2,xy1)])
 
 def gen_head(loc):
     possible_heads = [gen_hammer,
                       gen_plier,
                       gen_sickle,
-            #                      gen_shovel,
+                      gen_shovel,
             #                      gen_file,
                       ]
     return random.choice(possible_heads)(loc)
 
+# just a rect
 def gen_hammer(loc):
-    head_sizes = [4, 5, 6]
-    head_orients = [0, 1, 2, 3]
     return Rect(loc[0], loc[1], 
-                random.choice(head_sizes), random.choice(head_sizes),
-                random.choice(head_orients))
-
+                random.choice(HEAD_SIZES), random.choice(HEAD_SIZES),
+                random.choice(ORIENTS))
+# (circ | rect) - rect
 def gen_plier(loc):
     def get_head():
         if random.random() < 0.5:
             return gen_hammer(loc)
         else:
-            return Circ(loc[0], loc[1], random.choice([4,5,6]))
+            return Circ(loc[0], loc[1], random.choice(HEAD_SIZES))
     def get_sub():
-        head_sizes = [1,2,3]
-        head_orients = [0, 1, 2, 3]
         sub_loc = jiggle(loc)
         return Rect(sub_loc[0], sub_loc[1],
-                    random.choice(head_sizes), random.choice(head_sizes),
-                    random.choice(head_orients))
+                    random.choice(HEAD_SIZES), random.choice(HEAD_SIZES),
+                    random.choice(ORIENTS))
     return get_head() - get_sub()
-
+# circ - circ
 def gen_sickle(loc):
-    W_big = random.choice([4,5,6,7])
+    W_big = random.choice(HEAD_SIZES)
     W_small = W_big - random.choice([1,2,3])
     head = Circ(loc[0], loc[1], W_big)
     sub_loc = jiggle(loc)
     sub = Circ(sub_loc[0], sub_loc[1], W_small)
     return head - sub
+# (circ | rect) + rect
+def gen_shovel(loc):
+    def get_add1():
+        if random.random() < 0.5:
+            return gen_hammer(loc)
+        else:
+            return Circ(loc[0], loc[1], random.choice(HEAD_SIZES))
+    def get_add2():
+        add_loc = jiggle(loc)
+        return Rect(add_loc[0], add_loc[1],
+                    random.choice(HEAD_SIZES), random.choice(HEAD_SIZES),
+                    random.choice(ORIENTS))
+    return get_add1() + get_add2()
 
 # =========================== TEST AND MAIN =========================
 def test_primitives():
@@ -189,7 +209,8 @@ def test_primitives():
 
 if __name__ == '__main__':
     # test_primitives()
-    s = gen_tool()
-    scipy.misc.imsave('drawings/outfile.png', s.to_np())
+    for i in range(100):
+        s = gen_tool()
+        scipy.misc.imsave('drawings/outfile.png', s.to_np())
 
 
