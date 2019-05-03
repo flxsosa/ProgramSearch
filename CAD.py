@@ -79,34 +79,39 @@ class CSG(Program):
 
     def scad(self,fn=None):
         cylindrical = """
-module cylindrical(a, b, r) {
+function vectorLength(v1,v2) = sqrt(
+    (v2[0]-v1[0])*(v2[0]-v1[0])+
+    (v2[1]-v1[1])*(v2[1]-v1[1])+
+    (v2[2]-v1[2])*(v2[2]-v1[2]));
 
-    dir = b-a;
-    h   = norm(dir);
-    if(dir[0] == 0 && dir[1] == 0) {
-        // no transformation necessary
-        cylinder(r=r, h=h, $fn = 60);
-    }
-    else {
-        w  = dir / h;
-        u0 = cross(w, [0,0,1]);
-        u  = u0 / norm(u0);
-        v0 = cross(w, u);
-        v  = v0 / norm(v0);
-        multmatrix(m=[[u[0], v[0], w[0], a[0]],
-                      [u[1], v[1], w[1], a[1]],
-                      [u[2], v[2], w[2], a[2]],
-                      [0,    0,    0,    1]])
-        cylinder(r=r, h=h, $fn = 60);
-    }
-} 
+function lookAt(v1, v2) =
+    let(v = v2-v1)
+    [
+       0,
+       acos(v[2]/vectorLength(v1,v2)),
+       atan2(v[1], v[0])
+    ];
+
+module cylindrical(p1,p2,radius)
+{
+    translate(p1)
+    rotate(lookAt(p1,p2))
+    cylinder(vectorLength(p1,p2),radius,radius,$fn=60);
+}
 """
         source = f"translate([{-RESOLUTION//2},{-RESOLUTION//2},{-RESOLUTION//2}])"
         source = "%s {\n%s\n}\n"%(source,self._scad())
         source = f"{cylindrical}\n{source}"
         if fn is None: return source
-        with open(fn,"w") as handle:
-            handle.write(source)
+        if fn.endswith("scad"):
+            with open(fn,"w") as handle:
+                handle.write(source)
+        elif fn.endswith("png"):
+            with open(fn + ".scad","w") as handle:
+                handle.write(source)
+            os.system(f"openscad --camera=0,0,0,60,0,30,140 --autocenter -o {fn} {fn}.scad")
+            #os.system(f"rm {fn}.scad")
+            
         return source
 
     def __repr__(self):

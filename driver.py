@@ -42,7 +42,7 @@ if __name__ == "__main__":
         for _ in range(ns):
             rs().execute()
         print(f"{ns/(time.time() - startTime)} (renders + samples)/second")
-        for n in range(100):
+        for n in range(10):
             s = rs()
             if arguments.td:
                 plot.imshow(s.highresolution(256))
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             else:
                 s.show(export=f"demo/CAD_{n}_3d.png")
                 print(s)
-            s.scad(f"demo/CAD_{n}_model.scad")
+            s.scad(f"demo/CAD_{n}_model.png")
 
         import sys
         sys.exit(0)
