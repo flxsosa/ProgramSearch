@@ -7,7 +7,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description = "")
     parser.add_argument("mode", choices=["imitation","exit","test","demo","makeData","heatMap",
-                                         "critic"])
+                                         "critic","render"])
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--maxShapes", default=20,
                             type=int)
@@ -27,9 +27,30 @@ if __name__ == "__main__":
     parser.add_argument("--oneParent", default=True, action='store_true')
     parser.add_argument("--noTranslate", default=True, action='store_true')
     parser.add_argument("--resume", default=False, action='store_true')
+    parser.add_argument("--render", default=[],type=str,nargs='+')
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
+
+    if arguments.render:
+        for path in arguments.render:
+            if path.endswith(".pickle") or path.endswith(".p"):
+                with open(path,"rb") as handle:
+                    program = pickle.load(handle)
+                    print(f"LOADED {path}")
+                    print(ProgramGraph.fromRoot(program).prettyPrint(True))
+                    program.scad("/tmp/render.scad")
+            elif path.endswith(".scad"):
+                os.system(f"cp {path} /tmp/render.scad")
+            else: assert False, f"unknown file extension {path}"
+            
+
+            os.chdir("render_scad_tool")
+            os.system("python render_scad.py /tmp/render.scad")
+            os.chdir("..")
+            os.system(f"cp render_scad_tool/example.png {path}_pretty.png")
+        sys.exit(0)
+
 
     if arguments.mode == "demo":
         os.system("mkdir demo")

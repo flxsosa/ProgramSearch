@@ -28,7 +28,7 @@ class ProgramGraph:
 
     def __len__(self): return len(self.nodes)
 
-    def prettyPrint(self):
+    def prettyPrint(self,letters=False):
         variableOfNode = [None for _ in self.nodes]
         nameOfNode = [None for _ in self.nodes] # pp of node
 
@@ -44,7 +44,10 @@ class ProgramGraph:
             serialization = [t if not isinstance(t,Program) else pp(getIndex(t))
                              for t in self.nodes[j].serialize()]
             expression = f"({' '.join(map(str, serialization))})"
-            variableOfNode[j] = f"${len(lines)}"
+            if letters:
+                variableOfNode[j] = f"{chr(ord('A') + len(lines))}"
+            else:
+                variableOfNode[j] = f"${len(lines)}"
             lines.append(f"{variableOfNode[j]} <- {expression}")
             return variableOfNode[j]
 

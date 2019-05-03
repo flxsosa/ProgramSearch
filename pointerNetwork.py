@@ -407,7 +407,7 @@ class ScopeEncoding():
             
 class ProgramPointerNetwork(Module):
     """A network that looks at the objects in a ProgramGraph and then predicts what to add to the graph"""
-    def __init__(self, objectEncoder, specEncoder, DSL, oneParent=False,
+    def __init__(self, objectEncoder, specEncoder, DSL, oneParent=True,
                  H=256, attentionRounds=1, heads=4):
         """
         specEncoder: Module that encodes spec to initial hidden state of RNN
@@ -677,6 +677,69 @@ class ProgramPointerNetwork(Module):
                 if line is None:  continue
                 yield (line, ll)
 
+
+class NoExecution(Module):
+    """A baseline that does not use execution guidance"""    
+    def __init__(self, specEncoder, DSL, H=512):
+        super(NoExecution, self).__init__()
+        self.DSL = DSL
+        self.specEncoder = specEncoder
+
+        self.specialSymbols = [
+            "STARTING", "ENDING", "POINTER"
+            ]
+
+        self.lexicon = DSL.lexicon + self.specialSymbols
+        self.wordToIndex = {w: j for j,w in enumerate(self.lexicon) }
+        self.embedding = nn.Embedding(len(self.lexicon), H)
+
+        self.output = nn.Sequential(nn.Linear(H, len(self.lexicon)),
+                                    nn.LogSoftmax(dim=-1))
+        
+        self.decoderToPointer = nn.Linear(H, H, bias=False)
+        self.encoderToPointer = nn.Linear(encoderDimensionality, H, bias=False)
+        self.attentionSelector = nn.Linear(H, 1, bias=False)
+
+
+        self.model = nn.GRU(H + H,H,1)
+        self.initialState = nn.Linear(specEncoder.outputDimensionality, H)
+        self.H = H
+        self.finalize()
+
+    def programLikelihood(self, program):
+        lines = program.toTrace()
+        scope = {} # map from program to attention key
+        h = self.initialState(self.specEncoder(program.execute()))
+
+        
+        for command in program.toTrace():
+            tokens = ["STARTING"] + command.serialize()
+            symbolSequence = [self.wordToIndex[t if not isinstance(t,Program) else "POINTER"]
+                              for t in tokens]
+            # inputSequence : L x H
+            inputSequence = self.tensor(symbolSequence[:-1])
+            outputSequence = self.tensor(symbolSequence[1:])
+            inputSequence = self.embedding(inputSequence)
+
+            # Concatenate the object encodings w/ the inputs
+            objectInputs = self.device(torch.zeros(len(symbolSequence) - 1, self.H))
+            for t, p in enumerate(tokens):
+                if isinstance(p, Program):
+                    objectInputs[t + 1] = scope[p]
+                    
+            inputSequence = torch.cat([inputSequence, objectInputs], 1).unsqueeze(1)
+
+            o,h = self.model(inputSequence, h.unsqueeze(0).unsqueeze(0))
+
+            h = h.squeeze(0).squeeze(0)
+
+            # remove children from scope
+            for child in command.children():
+                del scope[child]
+            scope[command] = h
+
+        
+        
 if __name__ == "__main__":
     m = PointerNetwork(SymbolEncoder([str(n) for n in range(10) ]), ["large","small"])
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)

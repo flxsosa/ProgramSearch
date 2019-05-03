@@ -421,7 +421,7 @@ class Sphere(CSG):
     def toTrace(self): return [self]
 
     def _scad(self):
-        return f"translate([{self.x}, {self.y}, {self.z}])" + f" sphere(r={self.r}, $fn = 60);"
+        return f"translate([{self.x}, {self.y}, {self.z}])" + f" sphere(r={self.r + 1}, $fn = 60);"
 
     def translate(self,x,y,z):
         return Sphere(self.x + x,self.y + y,self.z + z,self.r)
