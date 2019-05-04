@@ -108,7 +108,7 @@ if __name__ == "__main__":
             dsl = dsl_2d
             oe = ObjectEncoder()
             se = SpecEncoder()
-            training = getTrainingData('CSG_data.p')
+            training = lambda : randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
 
         print(f"CNN output dimensionalitys are {oe.outputDimensionality} & {se.outputDimensionality}")
 
