@@ -6,26 +6,26 @@ from CAD import *
 if __name__ == '__main__':
     def Zelda():
         z = Rectangle(12,12,
-                      6,18,
-                      12,24,
+                      18,6,
+                      24,12,
                       18,18)
         
-        z = z - Rectangle(6,12,
-                          6,18,
+        z = z - Rectangle(12,6,
+                          18,6,
                           18,18,
-                          18,12)
-        z = z + Rectangle(18,6,
+                          12,18)
+        z = z + Rectangle(6,18,
                           12,12,
                           18,18,
-                          24,12)
-        z = z + Rectangle(0,12,
-                          6,18,
+                          12,24)
+        z = z + Rectangle(12,0,
+                          18,6,
                           12,12,
                           6,6)
         z = z - Rectangle(0,0,
-                          0,12,
-                          24,12,
-                          24,6)
+                          12,0,
+                          12,24,
+                          6,24)
         return z
         
     Zelda().export("demo/Zelda.png",256)
