@@ -68,8 +68,7 @@ if __name__ == "__main__":
         for n in range(10):
             s = rs()
             if arguments.td:
-                plot.imshow(s.render(256))
-                plot.savefig(f"demo/CAD_{n}_hr.png")
+                s.export(f"demo/CAD_{n}_hr.png",256)
                 plot.imshow(s.render())
                 plot.savefig(f"demo/CAD_{n}_lr.png")
                 print(s)

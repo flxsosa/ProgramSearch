@@ -1442,7 +1442,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                                   x0 + b, y0 + b)
             
     def circular():
-        d = random.choice([d for d in choices if d > 1])
+        d = random.choice([d for d in choices if d > 4])
         x = random.choice([x for x in choices if x - d/2 >= 0 and x + d/2 < resolution ])
         y = random.choice([y for y in choices if y - d/2 >= 0 and y + d/2 < resolution ])
         return Circle(x,y,d)
