@@ -186,7 +186,7 @@ module cylindrical(p1,p2,radius)
     def export(self,fn,resolution):
         pixels = self.render(resolution)
         assert len(pixels.shape) == 2
-        saveMatrixAsImage(pixels,fn)
+        saveMatrixAsImage(np.flip(pixels.T,0),fn)
         
 
     def removeCodeNotChangingProjections(self):
