@@ -3,6 +3,33 @@ from CAD import *
 """basically all of this is broken"""
 
 if __name__ == '__main__':
+    def Zelda():
+        z = Rectangle(12+4,12,
+                      6+4,18,
+                      12+4,24,
+                      18+4,18)
+        
+        z = z - Rectangle(6+4,12,
+                          6+4,18,
+                          18+4,18,
+                          18+4,12)
+        z = z + Rectangle(18+4,6,
+                          12+4,12,
+                          18+4,18,
+                          24+4,12)
+        z = z + Rectangle(0+4,12,
+                          6+4,18,
+                          12+4,12,
+                          6+4,6)
+        z = z - Rectangle(0+4,0,
+                          0+4,12,
+                          24+4,12,
+                          24+4,6)
+        return z
+        
+    Zelda().export("demo/Zelda.png",256)
+                  
+                  
     def rectangle(x,y,w,h):
         return Rectangle(x*2 - w, y*2 - h,
                          x*2 - w, y*2 + h,

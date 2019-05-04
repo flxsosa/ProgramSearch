@@ -186,7 +186,7 @@ module cylindrical(p1,p2,radius)
     def export(self,fn,resolution):
         pixels = self.render(resolution)
         assert len(pixels.shape) == 2
-        saveMatrixAsImage(pixels,fn)
+        saveMatrixAsImage(np.flip(pixels.T,0),fn)
         
 
     def removeCodeNotChangingProjections(self):
@@ -1433,7 +1433,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                 if len(a) == 0: continue
                 a = random.choice(a)
                 b = [b for b in range(resolution)
-                     if x0 - a + b in choices and y0 + a + b in choices and b > 1]
+                     if x0 + b in choices and y0 + b in choices and x0 - a + b in choices and y0 + a + b in choices and b > 1]
                 if len(b) == 0: continue
                 b = random.choice(b)
                 return Rectangle(x0,y0,
@@ -1442,7 +1442,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                                   x0 + b, y0 + b)
             
     def circular():
-        d = random.choice([d for d in choices if d > 1])
+        d = random.choice([d for d in choices if d > 4])
         x = random.choice([x for x in choices if x - d/2 >= 0 and x + d/2 < resolution ])
         y = random.choice([y for y in choices if y - d/2 >= 0 and y + d/2 < resolution ])
         return Circle(x,y,d)

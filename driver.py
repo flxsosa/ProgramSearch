@@ -68,8 +68,7 @@ if __name__ == "__main__":
         for n in range(10):
             s = rs()
             if arguments.td:
-                plot.imshow(s.render(256))
-                plot.savefig(f"demo/CAD_{n}_hr.png")
+                s.export(f"demo/CAD_{n}_hr.png",256)
                 plot.imshow(s.render())
                 plot.savefig(f"demo/CAD_{n}_lr.png")
                 print(s)
@@ -109,7 +108,7 @@ if __name__ == "__main__":
             dsl = dsl_2d
             oe = ObjectEncoder()
             se = SpecEncoder()
-            training = getTrainingData('CSG_data.p')
+            training = lambda : randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
 
         print(f"CNN output dimensionalitys are {oe.outputDimensionality} & {se.outputDimensionality}")
 
