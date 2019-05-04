@@ -1,6 +1,5 @@
 from CAD import *
 
-"""basically all of this is broken"""
 
 if __name__ == '__main__':
     def Zelda():
