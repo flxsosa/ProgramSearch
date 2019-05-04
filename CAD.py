@@ -124,6 +124,10 @@ module cylindrical(p1,p2,radius)
 
     def __ne__(self, o): return not (self == o)
 
+    def __add__(self,o): return Union(self,o)
+
+    def __sub__(self,o): return Difference(self,o)
+
     def __hash__(self): return hash(self.serialize())
 
     def execute(self):
@@ -179,12 +183,30 @@ module cylindrical(p1,p2,radius)
             return 
             #plot.savefig(f"{export}_d.png")
 
+    def export(self,fn,resolution):
+        pixels = self.render(resolution)
+        assert len(pixels.shape) == 2
+        saveMatrixAsImage(pixels,fn)
+        
+
     def removeCodeNotChangingProjections(self):
         while True:
             current = np.array(voxels2dm(self.render()))
             bad = False
             for child in self.simplifications():
                 new = np.array(voxels2dm(child.render()))
+                if np.sum(np.abs(new - current)) <= 0.0001:
+                    bad = True
+                    self = child
+                    break
+            if not bad: return self
+                
+    def removeCodeNotChangingRender(self):
+        while True:
+            current = self.render()
+            bad = False
+            for child in self.simplifications():
+                new = child.render()
                 if np.sum(np.abs(new - current)) <= 0.0001:
                     bad = True
                     self = child
@@ -472,73 +494,75 @@ class Sphere(CSG):
     def flipZ(self):
         return Sphere(self.x, self.y, RESOLUTION - self.z, self.r)
 
-class TRectangle(CSG):
+class Rectangle(CSG):
     token = 'tr'
     type = arrow(integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
                  integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
+                 integer(0, RESOLUTION - 1), integer(0, RESOLUTION - 1),
                  tCSG)
     
-    def __init__(self, x0, y0, x1, y1):
-        super(TRectangle, self).__init__()
-        if x1 <= x0: raise ParseFailure()
-        if y1 <= y0: raise ParseFailure()
+    def __init__(self, x0, y0, x1, y1,
+                 x2, y2, x3, y3):
+        super(Rectangle, self).__init__()
         self.x0 = x0
         self.y0 = y0
         self.x1 = x1
         self.y1 = y1
+        self.x2 = x2
+        self.y2 = y2
+        self.x3 = x3
+        self.y3 = y3
 
     def toTrace(self): return [self]
 
-    def heatMapTarget(self):
-        hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
-        hm[self.x0,self.y0,0] = True
-        hm[self.x1,self.y1,1] = True
-        return hm
-
     def __str__(self):
-        return f"(tr {self.x0} {self.y0} {self.x1} {self.y1})"
+        return f"(tr ({self.x0}, {self.y0}) ({self.x1}, {self.y1}) ({self.x2}, {self.y2}) ({self.x3}, {self.y3}))"
 
     def children(self): return []
 
     def __eq__(self, o):
-        return isinstance(o, TRectangle) and self.serialize() == o.serialize()
+        return isinstance(o, Rectangle) and self.serialize() == o.serialize()
 
     def __hash__(self):
         return hash(self.serialize())
 
     def serialize(self):
-        return (self.__class__.token, self.x0, self.y0, self.x1, self.y1)
+        return (self.__class__.token,
+                self.x0, self.y0, self.x1, self.y1,
+                self.x2, self.y2, self.x3, self.y3)
 
     def _render(self,r=None):
         r = r or RESOLUTION
-        a = np.zeros((r,r))
-        a[int(self.x0*r/RESOLUTION):int(self.x1*r/RESOLUTION),
-          int(self.y0*r/RESOLUTION):int(self.y1*r/RESOLUTION)] = 1
-        return a
+        x, y = np.indices((r,r))/float(r)
+        p0 = np.array([self.x0,self.y0])/RESOLUTION
+        p1 = np.array([self.x1,self.y1])/RESOLUTION
+        p2 = np.array([self.x2,self.y2])/RESOLUTION
+        p3 = np.array([self.x3,self.y3])/RESOLUTION
 
+        def halfPlane(p,q):
+            nonlocal x, y
+            return (x - p[0])*(p[1] - q[1]) - (y - p[1])*(p[0] - q[0])
+        return 1.*((halfPlane(p0,p1) <= 0.)&(halfPlane(p1,p2) <= 0)&(halfPlane(p2,p3) <= 0)&(halfPlane(p3,p0) <= 0))
 
-    def __contains__(self, p):
-        return p[0] >= self.x0 and p[1] >= self.y0 and \
-            p[0] < self.x1 and p[1] < self.y1
+    # def flipX(self):
+    #     return Rectangle(RESOLUTION - self.x1, self.y0,
+    #                       RESOLUTION - self.x0, self.y1)
 
-    def flipX(self):
-        return TRectangle(RESOLUTION - self.x1, self.y0,
-                          RESOLUTION - self.x0, self.y1)
+    # def flipY(self):
+    #     return Rectangle(self.x0, RESOLUTION - self.y1,
+    #     			   self.x1, RESOLUTION - self.y0)
 
-    def flipY(self):
-        return TRectangle(self.x0, RESOLUTION - self.y1,
-				   self.x1, RESOLUTION - self.y0)
-
-class TCircle(CSG):
+class Circle(CSG):
     token = 'tc'
     type = arrow(integer(0, RESOLUTION - 1),
                  integer(0, RESOLUTION - 1),
                  integer(0, RESOLUTION - 1),
                  tCSG)
     
-    def __init__(self, x,y,r):
-        super(TCircle, self).__init__()
-        self.r = r
+    def __init__(self, x,y,d):
+        super(Circle, self).__init__()
+        self.d = d
         self.x = x
         self.y = y
 
@@ -550,26 +574,27 @@ class TCircle(CSG):
         return hm
         
     def __str__(self):
-        return f"(tc ({self.x}, {self.y}) {self.r})"
+        return f"(tc ({self.x}, {self.y}) d={self.d})"
 
     def children(self): return []
 
     def __eq__(self, o):
-        return isinstance(o, TCircle) and self.serialize() == o.serialize()
+        return isinstance(o, Circle) and self.serialize() == o.serialize()
     def __hash__(self):
         return hash(self.serialize())
 
     def serialize(self):
-        return (self.__class__.token, self.x,self.y,self.r)
+        return (self.__class__.token, self.x,self.y,self.d)
 
     def __contains__(self, p):
-        return (p[0]-self.x)*(p[0]-self.x) + (p[1] - self.y)*(p[1] - self.y) <= self.r*self.r
+        r = self.d/2
+        return (p[0]-self.x)*(p[0]-self.x) + (p[1] - self.y)*(p[1] - self.y) <= r*r
 
     def flipX(self):
-        return TCircle(RESOLUTION - self.x, self.y, self.r)
+        return Circle(RESOLUTION - self.x, self.y, self.d)
 
     def flipY(self):
-        return TCircle(self.x, RESOLUTION - self.y, self.r)
+        return Circle(self.x, RESOLUTION - self.y, self.d)
 
     def _render(self,r=None):
         r = r or RESOLUTION
@@ -579,7 +604,9 @@ class TCircle(CSG):
         dy = (y - self.y/RESOLUTION)
         distance2 = dx*dx + dy*dy
 
-        return 1.*(distance2 <= (self.r/RESOLUTION)*(self.r/RESOLUTION))
+        r = self.d/2
+
+        return 1.*(distance2 <= (r/RESOLUTION)*(r/RESOLUTION))
 
 class Union(CSG):
     token = '+'
@@ -829,7 +856,7 @@ class Intersection(CSG):
                        0., 1.)
 
 dsl_3d = DSL([Union, Difference, Intersection, Cuboid, Sphere, Cylinder])
-dsl_2d = DSL([Union, Difference, Intersection, TRectangle, TCircle])
+dsl_2d = DSL([Union, Difference, Intersection, Rectangle, Circle])
 
 
 def loadScad(path):
@@ -1374,6 +1401,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None,
                 nudge=False, translate=False):
+    assert not translate
     import matplotlib.pyplot as plot
 
     def translation(x,y,child):
@@ -1385,43 +1413,40 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
         return child
     dc = 16 # number of distinct coordinates
     choices = [c
-               for c in range(resolution//(dc*2), resolution, resolution//dc) ]
+               for c in range(0, resolution, resolution//dc) ]
     def quadrilateral():
-        if not translate:
+        if random.random() < 0.5:
             x0 = random.choice(choices[:-1])
             y0 = random.choice(choices[:-1])
             x1 = random.choice([x for x in choices if x > x0 ])
             y1 = random.choice([y for y in choices if y > y0 ])
-            return TRectangle(x0,y0,x1,y1)
+            return Rectangle(x0,y0,
+                              x0,y1,
+                              x1,y1,
+                              x1,y0)
+        else:
+            while True:
+                x0 = random.choice(choices)
+                y0 = random.choice(choices)
+                a = [a for a in range(resolution)
+                     if x0 - a in choices and y0 + a in choices and a > 1]
+                if len(a) == 0: continue
+                a = random.choice(a)
+                b = [b for b in range(resolution)
+                     if x0 - a + b in choices and y0 + a + b in choices and b > 1]
+                if len(b) == 0: continue
+                b = random.choice(b)
+                return Rectangle(x0,y0,
+                                  x0 - a, y0 + a,
+                                  x0 - a + b, y0 + a + b,
+                                  x0 + b, y0 + b)
             
-        while True:
-            
-            w = random.choice(range(2, resolution, resolution//dc))
-            h = random.choice(range(2, resolution, resolution//dc))
-            x = random.choice(choices)
-            y = random.choice(choices)
-            if x + w < resolution and y + h < resolution:
-                return translation(x,y,
-                                   Rectangle(w,h))
-
     def circular():
-        choices = [c
-                   for c in range(resolution//(dc*2), resolution, resolution//dc) ]
+        d = random.choice([d for d in choices if d > 1])
+        x = random.choice([x for x in choices if x - d/2 >= 0 and x + d/2 < resolution ])
+        y = random.choice([y for y in choices if y - d/2 >= 0 and y + d/2 < resolution ])
+        return Circle(x,y,d)
 
-        if not translate:
-            r = random.choice(range(2,10,2))
-            x = random.choice([x for x in choices if x - r > 0 and x + r < resolution ])
-            y = random.choice([y for y in choices if y - r > 0 and y + r < resolution ])
-            return TCircle(x,y,r)
-        while True:
-            r = random.choice(range(2,10,2))
-            choices = [c
-                       for c in range(resolution//(dc*2), resolution, resolution//dc) ]
-            x = random.choice(choices)
-            y = random.choice(choices)
-            if x - r >= 0 and x + r < resolution and y - r >= 0 and y + r < resolution:
-                return translation(x,y,
-                                   Circle(r))
     while True:
         s = None
         numberOfShapes = 0
@@ -1432,11 +1457,9 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                 s = o
             else:
                 if random.choice([True,False]):
-                    new = Union(s,o)
-                elif True or random.choice([True,False]):
-                    new = Difference(s,o)
+                    new = s + o
                 else:
-                    new = Difference(o,s)
+                    new = s - o
                 # Change at least ten percent of the pixels
                 oldOn = s.render().sum()
                 newOn = new.render().sum()
@@ -1447,7 +1470,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
         try:
             finalScene = s.removeDeadCode()
             assert np.all(finalScene.render() == s.render())
-            s = finalScene
+            s = finalScene.removeCodeNotChangingRender()
             break
         except BadCSG:
             continue

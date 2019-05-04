@@ -1,5 +1,7 @@
 from CAD import *
 
+import matplotlib.pyplot as plot
+
 
 
 
@@ -66,12 +68,15 @@ if __name__ == "__main__":
         for n in range(10):
             s = rs()
             if arguments.td:
-                plot.imshow(s.highresolution(256))
+                plot.imshow(s.render(256))
                 plot.savefig(f"demo/CAD_{n}_hr.png")
+                plot.imshow(s.render())
+                plot.savefig(f"demo/CAD_{n}_lr.png")
+                print(s)
             else:
                 s.show(export=f"demo/CAD_{n}_3d.png")
                 print(s)
-            s.scad(f"demo/CAD_{n}_model.png")
+                s.scad(f"demo/CAD_{n}_model.png")
 
         import sys
         sys.exit(0)

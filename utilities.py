@@ -111,7 +111,7 @@ class PQ(object):
 
 def saveMatrixAsImage(m, fn):
     import scipy.misc
-    scipy.misc.imsave(fn, m)
+    scipy.misc.imsave(fn, m.T)
 
 def showMatrixAsImage(*m):
     import matplotlib.pyplot as plot
