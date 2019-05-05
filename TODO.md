@@ -5,9 +5,12 @@
 	- [ ] determine correct distribution for constant
 - [X] test '-' and space delims
 
-- [ ] finetune RL
-- [ ] single network, value and policy head
-- [ ] train with these new fixes on GCP
+- [ ] finetune policy with RL
+	- [X] write code
+	- [ ] test it, debug and speed
+
+- [X] single network, value and policy head - nah
+- [X] start to train with these new fixes on GCP
 
 - [ ] do proper robustfill baseline
 	- [X] start training

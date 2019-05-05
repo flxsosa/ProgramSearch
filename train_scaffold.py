@@ -73,12 +73,26 @@ def train_model_supervised(agent):
     agent.save(args.save_path)
 
 def rl_train(agent):
-    from train_value_fun import train_value_fun
+    from train_value_fun import train_RL
     if args.rl_mode == 'value only':
-        train_value_fun(agent)
-    else:
+        train_RL(agent)
+    elif args.rl_mode == 'both':
+        train_RL(agent, tune_policy=True)
+    else: 
         assert False
 
+def initialize_value_as_policy(agent):
+    policy_params = agent.nn.named_parameters()
+    value_params = agent.Vnn.named_parameters()
+
+    dict_value_params = dict(value_params)
+
+    for name, param in policy_params:
+        if name in dict_value_params and not "action_decoder" in name:
+            print(f"copying {name}")
+            dict_value_params[name].data.copy_(param.data)
+        else: 
+            print(f"skipped {name}")
 
 if __name__ == '__main__':
     #print some args stuff
@@ -88,7 +102,10 @@ if __name__ == '__main__':
     #load model or create model
     agent = load_model()
     #train
-    train_model_supervised(agent)
+    #train_model_supervised(agent)
+
+    #optionally, can do this:
+    initialize_value_as_policy(agent)
     
     #rl train, whatever that entails
     rl_train(agent)

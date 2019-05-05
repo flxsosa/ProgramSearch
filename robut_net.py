@@ -177,7 +177,7 @@ class Model(nn.Module):
         return x
 
     def learn_supervised(self, chars, masks, last_butts, prev_buttons, targets):
-        self.train()
+        #self.train()
         self.opt.zero_grad()
 
         output_dists = self(chars, masks, last_butts, prev_buttons)
