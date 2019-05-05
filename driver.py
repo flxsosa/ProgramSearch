@@ -30,6 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("--noTranslate", default=True, action='store_true')
     parser.add_argument("--resume", default=False, action='store_true')
     parser.add_argument("--render", default=[],type=str,nargs='+')
+    parser.add_argument("--tools", default=False, action='store_true')
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
@@ -158,11 +159,21 @@ if __name__ == "__main__":
     elif arguments.mode == "test":
         m = load_checkpoint(arguments.checkpoint)
         if arguments.td:
-            dataGenerator = getTrainingData('CSG_data.p')
+            if arguments.tools:
+                dataGenerator = make2DTools()
+            else:
+                dataGenerator = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         else:
-            dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes,
-                                              minShapes=arguments.maxShapes)
+            if arguments.tools:
+                assert False, "currently no 3-D tools"
+            else:
+                dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes,
+                                                  minShapes=arguments.maxShapes)
+        if arguments.tools:
+            suffix = "tools"
+        else:
+            suffix = f"{arguments.maxShapes}_shapes"
         testCSG(m,
                 dataGenerator,
                 arguments.timeout,
-                export=f"figures/CAD_{arguments.maxShapes}_shapes.png")
+                export=f"figures/CAD_{2 if arguments.td else 3}D_{suffix}.png")

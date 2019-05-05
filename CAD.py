@@ -1527,7 +1527,7 @@ def testCSG(m, getProgram, timeout, export):
     print(f"One parent restriction?  {oneParent}")
     solvers = [# RandomSolver(dsl),
                # MCTS(m, reward=lambda l: 1. - l),
-               SMC(m),
+               #SMC(m),
         # BeamSearch(m, criticCoefficient=1),
                 # BeamSearch(m, criticCoefficient=0.),
                ForwardSample(m, maximumLength=18)]
@@ -1549,8 +1549,11 @@ def testCSG(m, getProgram, timeout, export):
 
     os.system("mkdir data/test")
 
-    for ti in range(30):
-        spec = getProgram()
+    if isinstance(getProgram, list):
+        specs = getProgram
+    else:
+        specs = [getProgram() for _ in range(30) ]
+    for ti,spec in enumerate(specs):
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
@@ -1582,9 +1585,13 @@ def testCSG(m, getProgram, timeout, export):
                 bestProgram.scad("data/test/%03d_%s.scad"%(ti,solver.name))
                 
 
+    names = [s.name for s in solvers]
+    if export is not None:
+        with open(os.path.splitext(export)[0] + ".pickle"),"wb") as handle:
+            pickle.dump(handle,list(zip(names, testResults)))
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
-                    names=[s.name for s in solvers],
+                    names=names,
                     export=export)
 
 def plotTestResults(testResults, timeout, defaultLoss=None,

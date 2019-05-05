@@ -1,7 +1,9 @@
 from CAD import *
 
+def make2DTools():
+    everyTool = []
 
-if __name__ == '__main__':
+
     def Zelda():
         z = Rectangle(12+4,12,
                       6+4,18,
@@ -27,6 +29,7 @@ if __name__ == '__main__':
         return z
         
     Zelda().export("demo/Zelda.png",256)
+    everyTool.append(Zelda())
                   
                   
     def rectangle(x,y,w,h):
@@ -54,6 +57,7 @@ if __name__ == '__main__':
         return s1 + s2 - s3
 
     wrench().export("demo/wrench.png",256)
+    everyTool.append(wrench())
 
     # shovel 
     def shovel():
@@ -64,6 +68,7 @@ if __name__ == '__main__':
         return s1 + s2 + s3 + s4
 
     shovel().export("demo/shovel.png",256)
+    everyTool.append(shovel())
 
     # key 
     def key():
@@ -75,6 +80,7 @@ if __name__ == '__main__':
         return s1 + (s2 - s3) + (s4 - s5)
 
     key().export("demo/key.png",256)
+    everyTool.append(key())
 
     # hammer 
     def hammer():
@@ -83,6 +89,7 @@ if __name__ == '__main__':
         return s1 + s2
 
     hammer().export("demo/hammer.png",256)
+    everyTool.append(hammer())
 
     # plier 
     def plier():
@@ -93,6 +100,7 @@ if __name__ == '__main__':
         return s1 + s2 + (s3 - s4)
 
     plier().export("demo/plier.png",256)
+    everyTool.append(plier())
 
     # double_wrench 
     def double_wrench():
@@ -104,6 +112,7 @@ if __name__ == '__main__':
         return s1 + (s2 - s3) + (s4 - s5)
 
     double_wrench().export("demo/double_wrench.png",256)
+    everyTool.append(double_wrench())
 
     # mag 
     def mag():
@@ -113,6 +122,7 @@ if __name__ == '__main__':
         return (s1 - s2) + s3
 
     mag().export("demo/mag.png",256)
+    everyTool.append(mag())
 
     # sickle 
     def sickle():
@@ -122,6 +132,7 @@ if __name__ == '__main__':
         return (s1 - s2) + s3
 
     sickle().export("demo/sickle.png",256)
+    everyTool.append(sickle())
 
     # comrad 
     def comrad():
@@ -133,3 +144,8 @@ if __name__ == '__main__':
         return (s1 - s2) + s3 + s4 + s5
 
     comrad().export("demo/comrad.png",256)
+    everyTool.append(comrad())
+    return everyTool
+
+if __name__ == '__main__':
+    make2DTools()
