@@ -1542,7 +1542,7 @@ def testCSG(m, getProgram, timeout, export):
                 program = Difference(Sphere(1,1,1,1),Sphere(1,1,1,1))
                 
         if twodimensional:
-            saveMatrixAsImage(program.highresolution(256), path)
+            saveMatrixAsImage(program.render(256), path)
         else:
             program.show(export=path)            
 
