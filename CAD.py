@@ -1584,7 +1584,8 @@ def testCSG(m, getProgram, timeout, export):
                     pickle.dump(bestProgram, handle)
                 exportProgram(bestProgram,
                               "data/test/%03d_%s.png"%(ti,solver.name))
-                bestProgram.scad("data/test/%03d_%s.scad"%(ti,solver.name))
+                if not twodimensional:
+                    bestProgram.scad("data/test/%03d_%s.scad"%(ti,solver.name))
                 
 
     names = [s.name for s in solvers]
