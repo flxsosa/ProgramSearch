@@ -151,6 +151,15 @@ class LineDecoder(Module):
         objectInputs = self.device(torch.zeros(len(symbolSequence) - 1, self.H))
         for t, p in enumerate(target):
             if isinstance(p, Pointer):
+                # should this be t + 1 or t?
+                # target = [union, p0, p1]
+                # inputs = [start, union, p0, p1]
+                # outputs = [union, p0, p1, ending]
+                # so at time step 2 we want to feed it p0
+                # which occurs in the target at time step 1
+                # and also at step3 we want to feed it p1
+                # which occurs in the target at index 2
+                # so this should be t + 1
                 objectInputs[t + 1] = objectKeys[p.i]
         objectInputs = objectInputs
 
@@ -697,7 +706,7 @@ class NoExecution(Module):
                                     nn.LogSoftmax(dim=-1))
         
         self.decoderToPointer = nn.Linear(H, H, bias=False)
-        self.encoderToPointer = nn.Linear(encoderDimensionality, H, bias=False)
+        self.encoderToPointer = nn.Linear(H, H, bias=False)
         self.attentionSelector = nn.Linear(H, 1, bias=False)
 
 
@@ -705,38 +714,141 @@ class NoExecution(Module):
         self.initialState = nn.Linear(specEncoder.outputDimensionality, H)
         self.H = H
         self.finalize()
-
-    def programLikelihood(self, program):
-        lines = program.toTrace()
-        scope = {} # map from program to attention key
-        h = self.initialState(self.specEncoder(program.execute()))
-
         
-        for command in program.toTrace():
-            tokens = ["STARTING"] + command.serialize()
+    def pointerAttention(self, hiddenStates, objectEncodings):
+        """
+        hiddenStates: TxH
+        objectEncodings: (# objects)x(H)
+        OUTPUT: Tx(# objects) attention matrix
+        """
+        hiddenStates = self.decoderToPointer(hiddenStates)
+        objectKeys = self.encoderToPointer(objectEncodings)
+        
+        _h = hiddenStates.unsqueeze(1).repeat(1, objectKeys.size(0), 1)
+        _o = objectKeys.unsqueeze(0).repeat(hiddenStates.size(0), 1, 1)
+        attention = self.attentionSelector(torch.tanh(_h + _o)).squeeze(2)
+        #attention = self.attentionSelector(torch.tanh(_h * some_bilinear * _o)).squeeze(2)
+
+        return F.log_softmax(attention, dim=1)
+
+    def gradientStepTraceBatched(self, optimizer, specsAndTraces):
+        self.zero_grad()
+
+        specRenderings = np.array([s.execute()
+                                   for s,_ in specsAndTraces ])
+        specEncodings = self.specEncoder(specRenderings)
+        losses = []
+        totalLikelihood = 0.
+        for b, (spec, trace) in enumerate(specsAndTraces):
+            ls = self.programLikelihood(trace,specEncodings[b])
+            losses.append([-l.data.item() for l in ls])
+            totalLikelihood += sum(ls)
+        (-totalLikelihood).backward()
+        optimizer.step()
+        return losses
+            
+
+
+    def programLikelihood(self, trace, specEncoding):
+        scope = {} # map from program to attention key
+        h = self.initialState(specEncoding)
+
+        L = []
+        for command_index, command in enumerate(trace):
+            last_command = command_index == len(trace) - 1
+            tokens = ["STARTING"] + list(command.serialize()) + ["ENDING" if last_command else "STARTING"]
             symbolSequence = [self.wordToIndex[t if not isinstance(t,Program) else "POINTER"]
                               for t in tokens]
+            
             # inputSequence : L x H
-            inputSequence = self.tensor(symbolSequence[:-1])
+            inputSequence = self.tensor(symbolSequence)
             outputSequence = self.tensor(symbolSequence[1:])
-            inputSequence = self.embedding(inputSequence)
+            inputSequence = self.embedding(inputSequence[:-1])
 
             # Concatenate the object encodings w/ the inputs
             objectInputs = self.device(torch.zeros(len(symbolSequence) - 1, self.H))
             for t, p in enumerate(tokens):
                 if isinstance(p, Program):
-                    objectInputs[t + 1] = scope[p]
+                    objectInputs[t] = scope[p]
                     
             inputSequence = torch.cat([inputSequence, objectInputs], 1).unsqueeze(1)
 
             o,h = self.model(inputSequence, h.unsqueeze(0).unsqueeze(0))
 
             h = h.squeeze(0).squeeze(0)
+            o = o.squeeze(1)
+
+            thisLikelihood = 0.
+            if any( isinstance(t,Program) for t in tokens ):
+                alternatives = list(scope.items())
+                objectEncodings = torch.stack([oe for _,oe in alternatives])
+                objects = [o for o,_ in alternatives]                
+                attention = self.pointerAttention(o, objectEncodings)
+
+                for T,token in enumerate(tokens[1:]):
+                    if isinstance(token, Program):
+                        thisLikelihood += attention[T,objects.index(token)]
+                        assert symbolSequence[T + 1] == self.wordToIndex["POINTER"]
 
             # remove children from scope
             for child in command.children():
                 del scope[child]
             scope[command] = h
+
+            # sequence log likelihood ignoring pointer values
+            sll = -F.nll_loss(self.output(o), outputSequence, reduce=True, size_average=False)
+            thisLikelihood += sll
+            L.append(thisLikelihood)
+
+        return L
+
+
+            
+
+    def sample(self, spec):
+        h = self.initialState(self.specEncoder(spec.execute()))
+
+        scope = {} # map from program to attention key
+
+        lastOutput = "STARTING"
+        tokenBuffer = []
+        while True:
+            lastOutputIndex = self.wordToIndex[lastOutput if not isinstance(lastOutput,Program) else "POINTER"]
+            lastEmbedding = self.embedding(self.tensor([lastOutputIndex])).squeeze(0)
+            if isinstance(lastOutput,Program):
+                thisInput = torch.cat([lastEmbedding,scope[lastOutput]])
+            else:
+                thisInput = torch.cat([lastEmbedding,self.device(torch.zeros(self.H))])
+
+            o,h = self.model(thisInput.unsqueeze(0).unsqueeze(0), h.unsqueeze(0).unsqueeze(0))
+            h = h.squeeze(0).squeeze(0)
+            o = o.squeeze(0).squeeze(0)
+
+            distribution = self.output(o)
+            next_symbol = self.lexicon[torch.multinomial(distribution.exp(), 1)[0].data.item()]
+
+            if next_symbol in {"STARTING","ENDING"}:
+                new_command = self.DSL.parseLine(tokenBuffer)
+                if new_command is None: return None
+                tokenBuffer = []
+                for child in new_command.children():
+                    del scope[child]
+                scope[new_command] = h
+                if next_symbol == "ENDING": return list(scope.keys())
+                lastOutput = next_symbol
+            elif next_symbol == "POINTER":
+                alternatives = list(scope.items())
+                objectEncodings = torch.stack([oe for _,oe in alternatives])
+                objects = [o for o,_ in alternatives]                
+
+                distribution = self.pointerAttention(o.unsqueeze(0),objectEncodings).squeeze(0)
+                tokenBuffer.append(objects[torch.multinomial(distribution.exp(), 1)[0].data.item()])
+                lastOutput = tokenBuffer[-1]
+            else:
+                tokenBuffer.append(next_symbol)
+                lastOutput = next_symbol
+        
+            
 
         
         

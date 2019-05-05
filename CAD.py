@@ -1712,3 +1712,15 @@ def getTrainingData(path):
     return getData
         
 
+if __name__ == "__main__":
+    m = NoExecution(SpecEncoder(), dsl_2d)
+    p = Union(Circle(1,2,3),
+              Circle(2,21,9))
+
+    optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
+    while True:
+        losses = m.gradientStepTraceBatched(optimizer, [(p,p.toTrace())])
+        L = sum(l for ls in losses for l in ls  )
+        print(L)
+        if L < 0.2:
+            print(m.sample(p))

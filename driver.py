@@ -31,6 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--resume", default=False, action='store_true')
     parser.add_argument("--render", default=[],type=str,nargs='+')
     parser.add_argument("--tools", default=False, action='store_true')
+    parser.add_argument("--noExecution", default=False, action='store_true')
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
@@ -84,6 +85,8 @@ if __name__ == "__main__":
             
     if arguments.checkpoint is None:
         arguments.checkpoint = f"checkpoints/{'2d' if arguments.td else '3d'}_{arguments.mode}"
+        if arguments.noExecution:
+            arguments.checkpoint += "_noExecution"
         if arguments.viewpoints:
             arguments.checkpoint += "_viewpoints"
         if arguments.attention > 0:
@@ -117,11 +120,14 @@ if __name__ == "__main__":
             m = torch.load(arguments.checkpoint)
             print(f"Resuming checkpoint {arguments.checkpoint}")
         else:
-            m = ProgramPointerNetwork(oe, se, dsl,
-                                      oneParent=arguments.oneParent,
-                                      attentionRounds=arguments.attention,
-                                      heads=arguments.heads,
-                                      H=arguments.hidden)
+            if arguments.noExecution:
+                m = NoExecution(se,dsl)
+            else:
+                m = ProgramPointerNetwork(oe, se, dsl,
+                                          oneParent=arguments.oneParent,
+                                          attentionRounds=arguments.attention,
+                                          heads=arguments.heads,
+                                          H=arguments.hidden)
         trainCSG(m, training,
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
