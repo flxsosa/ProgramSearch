@@ -1533,14 +1533,15 @@ def testCSG(m, getProgram, timeout, export):
                ForwardSample(m, maximumLength=18)]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
+    twodimensional = True
     def exportProgram(program, path):
         if program is None:
-            if arguments.td:
+            if twodimensional:
                 program = Difference(Circle(1,1,1),Circle(1,1,1))
             else:
                 program = Difference(Sphere(1,1,1,1),Sphere(1,1,1,1))
                 
-        if arguments.td:
+        if twodimensional:
             saveMatrixAsImage(program.highresolution(256), path)
         else:
             program.show(export=path)            
@@ -1553,6 +1554,7 @@ def testCSG(m, getProgram, timeout, export):
         specs = getProgram
     else:
         specs = [getProgram() for _ in range(30) ]
+    twodimensional = len(specs[0].execute().shape) == 2
     for ti,spec in enumerate(specs):
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
