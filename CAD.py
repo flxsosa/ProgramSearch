@@ -1587,7 +1587,7 @@ def testCSG(m, getProgram, timeout, export):
 
     names = [s.name for s in solvers]
     if export is not None:
-        with open(os.path.splitext(export)[0] + ".pickle"),"wb") as handle:
+        with open(os.path.splitext(export)[0] + ".pickle","wb") as handle:
             pickle.dump(handle,list(zip(names, testResults)))
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
