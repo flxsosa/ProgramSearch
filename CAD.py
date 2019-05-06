@@ -130,8 +130,21 @@ module cylindrical(p1,p2,radius)
 
     def __hash__(self): return hash(self.serialize())
 
+    @property
+    def dimensionality(self):
+        cs = self.children()
+        if len(cs) == 0: assert False
+        assert all( c.dimensionality == cs[0].dimensionality for c in cs  )
+        return cs[0].dimensionality
+        
+
     def execute(self):
-        return self.render()
+        if self.dimensionality == 2:
+            return self.render(64)
+        elif self.dimensionality == 3:
+            return self.render(32)
+        assert False
+        
 
     def render(self,r=None):
         resolution = r or RESOLUTION
@@ -241,6 +254,9 @@ class Cylinder(CSG):
         self.z1 = z1
         self.p0 = np.array([x0,y0,z0])
         self.p1 = np.array([x1,y1,z1])
+
+    @property
+    def dimensionality(self): return 3
 
     def _scad(self):
         return f"cylindrical([{self.x0}, {self.y0}, {self.z0}], [{self.x1}, {self.y1}, {self.z1}], {self.r});"
@@ -355,6 +371,9 @@ class Cuboid(CSG):
         self.y1 = y1
         self.z1 = z1
 
+    @property
+    def dimensionality(self): return 3        
+
     def removeDeadCode(self):
         if self.x1 <= self.x0: return None
         if self.y1 <= self.y0: return None
@@ -439,7 +458,8 @@ class Sphere(CSG):
         self.x = x
         self.y = y
         self.z = z
-
+    @property
+    def dimensionality(self): return 3
     def toTrace(self): return [self]
 
     def _scad(self):
@@ -514,6 +534,9 @@ class Rectangle(CSG):
         self.x3 = x3
         self.y3 = y3
 
+    @property
+    def dimensionality(self): return 2        
+
     def toTrace(self): return [self]
 
     def __str__(self):
@@ -567,6 +590,9 @@ class Circle(CSG):
         self.y = y
 
     def toTrace(self): return [self]
+
+    @property
+    def dimensionality(self): return 2
 
     def heatMapTarget(self):
         hm = np.zeros((RESOLUTION,RESOLUTION,3)) > 1.
@@ -1051,7 +1077,7 @@ def loadScads():
     assert False
 
 
-def random3D(maxShapes=13,minShapes=3):
+def random3D(maxShapes=13,minShapes=3,rotate=False):
     cs = range(0, RESOLUTION, int(RESOLUTION/8))
     def randomSpherical():
         r = random.choice([4,8,12])
@@ -1071,7 +1097,7 @@ def random3D(maxShapes=13,minShapes=3):
         return Cuboid(x0,y0,z0,
                       x1,y1,z1)
     def randomCylinder():
-        if random.random() < 0.7: # axis aligned
+        if (not rotate) or (random.random() < 0.7): # axis aligned
             r = random.choice([2,4,8,12])
             l = random.choice([4,8,12,16,20])
             # sample the center, aligned with the axis of the cylinder
@@ -1182,7 +1208,8 @@ class ObjectEncoder(CNN):
     """Encodes a 2d object"""
     def __init__(self):
         super(ObjectEncoder, self).__init__(channels=2,
-                                            inputImageDimension=RESOLUTION)
+                                            layers=3,
+                                            inputImageDimension=RESOLUTION*2)
 
     def forward(self, spec, obj):
         if isinstance(spec, list):
@@ -1203,7 +1230,8 @@ class SpecEncoder(CNN):
     """Encodes a 2d spec"""
     def __init__(self):
         super(SpecEncoder, self).__init__(channels=1,
-                                          inputImageDimension=RESOLUTION)
+                                          layers=3,
+                                          inputImageDimension=RESOLUTION*2)
 
 
 

@@ -32,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("--render", default=[],type=str,nargs='+')
     parser.add_argument("--tools", default=False, action='store_true')
     parser.add_argument("--noExecution", default=False, action='store_true')
+    parser.add_argument("--rotate", default=False, action='store_true')
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
@@ -61,7 +62,8 @@ if __name__ == "__main__":
         if arguments.td:
             rs = lambda : randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes, nudge=arguments.nudge, translate=arguments.translate)
         else:
-            rs = lambda : random3D(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
+            rs = lambda : random3D(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes,
+                                   rotate=arguments.rotate)
         startTime = time.time()
         ns = 50
         for _ in range(ns):
@@ -71,7 +73,7 @@ if __name__ == "__main__":
             s = rs()
             if arguments.td:
                 s.export(f"demo/CAD_{n}_hr.png",256)
-                plot.imshow(s.render())
+                plot.imshow(s.execute())
                 plot.savefig(f"demo/CAD_{n}_lr.png")
                 print(s)
             else:
@@ -91,6 +93,9 @@ if __name__ == "__main__":
             arguments.checkpoint += "_viewpoints"
         if arguments.attention > 0:
             arguments.checkpoint += f"_attention{arguments.attention}_{arguments.heads}"
+        if not arguments.td:
+            if not arguments.rotate:
+                arguments.checkpoint += "_noRotate"
         arguments.checkpoint += ".pickle"
         print(f"Setting checkpointpath to {arguments.checkpoint}")
     if arguments.mode == "imitation":
@@ -107,7 +112,8 @@ if __name__ == "__main__":
             else:
                 oe = MultiviewObject()
                 se = MultiviewSpec()
-            training = lambda : random3D(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
+            training = lambda : random3D(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes,
+                                         rotate=arguments.rotate)
         else:
             dsl = dsl_2d
             oe = ObjectEncoder()
@@ -143,7 +149,8 @@ if __name__ == "__main__":
         if arguments.td:
             training = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         else:
-            training = lambda: random3D(maxShapes=arguments.maxShapes,minShapes=arguments.maxShapes)
+            training = lambda: random3D(maxShapes=arguments.maxShapes,minShapes=arguments.maxShapes,
+                                        rotate=arguments.rotate)
         critic.train(arguments.checkpoint,
                      training,
                      R)
@@ -174,7 +181,8 @@ if __name__ == "__main__":
                 assert False, "currently no 3-D tools"
             else:
                 dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes,
-                                                  minShapes=arguments.maxShapes)
+                                                  minShapes=arguments.maxShapes,
+                                                  rotate=arguments.rotate)
         if arguments.tools:
             suffix = "tools"
         else:
