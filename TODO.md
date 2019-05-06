@@ -22,7 +22,9 @@
 
 
 
+python launch.py -z "n1-highmem-8" --copy 'models/new_RLvalueonly.p' -g "p100" "RLvalueonly" "python train_scaffold.py --args args_RLvalueonly"
 
+python launch.py -z "n1-highmem-8" --copy 'models/new_RLfinetune.p' -g "p100" "RLfinetune" "python train_scaffold.py --args args_RLfinetune"
 
 
 ## ROBUST FILL REAL TRAINING TESTING

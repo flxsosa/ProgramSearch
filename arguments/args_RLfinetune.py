@@ -39,7 +39,7 @@ render_kind={'render_scratch' : 'yes',
 
 #Vnet_save_path = 'robut_vnet.p' 
 
-print_freq = 20
+print_freq = 2
 
 save_freq = 100
 
@@ -48,9 +48,9 @@ test_freq = 1000
 column_enc = 'conv' #'linear' #'conv' #'linear' 
 kernel_size = 5
 
-n_rollouts = 40
+n_rollouts = 500
 
-n_envs_per_rollout = 25
+n_envs_per_rollout = 2
 
 rl_iterations = 12000
 

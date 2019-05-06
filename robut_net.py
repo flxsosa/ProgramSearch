@@ -406,7 +406,7 @@ class Agent:
                 if i==0:
                     prev_s = envs[j].last_step[0]
                 else:
-                    prev_s = traces[j][-1].prev_s
+                    prev_s = traces[j][-1].s
                 traces[j].append( TraceEntry(prev_s, a, r, ss, done) )
         return traces
 

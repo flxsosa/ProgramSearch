@@ -23,8 +23,8 @@ from robustfill import RobustFill
 import string
 
 #big hack here 
-LOAD_PATH = './models/rb_baseline.p'
-SAVE_PATH = './models/rb_baseline.p'
+LOAD_PATH = './models/rb_baseline_debug.p'
+SAVE_PATH = './models/rb_baseline_debug.p'
 ITERATIONS = 50000
 BATCHSIZE = 32
 
@@ -78,7 +78,9 @@ def train_model_supervised(model):
         # print(list(len( a) for a in As))
         # print(As[0])
         # print(specs[0])
-
+        # print("inputs", specs)
+        # print("targets", As)
+        # input()
         enum_t = time.time()
 
         t = time.time()

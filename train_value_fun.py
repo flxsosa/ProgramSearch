@@ -17,16 +17,31 @@ def sample_from_traces(traces, biased=False, keep_all=False, get_actions=False):
     states = []
     rewards = []
     actions = []
+    prev_states = []
     for trace in traces:
         if keep_all: #instead of sampling, just use all of them for gradient update
             l = len(trace)
+            r = trace[-1].reward
+            #print("reward", r)
             for i, te in enumerate(trace):
                 states.append( te.s )
-                rewards.append( trace[-1].reward )
-                if i >= l - 1: #if last state, no action
-                    actions.append( None )
-                else: 
-                    actions.append ( trace[i+1].action )
+                rewards.append( r )
+                if get_actions and r == 1.0:
+                    """
+                    gets actions and previous states (which match the actions)
+                    only if they have positive reward
+                    """
+                    prev_states.append(te.prev_s)
+                    actions.append(te.action)
+
+                    # if i >= l - 1: #if last state, no action
+                    #     actions.append( None )
+                    # else: 
+                    #     actions.append ( trace[i+1].action )
+                    # print("state:" )
+                    # print("action:", actions[-1])
+                    # x = input()
+                    # if x == 'n': import pdb ; pdb.set_trace()
 
         else:
             assert not get_actions
@@ -35,9 +50,9 @@ def sample_from_traces(traces, biased=False, keep_all=False, get_actions=False):
             states.append( trace[idx].s )
             rewards.append( trace[-1].reward ) #TODO beware
 
-    return states, rewards, actions
+    return states, rewards, actions, prev_states
 
-
+#depricated, i think
 def filter_for_hits(states, rewards, actions):
     reward_states = []
     reward_actions = []
@@ -67,7 +82,7 @@ def train_RL(agent, mode='unbiased', tune_policy=False):
         ro_t = time.time()
         traces = agent.get_rollouts(envs, n_rollouts=args.n_rollouts) #TODO refactor
         ro_t2 = time.time()
-        states, rewards, actions = sample_from_traces(traces, keep_all=True, get_actions=tune_policy)
+        states, rewards, reward_actions, reward_states = sample_from_traces(traces, keep_all=True, get_actions=tune_policy)
 
         t = time.time()
         loss = agent.value_fun_optim_step(states, rewards)
@@ -76,8 +91,8 @@ def train_RL(agent, mode='unbiased', tune_policy=False):
         if tune_policy:
 
             #filter only positive rewards
-            reward_states, reward_actions = filter_for_hits(states, rewards, actions)
-            #print("reward states:", len(reward_states))
+            #reward_states, reward_actions = filter_for_hits(states, rewards, actions)
+            print("reward states:", len(reward_states), flush=True)
 
             pt = time.time()
             if len(reward_states) > 0:
@@ -94,7 +109,7 @@ def train_RL(agent, mode='unbiased', tune_policy=False):
         t3 = t2
         ttot3 = ttot2
 
-        if i%args.print_freq==0: 
+        if i%args.print_freq==0 and i!=0: 
             agent.save(args.save_path)
             print("Model saved", flush=True)
 
@@ -113,4 +128,4 @@ if __name__=='__main__':
     except FileNotFoundError:
         print ("no saved model found ... training value function from scratch") #TODO XXX
 
-    train_RL(agent)
+    train_RL(agent, tune_policy=True)
