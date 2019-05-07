@@ -26,7 +26,7 @@ import string
 LOAD_PATH = './models/rb_baseline_debug.p'
 SAVE_PATH = './models/rb_baseline_debug.p'
 ITERATIONS = 50000
-BATCHSIZE = 64
+BATCHSIZE = 32
 
 PRINT_FREQ = 20
 TEST_FREQ = 100
@@ -58,7 +58,7 @@ def generate_rb_data(batchsize):
     specs = [] 
     As = []
     for _ in range(batchsize): 
-        prog, inputs, outputs = generate_FIO(5)
+        prog, inputs, outputs = generate_FIO(4)
         io = list(zip(inputs, outputs))
         specs.append(io)
         As.append( prog.flatten() )

@@ -75,7 +75,7 @@ def train_RL(agent, mode='unbiased', tune_policy=False):
         ttot2 = time.time()
         envs = []
         for _ in range(args.n_envs_per_rollout):
-            _, inputs, outputs = generate_FIO(5)
+            _, inputs, outputs = generate_FIO(4)
             env = ROBENV(inputs, outputs)
             envs.append(env)
             
