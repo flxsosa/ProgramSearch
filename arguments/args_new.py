@@ -10,7 +10,7 @@ char_embed_dim = 20
 
 column_encoding_dim = 32 #16
 
-strLen = 100
+strLen = 36
 
 encoder = 'dense'
 
@@ -52,9 +52,9 @@ n_rollouts = 40
 
 n_envs_per_rollout = 25
 
-rl_iterations = 6000
+rl_iterations = 12000
 
-rl_mode = 'value_only'
+rl_mode = 'value only'
 
 ##test scaffold
 test_type = 'smc'

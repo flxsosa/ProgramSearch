@@ -26,7 +26,7 @@ import string
 LOAD_PATH = './models/rb_baseline_debug.p'
 SAVE_PATH = './models/rb_baseline_debug.p'
 ITERATIONS = 50000
-BATCHSIZE = 32
+BATCHSIZE = 64
 
 PRINT_FREQ = 20
 TEST_FREQ = 100
@@ -42,7 +42,7 @@ target_vocabulary = ALL_BUTTS
 def load_model():
     print(f"is cuda available? {torch.cuda.is_available()}")
     #model = RobustFill(*args, **kwargs) # TODO
-    model = RobustFill(input_vocabularies, target_vocabulary, hidden_size=512, embedding_size=128, cell_type="LSTM", max_length=40)
+    model = RobustFill(input_vocabularies, target_vocabulary, hidden_size=512, embedding_size=128, cell_type="LSTM", max_length=36)
     model.cuda()
     try:
         model.load(LOAD_PATH) # TODO, 

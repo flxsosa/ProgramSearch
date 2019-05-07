@@ -102,7 +102,7 @@ if __name__ == '__main__':
     #load model or create model
     agent = load_model()
     #train
-    #train_model_supervised(agent)
+    train_model_supervised(agent)
 
     #optionally, can do this:
     initialize_value_as_policy(agent)

@@ -11,7 +11,7 @@ import traceback
 
 _INDEX = list(range(-5, 6))
 
-MAX_STR_LEN = 100
+MAX_STR_LEN = 36
 
 _POSITION_K = list(range(-MAX_STR_LEN, MAX_STR_LEN+1))
 _CHARACTER = string.printable[:-4]

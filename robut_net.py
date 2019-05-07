@@ -223,9 +223,11 @@ class Agent:
         """    
         #chars:
         inputs, scratchs, committeds, outputs, masks, last_butts, past_buttons = zip(*x)
+        try:
+            inputs = np.stack( [i for i in inputs])
+        except ValueError:
+            import pdb; pdb.set_trace()
 
-
-        inputs = np.stack( [i for i in inputs])
         in_tensor = ntorch.tensor(inputs, ("batch", "Examples", "strLen"))
 
         scratchs = np.stack( scratchs)

@@ -503,7 +503,7 @@ def generate_FIO(n_ios, verbose=False):
     if verbose: print ("gneration failed retrying")
     return generate_FIO(n_ios)
 
-def get_supervised_sample(n_ios=5,
+def get_supervised_sample(n_ios=4,
                           render_kind={'render_scratch' : 'yes',
                                        'render_past_buttons' : 'no'}):
     
