@@ -102,6 +102,15 @@ def makeTestdata(synth=True, challenge=False, max_num_ex=4, include_const=False)
 
 if __name__ == '__main__':
     tasks = makeTestdata(synth=True, challenge=True, max_num_ex=4)
+
+    max_len = 0
+    for task in tasks:
+        inputs, outputs = task
+        for i in inputs:   
+            if len(i) > max_len: max_len = len(i)
+        for o in outputs:
+            if len(o) > max_len: max_len = len(o)
+
     # from ROBUT import get_supervised_sample
     # import time
 

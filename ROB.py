@@ -30,7 +30,7 @@ Overall Design Choice :
 """
 
 
-from ROBUT import _INDEX,_POSITION_K,_CHARACTER,_DELIMITER,_BOUNDARY,N_EXPRS,_POSSIBLE_TYPES,_POSSIBLE_DELIMS,_POSSIBLE_R
+from ROBUT import _INDEX,_POSITION_K,_CHARACTER,_DELIMITER,_BOUNDARY,N_EXPRS,_POSSIBLE_TYPES,_POSSIBLE_DELIMS,_POSSIBLE_R, MAX_STR_LEN
 
 from ROBUT import RepeatAgent, get_rollout, ALL_BUTTS, RobState, apply_fs
 
@@ -454,7 +454,7 @@ class R:
         assert 0, "what u doing boi"
 
 
-def generate_string(constraint, max_string_size=100):
+def generate_string(constraint, max_string_size=MAX_STR_LEN):
     constraint_dict, min_size = constraint
     #sample a size from min to max
     size = random.randint(min_size, max_string_size)

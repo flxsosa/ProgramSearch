@@ -10,7 +10,10 @@ import pregex as pre
 import traceback
 
 _INDEX = list(range(-5, 6))
-_POSITION_K = list(range(-100, 101))
+
+MAX_STR_LEN = 100
+
+_POSITION_K = list(range(-MAX_STR_LEN, MAX_STR_LEN+1))
 _CHARACTER = string.printable[:-4]
 _DELIMITER = "& , . ? ! @ ( ) [ ] % { } / : ; $ # \" ' -".split(' ') + [" "]
 _BOUNDARY = ["Start", "End"]
@@ -39,7 +42,7 @@ _POSSIBLE_R = {**_POSSIBLE_TYPES, **_POSSIBLE_DELIMS}
 
 
 
-N_IO = 5
+N_IO = 4
 
 class RobState:
 
