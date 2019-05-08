@@ -140,7 +140,7 @@ module cylindrical(p1,p2,radius)
 
     def execute(self):
         if self.dimensionality == 2:
-            return self.render(32)
+            return self.render(64)
         elif self.dimensionality == 3:
             return self.render(32)
         assert False
