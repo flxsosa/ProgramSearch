@@ -140,7 +140,7 @@ module cylindrical(p1,p2,radius)
 
     def execute(self):
         if self.dimensionality == 2:
-            return self.render(64)
+            return self.render(32)
         elif self.dimensionality == 3:
             return self.render(32)
         assert False
@@ -534,6 +534,11 @@ class Rectangle(CSG):
         self.x3 = x3
         self.y3 = y3
 
+    def extent(self):
+        xs = [self.x0,self.x1,self.x2,self.x3]
+        ys = [self.y0,self.y1,self.y2,self.y3]
+        return np.array([min(xs),min(ys)]),np.array([max(xs),max(ys)])
+
     @property
     def dimensionality(self): return 2        
 
@@ -590,6 +595,10 @@ class Circle(CSG):
         self.y = y
 
     def toTrace(self): return [self]
+
+    def extent(self):
+        r = self.d//2 + 1
+        return np.array([self.x - r,self.y - r]), np.array([self.x + r,self.y + r])
 
     @property
     def dimensionality(self): return 2
@@ -881,8 +890,77 @@ class Intersection(CSG):
         return np.clip(a*b,
                        0., 1.)
 
+        
+class Loop2(CSG):
+    token = 'for2'
+    type = arrow(tCSG,
+                 integer(2,5), # repetition count
+                 integer(0, RESOLUTION - 1), # dx
+                 integer(0, RESOLUTION - 1), # dy
+                 tCSG)
+    
+    def __init__(self, child, n, dx, dy):
+        super(Loop2, self).__init__()
+        self.child,self.n,self.dx,self.dy = child,n,dx,dy
+
+    def translate(self,*d):
+        return Loop2(self.child.translate(*d),self.n,self.dx,self.dy)
+
+    def simplifications(self):
+        yield self.child
+        for i in range(2,self.n):
+            yield Loop2(self.child,i,self.dx,self.dy)
+        for child in self.child.simplifications():
+            yield Loop2(child,self.n,self.dx,self.dy)
+    def toTrace(self):
+        return self.child.toTrace() + [ai]
+
+    def __str__(self):
+        return f"(for {str(self.child)} n={self.n} dx={self.dx} dy={self.dy})"
+
+    def extent(self):
+        a,b = self.child.extent()
+        displacement = np.array([self.dx,self.dy])
+        ps = np.stack(
+            [a + displacement*n for n in range(self.n) ] + [b + displacement*n for n in range(self.n) ])
+        return ps.min(0),ps.max(0)
+    def scale(self,s):
+        return Loop2(self.child.scale(s),self.n,
+                     self.dx*s,self.dy*s)
+
+    def children(self): return [self.child]
+
+    def serialize(self):
+        return (self.__class__.token,self.child,self.n,self.dx,self.dy)
+
+    def removeDeadCode(self):
+        child = self.child.removeDeadCode()
+        return Loop2(child,self.n,self.dx,self.dy)
+    
+    def flipX(self): return Union(self.elements[0].flipX(),
+                                  self.elements[1].flipX())
+    def flipY(self): return Union(self.elements[0].flipY(),
+                                  self.elements[1].flipY())
+    def flipZ(self): return Union(self.elements[0].flipZ(),
+                                  self.elements[1].flipZ())
+
+    def _render(self,r=None):
+        r = r or RESOLUTION
+        dx = self.dx*r//RESOLUTION
+        dy = self.dy*r//RESOLUTION
+        reference = self.child.render(r)
+        accumulator = reference
+        for i in range(self.n-1):
+            reference = np.copy(np.roll(reference, (dy,dx)))
+            # if dx > 0: reference[:dx] = 0
+            # elif dx < 0: reference[dx:] = 0
+            # if dy > 0: reference[:dy] = 0
+            # elif dy < 0: reference[dy:] = 0                
+            accumulator = accumulator + reference
+        return np.clip(accumulator,0.,1.)
+
 dsl_3d = DSL([Union, Difference, Intersection, Cuboid, Sphere, Cylinder])
-dsl_2d = DSL([Union, Difference, Intersection, Rectangle, Circle])
+dsl_2d = DSL([Union, Difference, Intersection, Loop2, Rectangle, Circle])
 
 
 def loadScad(path):
@@ -1132,7 +1210,7 @@ def random3D(maxShapes=13,minShapes=3,rotate=False):
 
             yo = random.choice([1,-1])
 
-            if True or random.random() < 0.33: # constant Z
+            if random.random() < 0.33: # constant Z
                 p0 = [a - l//2,b - yo*l//2,c]
                 p1 = [a + l//2,b + yo*l//2,c]
                 #(cylinder r=12 p0=[ 6 26 12] p1=[26  6 12])
@@ -1428,7 +1506,7 @@ def learnHeatMap(checkpoint='checkpoints/hm.p'):
     
 """Training"""
 def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=None,
-                nudge=False, translate=False):
+                nudge=False, translate=False, loops=False):
     assert not translate
     import matplotlib.pyplot as plot
 
@@ -1475,16 +1553,44 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
         y = random.choice([y for y in choices if y - d/2 >= 0 and y + d/2 < resolution ])
         return Circle(x,y,d)
 
+
     while True:
         s = None
         numberOfShapes = 0
         desiredShapes = random.choice(range(minShapes, 1 + maxShapes))
+        haveLooped = False
         for _ in range(desiredShapes):
+            if loops and not haveLooped and s is None:
+                while True:
+                    o = quadrilateral() if random.choice([True,False]) else circular()
+                    minimum, maximum = o.extent()
+                    size = maximum - minimum
+                    if random.random() > 0.5: # translate along X
+                        cs = [c for c in choices
+                              if maximum[0] + 2*c < resolution and c > size[0] ]
+                        if len(cs) == 0: continue
+                        dx = random.choice(cs)
+                        dy = 0
+                    else:
+                        cs = [c for c in choices
+                              if maximum[1] + 2*c < resolution and c > size[1] ]
+                        if len(cs) == 0: continue
+                        dy = random.choice(cs)
+                        dx = 0
+                    n = random.choice([n for n in [2,3,4,5]
+                                       if maximum[0] + n*dx < resolution and minimum[1] + n*dy < resolution ])
+                    s = Loop2(o,n,
+                              dx,dy)
+                    s.render()
+                    break
+                break
+            
+            
             o = quadrilateral() if random.choice([True,False]) else circular()
             if s is None:
                 s = o
             else:
-                if random.choice([True,False]):
+                if random.choice([True,True,False]):
                     new = s + o
                 else:
                     new = s - o
@@ -1739,7 +1845,6 @@ def getTrainingData(path):
 
     return getData
         
-
 if __name__ == "__main__":
     m = NoExecution(SpecEncoder(), dsl_2d)
     p = Union(Circle(1,2,3),
