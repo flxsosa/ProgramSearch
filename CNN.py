@@ -89,7 +89,6 @@ class CNN_3d(Module):
                  numberOfFilters=None):
         super(CNN_3d, self).__init__()
         assert inputImageDimension is not None
-        assert layers > 1
         def conv_block(in_channels, out_channels, pool, filterSize):
             module = nn.Sequential(
                 nn.Conv3d(in_channels, out_channels, filterSize, padding=filterSize//2),
