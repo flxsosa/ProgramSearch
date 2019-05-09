@@ -1286,8 +1286,11 @@ class ObjectEncoder(CNN):
     """Encodes a 2d object"""
     def __init__(self):
         super(ObjectEncoder, self).__init__(channels=2,
-                                            layers=3,
-                                            inputImageDimension=RESOLUTION*2)
+                                            inputImageDimension=RESOLUTION*2,
+                                            filterSizes=[3,3,3,3],
+                                            poolSizes=[2,2,1,1],
+                                            numberOfFilters=[32,32,32,16])
+                                            
 
     def forward(self, spec, obj):
         if isinstance(spec, list):
@@ -1308,8 +1311,10 @@ class SpecEncoder(CNN):
     """Encodes a 2d spec"""
     def __init__(self):
         super(SpecEncoder, self).__init__(channels=1,
-                                          layers=3,
-                                          inputImageDimension=RESOLUTION*2)
+                                          inputImageDimension=RESOLUTION*2,
+                                          filterSizes=[3,3,3,3],
+                                          poolSizes=[2,2,1,1],
+                                          numberOfFilters=[32,32,32,16])
 
 
 
