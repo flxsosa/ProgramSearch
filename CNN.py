@@ -80,42 +80,44 @@ class CNN(Module):
                 
 
 class CNN_3d(Module):
-    def __init__(self, _=None, channels=1, layers=2,
+    def __init__(self, _=None, channels=1, 
                  flattenOutput=True,
-                 inputImageDimension=None, hiddenChannels=64, outputChannels=64,
+                 inputImageDimension=None, 
                  channelsAsArguments=False,
-                 mp=2):
+                 filterSizes=None,
+                 poolSizes=None,
+                 numberOfFilters=None):
         super(CNN_3d, self).__init__()
         assert inputImageDimension is not None
         assert layers > 1
-        def conv_block(in_channels, out_channels, p=True):
+        def conv_block(in_channels, out_channels, pool, filterSize):
             module = nn.Sequential(
-                nn.Conv3d(in_channels, out_channels, 3, padding=1),
-                nn.ReLU(),
-                nn.Conv3d(out_channels, out_channels, 3, padding=1),
+                nn.Conv3d(in_channels, out_channels, filterSize, padding=filterSize//2),
                 nn.ReLU())
-            if mp > 1:
-                module = nn.Sequential(module, nn.MaxPool3d(mp))
+            if pool > 1:
+                module = nn.Sequential(module, nn.MaxPool3d(pool))
             return module                
 
         self.inputImageDimension = inputImageDimension
 
         self.channelsAsArguments = channelsAsArguments
 
-        # channels for hidden
-        hid_dim = hiddenChannels
-        z_dim = outputChannels
+        layers = []
+        previousChannels = channels
+        outputResolution = inputImageDimension
+        for filterSize,poolSize,out_channels in zip(filterSizes,poolSizes,numberOfFilters):
+            l = conv_block(previousChannels,out_channels,poolSize,filterSize)
+            layers.append(l)
+            previousChannels = out_channels
+            outputResolution = outputResolution//poolSize
+        if flattenOutput: layers.append(Flatten())
 
-        self.encoder = nn.Sequential(*([conv_block(channels, hid_dim)] + \
-                                       [conv_block(hid_dim, hid_dim) for _ in range(layers - 2) ] + \
-                                       [conv_block(hid_dim, z_dim)] + \
-                                       ([Flatten()] if flattenOutput else [])
-        ))
+        self.encoder = nn.Sequential(*layers)
 
         if flattenOutput:
-            self.outputDimensionality = int(outputChannels*inputImageDimension**3/((mp**3)**layers))
+            self.outputDimensionality = int(previousChannels*outputResolution**3)
         else:
-            self.outputChannels = z_dim
+            self.outputChannels = previousChannels
         self.channels = channels
 
         self.finalize()

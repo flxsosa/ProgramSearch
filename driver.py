@@ -103,12 +103,14 @@ if __name__ == "__main__":
             dsl = dsl_3d
             if not arguments.viewpoints:
                 oe = CNN_3d(channels=2, channelsAsArguments=True,
-                            hiddenChannels=32, outputChannels=32,
                             inputImageDimension=RESOLUTION,
-                            layers=2)
+                            filterSizes=[3,3,3],
+                            poolSizes=[4,1,1],
+                            numberOfFilters=[32,32,16])
                 se = CNN_3d(channels=1, inputImageDimension=RESOLUTION,
-                            hiddenChannels=32, outputChannels=32,
-                            layers=2)
+                            filterSizes=[3,3,3],
+                            poolSizes=[4,1,1],
+                            numberOfFilters=[32,32,16])
             else:
                 oe = MultiviewObject()
                 se = MultiviewSpec()
