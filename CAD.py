@@ -1520,6 +1520,23 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     dc = 16 # number of distinct coordinates
     choices = [c
                for c in range(0, resolution, resolution//dc) ]
+    def slantedQuadrilateral():
+        while True:
+            x0 = random.choice(choices)
+            y0 = random.choice(choices)
+            a = [a for a in range(resolution)
+                 if x0 - a in choices and y0 + a in choices and a > 1]
+            if len(a) == 0: continue
+            a = random.choice(a)
+            b = [b for b in range(resolution)
+                 if x0 + b in choices and y0 + b in choices and x0 - a + b in choices and y0 + a + b in choices and b > 1]
+            if len(b) == 0: continue
+            b = random.choice(b)
+            return Rectangle(x0,y0,
+                             x0 - a, y0 + a,
+                             x0 - a + b, y0 + a + b,
+                             x0 + b, y0 + b)
+
     def quadrilateral():
         if random.random() < 0.5:
             x0 = random.choice(choices[:-1])
@@ -1527,31 +1544,27 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
             x1 = random.choice([x for x in choices if x > x0 ])
             y1 = random.choice([y for y in choices if y > y0 ])
             return Rectangle(x0,y0,
-                              x0,y1,
-                              x1,y1,
-                              x1,y0)
+                             x0,y1,
+                             x1,y1,
+                             x1,y0)
         else:
-            while True:
-                x0 = random.choice(choices)
-                y0 = random.choice(choices)
-                a = [a for a in range(resolution)
-                     if x0 - a in choices and y0 + a in choices and a > 1]
-                if len(a) == 0: continue
-                a = random.choice(a)
-                b = [b for b in range(resolution)
-                     if x0 + b in choices and y0 + b in choices and x0 - a + b in choices and y0 + a + b in choices and b > 1]
-                if len(b) == 0: continue
-                b = random.choice(b)
-                return Rectangle(x0,y0,
-                                  x0 - a, y0 + a,
-                                  x0 - a + b, y0 + a + b,
-                                  x0 + b, y0 + b)
-            
+            return slantedQuadrilateral()
     def circular():
         d = random.choice([d for d in choices if d > 4])
         x = random.choice([x for x in choices if x - d/2 >= 0 and x + d/2 < resolution ])
         y = random.choice([y for y in choices if y - d/2 >= 0 and y + d/2 < resolution ])
         return Circle(x,y,d)
+    def triangle():
+        q = slantedQuadrilateral()
+        x0 = q.x1
+        y0 = q.y0
+        x1 = q.x3
+        y1 = q.y1
+        p = Rectangle(x0,y0,
+                      x0,y1,
+                      x1,y1,
+                      x1,y0)
+        return p - q        
 
 
     while True:

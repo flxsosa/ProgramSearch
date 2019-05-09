@@ -19,7 +19,7 @@ def branch():
 def launchGoogleCloud(size, name, gpuType, gpuCount):
 
     name = name.replace('_','-').replace('.','-').lower()
-    snapshot = "program-search-cuda9"
+    snapshot = "containedcuda"
 
     #os.system(f"gcloud compute --project tenenbaumlab disks create {name} --size 30 --zone us-east1-b --source-snapshot dreamcoder-jan26 --type pd-standard")
     os.system(f"gcloud compute --project tenenbaumlab disks create {name} --size 100 --zone us-east1-c --source-snapshot {snapshot} --type pd-standard")
@@ -63,7 +63,6 @@ def sendCheckpoint(address, checkpoint):
 def sendModel(address, modelpath):
     print("sending model")
     scp(address, modelpath, f"~/ProgramSearch/{modelpath}") #TODO
-    scp(address, modelpath+"vnet", f"~/ProgramSearch/{modelpath}vnet")
 
 def sendCommand(
         address,
@@ -98,10 +97,6 @@ git pull
     preamble += "mv ~/patch ~/ProgramSearch/patch\n"
     preamble += "git apply patch ; mkdir jobs\n"
 
-    # Google image already has these modules loaded
-    preamble += "git submodule update --init --recursive\n"
-
-    #SYNCing ..
     if upload:
         # This is probably a terribly insecure idea...
         # But I'm not sure what the right way of doing it is
@@ -112,7 +107,7 @@ git pull
         UPLOADFREQUENCY = 60 * 3  # every 3 minutes
         uploadCommand = """\
 rsync  -e 'ssh  -o StrictHostKeyChecking=no' -avz \
-results models jobs {}""".format(upload) # TODO change folders that are synced
+checkpoints jobs {}""".format(upload) # TODO change folders that are synced
         preamble += """
 mv ~/.ssh/%s ~/.ssh/id_rsa
 mv ~/.ssh/%s.pub ~/.ssh/id_rsa.pub
@@ -165,7 +160,7 @@ sudo shutdown -h now
     # Execute the script
     # For some reason you need to pipe the output to /dev/null in order to get
     # it to detach
-    ssh(address, "export PATH=\"/home/mnye/miniconda3/bin:$PATH\" && bash ./script.sh > /dev/null 2>&1 &")
+    ssh(address, "bash ./script.sh > /dev/null 2>&1 &")
     print("Executing script on remote host.")
 
 
@@ -186,7 +181,8 @@ def launchExperiment(
         print("You didn't specify an upload host, and also specify that the machine should shut down afterwards. These options are incompatible because this would mean that you couldn't get the experiment outputs.")
         sys.exit(1)
 
-    # building script: 
+    # building script:
+    command = f"python dummy.py&&singularity exec --nv container.img {command}"
     script = """
 %s > jobs/%s 2>&1
 """ % (command, job_id)
@@ -205,9 +201,9 @@ def launchExperiment(
         shutdown)
     if tail: #TODO
         ssh(address, f""" \
-                    mkdir -p ec/jobs && \
-                    touch ec/jobs/{job_id} && \
-                    tail -f -n+0 ec/jobs/{job_id} \
+                    mkdir -p ProgramSearch/jobs && \
+                    touch ProgramSearch/jobs/{job_id} && \
+                    tail -f -n+0 ProgramSearch/jobs/{job_id} \
 """)
 
 
@@ -217,10 +213,10 @@ if __name__ == "__main__":
     parser.add_argument('-u', "--upload",
                         default={
                             "mnye": "mnye@openmind7.mit.edu:/om/user/mnye/ProgramSearch",
+                            "ellisk": "ellisk@openmind7.mit.edu:/om2/user/ellisk/ProgramSearch",
                         }.get(user(), None))
     parser.add_argument('-z', "--size",
                         default="f1-micro")
-                        #TODO: may want to modify this to be a little easier to work with
     parser.add_argument("--tail",
                         default=False,
                         help="attach to the machine and tail ec's output.",
