@@ -19,7 +19,7 @@ def branch():
 def launchGoogleCloud(size, name, gpuType, gpuCount):
 
     name = name.replace('_','-').replace('.','-').lower()
-    snapshot = "containedcuda"
+    snapshot = "containedcuda2"
 
     #os.system(f"gcloud compute --project tenenbaumlab disks create {name} --size 30 --zone us-east1-b --source-snapshot dreamcoder-jan26 --type pd-standard")
     os.system(f"gcloud compute --project tenenbaumlab disks create {name} --size 100 --zone us-east1-c --source-snapshot {snapshot} --type pd-standard")

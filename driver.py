@@ -34,8 +34,12 @@ if __name__ == "__main__":
     parser.add_argument("--noExecution", default=False, action='store_true')
     parser.add_argument("--rotate", default=False, action='store_true')
     
+    print(f"Invoking as:\n\tpython {''.join(sys.argv)}")
+    
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
+
+
 
     if arguments.render:
         for path in arguments.render:
