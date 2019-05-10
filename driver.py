@@ -2,7 +2,8 @@ from CAD import *
 from tool_set import *
 import matplotlib.pyplot as plot
 
-import datetime
+
+from datetime import datetime
 
 
 

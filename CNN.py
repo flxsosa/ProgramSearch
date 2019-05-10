@@ -46,7 +46,7 @@ class CNN(Module):
 
         self.outputResolution = outputResolution
         if flattenOutput:
-            self.outputDimensionality = int(outputChannels*self.outputResolution*self.outputResolution)
+            self.outputDimensionality = int(previousChannels*self.outputResolution*self.outputResolution)
         else:
             self.outputChannels = previousChannels
         
