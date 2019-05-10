@@ -1646,6 +1646,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
 def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     print("cuda?",m.use_cuda)
     assert checkpoint is not None, "must provide a checkpoint path to export to"
+    sys.stdout.flush()
     
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     
@@ -1658,6 +1659,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     B = 16
 
     while trainTime is None or time.time() - startTime < trainTime:
+        sys.stdout.flush()
         ss = [getProgram() for _ in range(B)]
         ls = m.gradientStepTraceBatched(optimizer, [(s, s.toTrace())
                                                     for s in ss])
