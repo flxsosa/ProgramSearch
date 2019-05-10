@@ -30,7 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("--nudge", default=False, action='store_true')
     parser.add_argument("--oneParent", default=True, action='store_true')
     parser.add_argument("--noTranslate", default=True, action='store_true')
-    parser.add_argument("--resume", default=False, action='store_true')
+    parser.add_argument("--resume", default=None, type=str)
     parser.add_argument("--render", default=[],type=str,nargs='+')
     parser.add_argument("--tools", default=False, action='store_true')
     parser.add_argument("--noExecution", default=False, action='store_true')
@@ -132,8 +132,8 @@ if __name__ == "__main__":
         print(f"CNN output dimensionalitys are {oe.outputDimensionality} & {se.outputDimensionality}")
 
         if arguments.resume:
-            m = torch.load(arguments.checkpoint)
-            print(f"Resuming checkpoint {arguments.checkpoint}")
+            m = torch.load(arguments.resume)
+            print(f"Resuming checkpoint {arguments.resume}")
         else:
             if arguments.noExecution:
                 m = NoExecution(se,dsl)
@@ -147,7 +147,8 @@ if __name__ == "__main__":
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                  checkpoint=arguments.checkpoint)
     elif arguments.mode == "critic":
-        m = torch.load(arguments.checkpoint)
+        assert arguments.resume is not None, "You need to specify a checkpoint with --resume, which bootstraps the policy"
+        m = torch.load(arguments.resume)
         critic = A2C(m)
         def R(spec, program):
             if len(program) == 0 or len(program) > len(spec.toTrace()): return False
