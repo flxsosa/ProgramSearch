@@ -1525,7 +1525,7 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     dc = 16 # number of distinct coordinates
     choices = [c
                for c in range(0, resolution, resolution//dc) ]
-    def slantedQuadrilateral():
+    def slantedQuadrilateral(square=False):
         while True:
             x0 = random.choice(choices)
             y0 = random.choice(choices)
@@ -1533,8 +1533,12 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                  if x0 - a in choices and y0 + a in choices and a > 1]
             if len(a) == 0: continue
             a = random.choice(a)
-            b = [b for b in range(resolution)
-                 if x0 + b in choices and y0 + b in choices and x0 - a + b in choices and y0 + a + b in choices and b > 1]
+            if not square:
+                b = [b for b in range(resolution)
+                     if x0 + b in choices and y0 + b in choices and x0 - a + b in choices and y0 + a + b in choices and b > 1]
+            else:
+                b = [b for b in range(resolution)
+                     if x0 + b in choices and y0 + b in choices and x0 - a + b in choices and y0 + a + b in choices and b > 1 and b == a]
             if len(b) == 0: continue
             b = random.choice(b)
             return Rectangle(x0,y0,
@@ -1559,17 +1563,46 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
         x = random.choice([x for x in choices if x - d/2 >= 0 and x + d/2 < resolution ])
         y = random.choice([y for y in choices if y - d/2 >= 0 and y + d/2 < resolution ])
         return Circle(x,y,d)
-    def triangle():
-        q = slantedQuadrilateral()
-        x0 = q.x1
-        y0 = q.y0
-        x1 = q.x3
-        y1 = q.y1
-        p = Rectangle(x0,y0,
-                      x0,y1,
-                      x1,y1,
-                      x1,y0)
-        return p - q        
+    def triangle():        
+        q = slantedQuadrilateral(square=True)
+        # facing upward
+        if random.random() < 0.25:
+            x0 = q.x1
+            y0 = q.y0
+            x1 = q.x3
+            y1 = q.y1
+            p = Rectangle(x0,y0,
+                          x0,y1,
+                          x1,y1,
+                          x1,y0)
+        elif random.random() < 0.33: # facing downward
+            x0 = q.x1
+            y0 = q.y1
+            x1 = q.x3
+            y1 = q.y2
+            p = Rectangle(x0,y0,
+                          x0,y1,
+                          x1,y1,
+                          x1,y0)
+        elif random.random() < 0.5: # facing rightward
+            x0 = q.x1
+            y0 = q.y0
+            x1 = q.x2
+            y1 = q.y2
+            p = Rectangle(x0,y0,
+                          x0,y1,
+                          x1,y1,
+                          x1,y0)
+        else: # facing left
+            x0 = q.x0
+            y0 = q.y0
+            x1 = q.x3
+            y1 = q.y2
+            p = Rectangle(x0,y0,
+                          x0,y1,
+                          x1,y1,
+                          x1,y0)
+        return q - p
 
 
     while True:
@@ -1603,12 +1636,17 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
                     break
                 break
             
-            
-            o = quadrilateral() if random.choice([True,False]) else circular()
+
+            if random.random() < 0.1:
+                o = triangle()
+                is_triangle = True
+            else:
+                o = quadrilateral() if random.choice([True,False]) else circular()
+                is_triangle = False
             if s is None:
                 s = o
             else:
-                if random.choice([True,True,False]):
+                if is_triangle or random.choice([True,True,False]):
                     new = s + o
                 else:
                     new = s - o
