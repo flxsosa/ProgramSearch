@@ -2,6 +2,7 @@ from CAD import *
 from tool_set import *
 import matplotlib.pyplot as plot
 
+import datetime
 
 
 
@@ -33,8 +34,9 @@ if __name__ == "__main__":
     parser.add_argument("--tools", default=False, action='store_true')
     parser.add_argument("--noExecution", default=False, action='store_true')
     parser.add_argument("--rotate", default=False, action='store_true')
-    
-    print(f"Invoking as:\n\tpython {''.join(sys.argv)}")
+
+    timestamp = datetime.now().strftime('%FT%T')
+    print(f"Invoking @ {timestamp} as:\n\tpython {' '.join(sys.argv)}")
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
@@ -100,7 +102,7 @@ if __name__ == "__main__":
         if not arguments.td:
             if not arguments.rotate:
                 arguments.checkpoint += "_noRotate"
-        arguments.checkpoint += ".pickle"
+        arguments.checkpoint += f"{timestamp}.pickle"
         print(f"Setting checkpointpath to {arguments.checkpoint}")
     if arguments.mode == "imitation":
         if not arguments.td:
@@ -196,4 +198,4 @@ if __name__ == "__main__":
         testCSG(m,
                 dataGenerator,
                 arguments.timeout,
-                export=f"figures/CAD_{2 if arguments.td else 3}D_{suffix}.png")
+                timestamp=timestamp)

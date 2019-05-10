@@ -1675,7 +1675,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 
 
-def testCSG(m, getProgram, timeout, export):
+def testCSG(m, getProgram, timeout, timestamp):
     random.seed(0)
     oneParent = m.oneParent
     print(f"One parent restriction?  {oneParent}")
@@ -1702,7 +1702,8 @@ def testCSG(m, getProgram, timeout, export):
 
     testResults = [[] for _ in solvers]
 
-    os.system("mkdir data/test")
+    outputDirectory = f"experimentOutputs/{timestamp}"
+    os.system(f"mkdir  -p {outputDirectory}")
 
     if isinstance(getProgram, list):
         specs = getProgram
@@ -1714,8 +1715,8 @@ def testCSG(m, getProgram, timeout, export):
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
         
-        exportProgram(spec, "data/test/%03d.png"%ti)
-        with open("data/test/%03d_spec.pickle"%ti,"wb") as handle:
+        exportProgram(spec, "%s/%03d.png"%(outputDirectory,ti))
+        with open("%s/%03d_spec.pickle"%(outputDirectory,ti),"wb") as handle:
             pickle.dump(spec, handle)
         for n, solver in enumerate(solvers):
             print(f"Running solver {solver.name}")
@@ -1734,22 +1735,21 @@ def testCSG(m, getProgram, timeout, export):
                     bestProgram = None
                 else:
                     bestProgram = max(obs, key=lambda bp: bp.IoU(spec))
-                with open("data/test/%03d_%s.pickle"%(ti,solver.name),"wb") as handle:
+                with open("%s/%03d_%s.pickle"%(outputDirectory,ti,solver.name),"wb") as handle:
                     pickle.dump(bestProgram, handle)
                 exportProgram(bestProgram,
-                              "data/test/%03d_%s.png"%(ti,solver.name))
+                              "%s/%03d_%s.png"%(outputDirectory,ti,solver.name))
                 if not twodimensional:
-                    bestProgram.scad("data/test/%03d_%s.scad"%(ti,solver.name))
+                    bestProgram.scad("%s/%03d_%s.scad"%(outputDirectory,ti,solver.name))
                 
 
     names = [s.name for s in solvers]
-    if export is not None:
-        with open(os.path.splitext(export)[0] + ".pickle","wb") as handle:
-             pickle.dump(list(zip(names, testResults)),handle)
+    with open(f"{outputDirectory}/testResults.pickle","wb") as handle:
+        pickle.dump(list(zip(names, testResults)),handle)
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
                     names=names,
-                    export=export)
+                    export=f"{outputDirectory}/curve.png")
 
 def plotTestResults(testResults, timeout, defaultLoss=None,
                     names=None, export=None):
