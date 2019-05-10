@@ -103,7 +103,7 @@ if __name__ == "__main__":
         if not arguments.td:
             if not arguments.rotate:
                 arguments.checkpoint += "_noRotate"
-        arguments.checkpoint += f"{timestamp}.pickle"
+        arguments.checkpoint += f"_{timestamp}.pickle"
         print(f"Setting checkpointpath to {arguments.checkpoint}")
     if arguments.mode == "imitation":
         if not arguments.td:
