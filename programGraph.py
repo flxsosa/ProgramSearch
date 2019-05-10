@@ -7,7 +7,8 @@ class ProgramGraph:
         self.nodes = nodes if isinstance(nodes, tuple) else tuple(nodes)
 
     @staticmethod
-    def fromRoot(r, oneParent=False):
+    def fromRoots(rs, oneParent=True):
+        assert oneParent
         if not oneParent:
             ns = set()
             def reachable(n):
@@ -22,8 +23,11 @@ class ProgramGraph:
             def visit(n):
                 ns.append(n)
                 for c in n.children(): visit(c)
-            visit(r)
+            for r in rs: visit(r)
             return ProgramGraph(ns)
+    @staticmethod
+    def fromRoot(r,oneParent=True):
+        return ProgramGraph.fromRoots([r],oneParent=oneParent)
                     
 
     def __len__(self): return len(self.nodes)

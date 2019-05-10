@@ -5,6 +5,26 @@ from exit import *
 
 import time
 
+class ForwardSample_noExecution(Solver):
+    def __init__(self,m):
+        self.model = m
+
+    @property
+    def name(self): return "no_REPL"
+
+    def _infer(self, spec, loss, timeout):
+        maximumLines = len(spec.toTrace()) + 1
+        maximumTokens = sum(len(c.serialize())
+                            for c in spec.toTrace() ) + 2
+
+        t0 = time.time()
+        se = self.model.specEncoder(spec.execute())
+        while time.time() - t0 < timeout:
+            program = self.model.sample(spec, se,
+                                        maximumLines=maximumLines,
+                                        maximumTokens=maximumTokens)
+            if program is None: continue
+            self._report(ProgramGraph.fromRoots(program))
 
 class ForwardSample(ExitSolver):
     def __init__(self, model, _=None, maximumLength=8):

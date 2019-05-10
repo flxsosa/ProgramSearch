@@ -35,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--tools", default=False, action='store_true')
     parser.add_argument("--noExecution", default=False, action='store_true')
     parser.add_argument("--rotate", default=False, action='store_true')
+    parser.add_argument("--solvers",default=["fs"],nargs='+')
 
     timestamp = datetime.now().strftime('%FT%T')
     print(f"Invoking @ {timestamp} as:\n\tpython {' '.join(sys.argv)}")
@@ -200,4 +201,5 @@ if __name__ == "__main__":
         testCSG(m,
                 dataGenerator,
                 arguments.timeout,
+                solvers=arguments.solvers,
                 timestamp=timestamp)

@@ -1675,16 +1675,16 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 
 
-def testCSG(m, getProgram, timeout, timestamp):
+def testCSG(m, getProgram, timeout, timestamp, solvers):
     random.seed(0)
     oneParent = m.oneParent
     print(f"One parent restriction?  {oneParent}")
-    solvers = [# RandomSolver(dsl),
-               # MCTS(m, reward=lambda l: 1. - l),
-               #SMC(m),
-        # BeamSearch(m, criticCoefficient=1),
-                # BeamSearch(m, criticCoefficient=0.),
-               ForwardSample(m, maximumLength=18)]
+    _solvers = {"SMC": lambda : SMC(m),
+                "bm": lambda : BeamSearch(m),
+                "fs": lambda : ForwardSample(m),
+                "bmv": lambda : BeamSearch(m,criticCoefficient=1.),
+                "noExecution": lambda : ForwardSample_noExecution(m)}
+    solvers = [_solvers[s]() for s in solvers]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     twodimensional = True

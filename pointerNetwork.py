@@ -803,12 +803,18 @@ class NoExecution(Module):
         return L
 
 
-            
+    @property
+    def oneParent(self): return True
 
-    def sample(self, spec):
-        h = self.initialState(self.specEncoder(spec.execute()))
+    def sample(self, spec, specEncoding=None, maximumLines=None, maximumTokens=None):
+        if specEncoding is None:
+            specEncoding = self.specEncoder(spec.execute())
+        h = self.initialState(specEncoding)
 
         scope = {} # map from program to attention key
+
+        numberOfLines = 0
+        numberOfTokens = 0
 
         lastOutput = "STARTING"
         tokenBuffer = []
@@ -836,8 +842,11 @@ class NoExecution(Module):
                 scope[new_command] = h
                 if next_symbol == "ENDING": return list(scope.keys())
                 lastOutput = next_symbol
+                numberOfLines += 1
             elif next_symbol == "POINTER":
+                numberOfTokens += 1
                 alternatives = list(scope.items())
+                if len(alternatives) == 0: return None
                 objectEncodings = torch.stack([oe for _,oe in alternatives])
                 objects = [o for o,_ in alternatives]                
 
@@ -845,8 +854,14 @@ class NoExecution(Module):
                 tokenBuffer.append(objects[torch.multinomial(distribution.exp(), 1)[0].data.item()])
                 lastOutput = tokenBuffer[-1]
             else:
+                numberOfTokens += 1
                 tokenBuffer.append(next_symbol)
                 lastOutput = next_symbol
+
+            if maximumLines is not None and numberOfLines > maximumLines:
+                return list(scope.keys())
+            if maximumTokens is not None and numberOfTokens > maximumTokens:
+                return list(scope.keys())
         
             
 
