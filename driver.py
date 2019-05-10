@@ -153,9 +153,8 @@ if __name__ == "__main__":
         critic = A2C(m)
         def R(spec, program):
             if len(program) == 0 or len(program) > len(spec.toTrace()): return False
-            spec = spec.execute() > 0.5
             for o in program.objects():
-                if np.all((o.execute() > 0.5) == spec): return True
+                if o.IoU(spec) > 0.95: return True
             return False
         if arguments.td:
             training = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
