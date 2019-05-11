@@ -61,8 +61,8 @@ def sendCheckpoint(address, checkpoint):
     scp(address, checkpoint, f"~/{os.path.split(checkpoint)[1]}")
 
 def sendModel(address, modelpath):
-    print("sending model")
-    scp(address, modelpath, f"~/ProgramSearch/{modelpath}") #TODO
+    print(f"sending model {modelpath} to remote home directory")
+    scp(address, modelpath, f"~") #TODO
 
 def sendCommand(
         address,
