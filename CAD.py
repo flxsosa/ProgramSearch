@@ -1176,7 +1176,7 @@ def random3D(maxShapes=13,minShapes=3,rotate=False):
                       x1,y1,z1)
     def randomCylinder():
         if (not rotate) or (random.random() < 0.7): # axis aligned
-            r = random.choice([2,4,8,12])
+            r = random.choice([4,8,12])
             l = random.choice([4,8,12,16,20])
             # sample the center, aligned with the axis of the cylinder
             a = random.choice([c for c in range(RESOLUTION)
