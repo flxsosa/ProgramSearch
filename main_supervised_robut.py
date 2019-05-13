@@ -65,15 +65,17 @@ todo:
 
 """
 
-from ROBUT import get_supervised_sample, ALL_BUTTS
+from ROBUT import ALL_BUTTS
+from ROB import get_supervised_sample
 from robut_net import Agent
 from load_args import args #requires
 import torch
 import time
 
-from train_value_fun import train_value_fun
+from train_value_fun import train_RL
 
 from robut_data import get_supervised_batchsize, GenData, makeTestdata
+import dill
 
 def test_gsb():
     for i, (S, A) in enumerate(get_supervised_batchsize(get_supervised_sample, 200)):
@@ -324,7 +326,9 @@ def test_smc():
     agent.load(args.load_path)
     print("loaded model")
 
-    tasklist = makeTestdata(synth=False, challenge=True, max_num_ex=4)
+    #tasklist = makeTestdata(synth=False, challenge=True, max_num_ex=4)
+    with open('rb_tasks.p', 'rb') as h:
+        tasklist = dill.load(h)
     print("loaded data")
     import random
     random.shuffle(tasklist)

@@ -760,7 +760,8 @@ class ROBENV:
             if len(self.pstate.past_buttons) >= 2:
                 prev_btn, cur_btn = self.pstate.past_buttons[-2:]
                 prev_btn.check_next_btn(cur_btn)
-        except (IndexError, ButtonSeqError, CommitPrefixError, NoChangeError) as e:
+        #except (IndexError, ButtonSeqError, CommitPrefixError, NoChangeError) as e:
+        except (IndexError, ButtonSeqError, NoChangeError) as e: #may also be able to get rid of noChangeError
             if self.verbose:
                 print ("CATCHING")
                 print ("error ", e)

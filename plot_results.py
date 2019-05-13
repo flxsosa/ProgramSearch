@@ -78,6 +78,8 @@ def plot(file_list, legend_list, filename):
 
             y_axis = [percent_solved(results, fn, x) for x in x_axis]
             ax[i].semilogx(x_axis, y_axis, label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
+            #l = int(len(x_axis)/10)
+            #ax[i].plot(x_axis[:l], y_axis[:l], label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
             #ax[i].set_title(title)
             ax[i].legend(loc='lower right')#'best')
             #import pdb; pdb.set_trace()
@@ -90,35 +92,55 @@ def plot(file_list, legend_list, filename):
 
 if __name__=='__main__':
 
-    file_list = [
-                    './results/smc_val_new.p1556099092',
-                    './results/forward_sample_alpha.p1555577199',
-                    './results/beam_val_new.p1556084609',
-                    './results/beam_alpha.p1555229962',
-                    './results/a_star_150k_alpha.p1555289034',
-                    './results/a_star_no_val_150k_alpha.p1555286946',
-                    './results/beam_val_noscratch.p1556240944', #unfinished
-                    './results/beam_noscratch.p1556240952', #unfinished
-                    './results/a_star_noscratch.p1556117426',
-                    './results/a_star_noscratch.p1556130303',
-                    './results/smc_val_noscratch.p1556173737',
-                    './results/sample_noscratch.p1556111283'
-                ]
+    file_list = [ 
+        './results/beam_val.p1557526743',
+        './results/beam_noval.p1557526751',
+        './results/smc.p1557526764',
+        './results/smc_noval.p1557526776',
+        './results/a_star.p1557526718',
+        './results/a_star_noval.p1557526718',
+        ]
 
     legend_list = [
-                    'SMC',
-                    'Forward sample',
-                    'Beam w/ value',
-                    'Beam w/out value',
-                    'A* w/ value',
-                    'A* w/out value',
-                    'Beam w/ value, no scratch',
-                    'Beam w/out value, no scratch',
-                    'A* w/ value, no scratch',
-                    'A* w/out value, no scratch',
-                    'SMC, no scratch',
-                    'sample, no scratch',
-                    ]
+        'Beam with value',
+        'Beam without value',
+        'SMC',
+        'Sample',
+        'A* with value',
+        'A* without value'
+        ]
+
+
+    ### Camera-ready:
+    # file_list = [
+    #                 './results/smc_val_new.p1556099092',
+    #                 './results/forward_sample_alpha.p1555577199',
+    #                 './results/beam_val_new.p1556084609',
+    #                 './results/beam_alpha.p1555229962',
+    #                 './results/a_star_150k_alpha.p1555289034',
+    #                 './results/a_star_no_val_150k_alpha.p1555286946',
+    #                 './results/beam_val_noscratch.p1556240944', #unfinished
+    #                 './results/beam_noscratch.p1556240952', #unfinished
+    #                 './results/a_star_noscratch.p1556117426',
+    #                 './results/a_star_noscratch.p1556130303',
+    #                 './results/smc_val_noscratch.p1556173737',
+    #                 './results/sample_noscratch.p1556111283'
+    #             ]
+
+    # legend_list = [
+    #                 'SMC',
+    #                 'Forward sample',
+    #                 'Beam w/ value',
+    #                 'Beam w/out value',
+    #                 'A* w/ value',
+    #                 'A* w/out value',
+    #                 'Beam w/ value, no scratch',
+    #                 'Beam w/out value, no scratch',
+    #                 'A* w/ value, no scratch',
+    #                 'A* w/out value, no scratch',
+    #                 'SMC, no scratch',
+    #                 'sample, no scratch',
+    #                 ]
 
     # file_list = ['./results/beam_alpha.p1555229962',
     #                 './results/beam_withval_multiple_alpha.p1555370579',
@@ -136,6 +158,6 @@ if __name__=='__main__':
     #                 'a_star, prev value',
     #                 ]
 
-    savefile = 'workshop_with_unfinished_beam'
+    savefile = 'new_baseline'
 
     plot(file_list, legend_list, savefile)

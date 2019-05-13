@@ -32,7 +32,7 @@ PRINT_FREQ = 20
 TEST_FREQ = 100
 SAVE_FREQ = 20
 
-DEBUG = True
+DEBUG = False
 
 
 
@@ -99,7 +99,10 @@ def train_model_supervised(model):
             print("saved model", flush=True)
         if i%TEST_FREQ == 0 and i!=0:  
             print("testing...")
-            specs, As = generate_rb_data(1)  if not DEBUG else debug_data[0][:1], debug_data[1][:1]
+            if not DEBUG:
+                specs, As = generate_rb_data(1)
+            else:
+                specs, As = debug_data[0][:1], debug_data[1][:1]
             print("TESTING SPEC:", specs)
             actions = model.sample(specs, n_samples=1)
             print("real actions:")

@@ -478,8 +478,10 @@ class Agent:
         stats['end_time'] = time.time()
         return hit, solution, stats
 
-    def forward_sample_solver(self, env, batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False): #TODO, no idea what this number should be
+    def forward_sample_solver(self, env, max_batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False): #TODO, no idea what this number should be
         stats = None
+        batch_size = 1
+
         while (not stats) or stats['nodes_expanded'] <= max_nodes_expanded:
             hit, solution, stats = self.sample_rollout(env, 
                                         batch_size=batch_size,
@@ -491,6 +493,10 @@ class Agent:
                 return hit, solution, stats
             if verbose:
                 print("nodes expanded:", stats['nodes_expanded'])
+
+            if batch_size < max_batch_size:
+                batch_size *= 2
+                print("doubling sample size to###########################", batch_size)
 
         #if nothing is found
         return hit, solution, stats

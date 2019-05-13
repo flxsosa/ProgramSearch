@@ -61,13 +61,14 @@ def test_on_real_data():
                     no_value=not test_args.use_value,
                     use_prev_value=test_args.use_prev_value) #todo add timeout
 
-        elif test_args.test_type == 'smc':
+        elif test_args.test_type == 'smc' and test_args.use_value:
             hit, solution, stats = agent.smc_rollout(env, max_beam_size=1024, max_iter=30, verbose=False, max_nodes_expanded=2*1024*30*10)
 
-        elif test_args.test_type == 'sample':
+        elif test_args.test_type == 'sample' or (test_args.test_type == 'smc' and not test_args.use_value):
+            print("doing forward sample")
             assert not test_args.use_value
             assert not test_args.use_prev_value
-            hit, solution, stats = agent.forward_sample_solver(env, batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False)
+            hit, solution, stats = agent.forward_sample_solver(env, max_batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False)
         else: assert False
 
         if hit:
