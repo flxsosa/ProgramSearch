@@ -8,7 +8,7 @@ import numpy as np
 
 
 class A2C:
-    def __init__(self, model, outerBatch=1, innerBatch=8):
+    def __init__(self, model, outerBatch=2, innerBatch=16):
         self.model = model
         self.outerBatch = outerBatch
         self.innerBatch = innerBatch
@@ -29,6 +29,7 @@ class A2C:
             t0 = time.time()
             specEncodings = self.model.specEncoder(np.array([s.execute() for s in specs ]))
             objectEncodings = ScopeEncoding(self.model)
+            fs.maximumLength = 1 + max(len(spec) for spec in specs)
             trajectories = fs.batchedRollout(specs, self.innerBatch,
                                              objectEncodings=objectEncodings,
                                              specEncodings=specEncodings)

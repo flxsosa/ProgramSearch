@@ -134,7 +134,6 @@ module cylindrical(p1,p2,radius)
     def dimensionality(self):
         cs = self.children()
         if len(cs) == 0: assert False
-        assert all( c.dimensionality == cs[0].dimensionality for c in cs  )
         return cs[0].dimensionality
         
 
