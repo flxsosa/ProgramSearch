@@ -107,7 +107,7 @@ git pull
         UPLOADFREQUENCY = 60 * 3  # every 3 minutes
         uploadCommand = """\
 rsync  -e 'ssh  -o StrictHostKeyChecking=no' -avz \
-checkpoints jobs {}""".format(upload) # TODO change folders that are synced
+experimentOutputs checkpoints jobs {}""".format(upload) # TODO change folders that are synced
         preamble += """
 mv ~/.ssh/%s ~/.ssh/id_rsa
 mv ~/.ssh/%s.pub ~/.ssh/id_rsa.pub

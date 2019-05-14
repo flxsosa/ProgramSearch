@@ -1,6 +1,8 @@
 from CAD import *
 
 def make2DTools():
+    import os
+    os.system("mkdir  -p demo")
     everyTool = []
 
 
