@@ -29,7 +29,7 @@ class A2C:
             t0 = time.time()
             specEncodings = self.model.specEncoder(np.array([s.execute() for s in specs ]))
             objectEncodings = ScopeEncoding(self.model)
-            fs.maximumLength = 1 + max(len(spec) for spec in specs)
+            fs.maximumLength = 1 + max(len(spec.toTrace()) for spec in specs)
             trajectories = fs.batchedRollout(specs, self.innerBatch,
                                              objectEncodings=objectEncodings,
                                              specEncodings=specEncodings)
