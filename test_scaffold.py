@@ -26,9 +26,19 @@ def test_on_real_data():
     agent.load(args.load_path)
     print("loaded model")
 
-    tasklist = makeTestdata(synth=True, challenge=True, max_num_ex=4)
+    if test_args.random_data:
+        with open("random_tasks_noconst10.p", 'rb') as h:
+            tasklist = dill.load(h)
+        print("USING RANDOM TEST DATA")
+    else:
+        tasklist = makeTestdata(synth=True, challenge=True, max_num_ex=4)
     #import random
     #random.shuffle(tasklist)
+
+
+    #print("USING SINGLE TASK*********")
+    #tasklist = [[("23 Witherspoon Drive, PA", "17 Terrace Street, PA", "188 Rosegarden Way, MA", "1873 Hopkins Road, AK"), ("Witherspoon Drive (PA)", "Terrace Street (PA)", "Rosegarden Way (MA)", "Hopkins Road (AK)")]]
+    #tasklist = [[("23 Witherspoon Drive, PA", "17 Terrace Street, PA", "188 Rosegarden Way, MA", "1873 Hopkins Road, AK"), ("Witherspoon Drive (PA) (PA)", "Terrace Street (PA) (PA)", "Rosegarden Way (MA) (MA)", "Hopkins Road (AK) (AK)")]]
 
     if test_args.debug:
         tasklist = tasklist[:3]
@@ -44,7 +54,7 @@ def test_on_real_data():
             print("BEAM SEARCH:")
             hit, solution, stats = agent.iterative_beam_rollout(env,
                     max_beam_size=1024,
-                    max_iter=30,
+                    max_iter=45,
                     use_value=test_args.use_value,
                     value_filter_multiple=2,
                     use_prev_value=test_args.use_prev_value) #TODO maybe full beam
@@ -54,7 +64,7 @@ def test_on_real_data():
             hit, solution, stats = agent.a_star_rollout(env,
                     batch_size=1,
                     max_count=1024*30*5,
-                    max_iter=30,
+                    max_iter=45,
                     verbose=False,
                     max_num_actions_expand=800,
                     beam_size=800,
@@ -62,13 +72,13 @@ def test_on_real_data():
                     use_prev_value=test_args.use_prev_value) #todo add timeout
 
         elif test_args.test_type == 'smc' and test_args.use_value:
-            hit, solution, stats = agent.smc_rollout(env, max_beam_size=1024, max_iter=30, verbose=False, max_nodes_expanded=2*1024*30*10)
+            hit, solution, stats = agent.smc_rollout(env, max_beam_size=1024, max_iter=45, verbose=False, max_nodes_expanded=2*1024*30*10)
 
         elif test_args.test_type == 'sample' or (test_args.test_type == 'smc' and not test_args.use_value):
             print("doing forward sample")
             assert not test_args.use_value
             assert not test_args.use_prev_value
-            hit, solution, stats = agent.forward_sample_solver(env, max_batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False)
+            hit, solution, stats = agent.forward_sample_solver(env, max_batch_size=1024, max_iter=45, max_nodes_expanded=2*1024*30*10, verbose=False)
         else: assert False
 
         if hit:
@@ -93,6 +103,7 @@ if __name__ == '__main__':
     parser.add_argument("--use_value", action='store_true')
     parser.add_argument("--debug", action='store_true')
     parser.add_argument("--use_prev_value", action='store_true')
+    parser.add_argument("--random_data", action='store_true')
     test_args, unk = parser.parse_known_args()
     print("test_args:", test_args)
     print("unknown test args:", unk)
@@ -106,7 +117,7 @@ if __name__ == '__main__':
 
 
     timestr = str(int(time.time()))
-    filename = test_args.resultsfile + timestr
+    filename = test_args.resultsfile #+ timestr
 
 
     #load model

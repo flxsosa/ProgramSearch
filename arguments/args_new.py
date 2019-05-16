@@ -26,8 +26,8 @@ train_iterations = 50000
 
 parallel = True
 n_processes = 8
-save_path = 'models/new.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
-load_path = 'models/new.p'
+save_path = 'models/new24k.p' #'robut_model_larger.p' #'robut_model_conv.p' # #'robut_model.p'
+load_path = 'models/new24k.p'
 
 encode_past_buttons = False
 past_button_embed_dim = None

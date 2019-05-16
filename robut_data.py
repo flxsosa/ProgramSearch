@@ -3,6 +3,8 @@ from multiprocessing import Queue, Process
 
 #from pathos.multiprocessing import Queue, Process 
 #parallel data gen
+import dill
+
 
 def get_supervised_batchsize(fn, batchsize=200):
     #takes a generation function and outputs lists of optimal size
@@ -99,17 +101,47 @@ def makeTestdata(synth=True, challenge=False, max_num_ex=4, include_const=False)
 
     return tasklist
 
+def save_random_test(n):
+    from ROB import generate_FIO
+    tasks = []
+    ps = []
+    l = 0
+    while l < n:
+        p, inputs, outputs = generate_FIO(4)
+        #check if it's all outputs and reject
+        if any(outputs[0] == o for o in outputs[1:]): continue
+        if len(p.flatten()) < 10: continue
+
+        tasks.append( (inputs, outputs) )
+        print("max input len", max( len(i) for i in inputs))
+        print("max output len", max( len(o) for o in inputs))
+        
+        ps.append( p.flatten() )
+
+        l += 1
+
+    with open("random_tasks_noconst10.p", 'wb') as h:
+        dill.dump(tasks, h)
+
+    return tasks, ps
+
+
+
 
 if __name__ == '__main__':
-    tasks = makeTestdata(synth=True, challenge=True, max_num_ex=4)
 
-    max_len = 0
-    for task in tasks:
-        inputs, outputs = task
-        for i in inputs:   
-            if len(i) > max_len: max_len = len(i)
-        for o in outputs:
-            if len(o) > max_len: max_len = len(o)
+    tasks, ps = save_random_test(100)
+
+    # tasks = makeTestdata(synth=True, challenge=True, max_num_ex=4)
+
+    # max_len = 0
+    # for task in tasks:
+    #     inputs, outputs = task
+    #     for i in inputs:   
+    #         if len(i) > max_len: max_len = len(i)
+    #     for o in outputs:
+    #         if len(o) > max_len: max_len = len(o)
+
 
     # from ROBUT import get_supervised_sample
     # import time

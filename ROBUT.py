@@ -185,8 +185,8 @@ class Commit(Button):
         for commit, output in zip(committed_new, pstate.outputs):
             if output == "":
                 continue
-            if not output.startswith(commit):
-                raise CommitPrefixError
+            # if not output.startswith(commit):
+            #     raise CommitPrefixError
         return RobState(pstate.inputs,
                         scratch_new,
                         committed_new,
@@ -760,14 +760,14 @@ class ROBENV:
             if len(self.pstate.past_buttons) >= 2:
                 prev_btn, cur_btn = self.pstate.past_buttons[-2:]
                 prev_btn.check_next_btn(cur_btn)
-        #except (IndexError, ButtonSeqError, CommitPrefixError, NoChangeError) as e:
-        except (IndexError, ButtonSeqError, NoChangeError) as e: #may also be able to get rid of noChangeError
+        except (IndexError, ButtonSeqError, CommitPrefixError, NoChangeError) as e:
+        #except (IndexError, ButtonSeqError, NoChangeError) as e: #may also be able to get rid of noChangeError
             if self.verbose:
                 print ("CATCHING")
                 print ("error ", e)
                 print(traceback.format_exc())
             self.done = True
-            self.last_step = RobState.crash_state_np(self.render_kind), -1.0, True 
+            self.last_step = RobState.crash_state_np(self.render_kind), -1.0, True
             return self.last_step
 
         reward = 0.0 if self.pstate.committed != self.pstate.outputs else 1.0
