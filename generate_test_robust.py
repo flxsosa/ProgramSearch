@@ -20,11 +20,11 @@ def address_info():
     return street_number(), street(), street_type(), street_zip(), street_state()
 
 def street_ex1(st_num, st, st_type, st_zip, st_state):
-    return [f"{st_num} {st} {st_type} {st_zip}", f"Num:{st_num} Street:{st}"]
+    return [f"{st_num} {st} {st_type} {st_zip}", f"Street:{st}, House num:{st_num} "]
 def street_ex2(st_num, st, st_type, st_zip, st_state):
-    return [f"{st_num}, {st} {st_type}, {st_state}", f"{st} {st_type} ({st_state})"]
+    return [f"{st_num} {st} {st_type}, {st_state}", f"{st} {st_type} ({st_state})"]
 def street_ex3(st_num, st, st_type, st_zip, st_state):
-    return [f"{st_num}, {st} {st_type}, {st_state}, {st_zip}", f"{st_state},{st_zip}"]
+    return [f"{st_num} {st} {st_type}, {st_state} {st_zip}", f"{st}, ({st_state}, {st_zip})"]
 def street_ex4(st_num, st, st_type, st_zip, st_state):
     zip_suffix = street_zip()
     return [f"{st_num}, {st} {st_type}, {st_state}, {st_zip}-{zip_suffix}", f"{st_state} {st_zip}"]
