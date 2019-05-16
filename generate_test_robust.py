@@ -32,10 +32,10 @@ def street_ex(n_io):
 
 ###Phone number stuff
 def threeD():
-    return "".join(random.choices(range(10), k=3))
+    return "".join(str(d) for d in random.choices(range(10), k=3))
 
 def fourD():
-    return "".join(random.choices(range(10), k=3))
+    return "".join(str(d) for d in random.choices(range(10), k=4))
 
 def phone_info():
     return threeD(), threeD(), fourD()
@@ -111,3 +111,5 @@ if __name__ == '__main__':
     # print (street_ex(4))
     tasks = date_ex(4)
     print(tasks)
+
+    print(phone_ex(4))
