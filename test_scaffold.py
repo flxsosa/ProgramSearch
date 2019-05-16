@@ -30,6 +30,11 @@ def test_on_real_data():
         with open("random_tasks_noconst10.p", 'rb') as h:
             tasklist = dill.load(h)
         print("USING RANDOM TEST DATA")
+    elif test_args.our_data:
+        with open("hand_made_data.p", 'rb') as h:
+            tasklist = dill.load(h)
+        print("USING OUR TEST DATA")
+        print("len(tasklist):", len(tasklist))
     else:
         tasklist = makeTestdata(synth=True, challenge=True, max_num_ex=4)
     #import random
@@ -104,6 +109,7 @@ if __name__ == '__main__':
     parser.add_argument("--debug", action='store_true')
     parser.add_argument("--use_prev_value", action='store_true')
     parser.add_argument("--random_data", action='store_true')
+    parser.add_argument("--our_data", action='store_true')
     test_args, unk = parser.parse_known_args()
     print("test_args:", test_args)
     print("unknown test args:", unk)

@@ -33,6 +33,7 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 LONGEST = [False, False, False, False, False, True, True, False, False, True, False, True, False, True, False, True, True, True, True, True, False, True, False, False, True, True, False, True, True, False, True, False, True, False, False, True, False, False, True, False, True, False, False, True, False, True, False, True, False, True, False, True, False, True, False, True, False, False, False, True, True, False, True, False, True, False, False, False, False, False, False, False, False, True, False, True, False, False, False, False, True, False, False, True, True, False, True, True, False, False, False, True, True, False, False, False, True, False, False, True] 
 ONLY_LONGEST = False
+HACK = True
 
 def percent_solved(results, fn, x):
     tot = 0
@@ -67,10 +68,13 @@ def plot(file_list, legend_list, filename):
                 r = {IO: res for lng, (IO, res) in zip(LONGEST, r.items()) if lng } 
 
                 print("NUMBER OF PROG", len(r))
-
+            if HACK:
+                if results_list:
+                    r = {IO: res for IO, res in zip(results_list[0].keys(), r.values())}
+                    print("NUMBER OF PROG", len(r))
             results_list.append(r)
 
-    EXAMINE = True
+    EXAMINE = False
     if EXAMINE:
         rs = {key: (r1, r2, r3, r4) for key, r1, r2, r3, r4 in zip(results_list[0].keys(), results_list[0].values(), results_list[1].values(), results_list[2].values(), results_list[3].values())} 
         rlist = list(rs.items())
@@ -97,7 +101,7 @@ def plot(file_list, legend_list, filename):
             #l = int(len(x_axis)/10)
             #ax[i].plot(x_axis[:l], y_axis[:l], label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
             #ax[i].set_title(title)
-            #ax[i].legend(loc='lower right')#'best')
+            ax[i].legend(loc='lower right')#'best')
             #import pdb; pdb.set_trace()
             plt.axes(ax[i])
             plt.xlabel(title)
@@ -108,23 +112,34 @@ def plot(file_list, legend_list, filename):
 
 if __name__=='__main__':
     #savefile = 'random_data'
-
-    savefile = 'random_data_long'
-    #random data, longer than 10
+    savefile = 'hand_data'
 
     file_list = [
-        './results/smc_random.p',
-        './results/smc_noval_random.p',
-        './results/beam_val_random.p',
-        './results/beam_noval_random.p',
-    ]
+        './results/sample_our.p',
+        './results/smc_our.p'
+        ]
 
     legend_list = [
-        'SMC',
-        'Sample',
-        'Beam w/ value',
-        'Beam w/out value',
-        ]
+    'Sample',
+    'SMC',
+    ]
+
+    # savefile = 'random_data_long'
+    # #random data, longer than 10
+
+    # file_list = [
+    #     './results/smc_random.p',
+    #     './results/smc_noval_random.p',
+    #     './results/beam_val_random.p',
+    #     './results/beam_noval_random.p',
+    # ]
+
+    # legend_list = [
+    #     'SMC',
+    #     'Sample',
+    #     'Beam w/ value',
+    #     'Beam w/out value',
+    #     ]
 
     #random data
     # file_list = [

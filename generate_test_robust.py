@@ -5,16 +5,16 @@ def street_number():
     return random.choice([_ for _ in range(400)])
 
 def street():
-    return random.choice(['Pine', "Brook", "Foothill", "Broadway"])
+    return random.choice(['Pine', "Brook", "Foothill", "Dew Point", "First", "Main", "Wood Violet", "Log Pond"])
 
 def street_type():
-    return random.choice(["Street", "Road", "Way", "Ave", "ST"])
+    return random.choice(["Street", "Road", "Way", "Ave", "St", "Lane"])
 
 def street_zip():
     return random.choice( range(10000, 100000))
 
 def street_state():
-    return random.choice(['CA','PA','IL'])
+    return random.choice(['CA','PA','IL', 'NY'])
 
 def address_info():
     return street_number(), street(), street_type(), street_zip(), street_state()
@@ -30,25 +30,27 @@ def street_ex4(st_num, st, st_type, st_zip, st_state):
     return [f"{st_num}, {st} {st_type}, {st_state}, {st_zip}-{zip_suffix}", f"{st_state} {st_zip}"]
 
 def street_ex(n_io):
-    infos = [address_info() for _ in range(n_io)]
-    ex_kind = random.choice([street_ex1, street_ex2, street_ex3, street_ex4])
-    return [ex_kind(*info) for info in infos]
+    tasks = []
+    for fn in [street_ex1, street_ex2, street_ex3, street_ex4]:
+        infos = [address_info() for _ in range(n_io)]
+        tasks.append( list(zip(*[fn(*info) for info in infos])))
+    return tasks
 
 # ========================= NAMES ============================
 def names_first():
-    return random.choice(["Alex", "Sasha", "Taylor", "Jackie"])
+    return random.choice(["Alex", "Sasha", "Taylor", "Jackie", "Isaac", "Norman", "Sarah Lee", "Mary Jane"])
 
 def names_last():
-    return random.choice(["Lennon", "Smith", "Einstein", "Schmidhuber"])
+    return random.choice(["Lennon", "Smith", "Einstein", "Schmidhuber", "MacDonald", "McCormick"])
 
 def names_middle():
     return random.choice([names_last(), ""])
 
 def names_title():
-    return random.choice(["Dr", "Sir", "Mr", "Mrs"])
+    return random.choice(["Dr", "Sir", "Mr", "Mrs", "Miss"])
 
 def names_suffix():
-    return random.choice([random.choice(["Esq", "I", "II", "Jr"]), ""])
+    return random.choice([random.choice(["Esq", "I", "III", "Jr"]), ""])
 
 def name_info():
     return names_first(), names_last(), names_middle(), names_title(), names_suffix()
@@ -65,43 +67,56 @@ def name_ex4(first, last, middle, title, suffix):
     return [f"{title} {first} {middle} {last}", f"{last}, {first_letter})"]
 
 def name_ex(n_io):
-    infos = [name_info() for _ in range(n_io)]
-    ex_kind = random.choice([name_ex1, name_ex2, name_ex3, name_ex4])
-    return [ex_kind(*info) for info in infos]
+    tasks = []
+    for fn in [name_ex1, name_ex2, name_ex3, name_ex4]:
+        infos = [name_info() for _ in range(n_io)]
+        tasks.append( list(zip(*[fn(*info) for info in infos])))
+    return tasks
 
-
-
-###Phone number stuff
+########Phone number stuff
 def threeD():
     return "".join(str(d) for d in random.choices(range(10), k=3))
 
 def fourD():
     return "".join(str(d) for d in random.choices(range(10), k=4))
 
-def phone_info():
-    return threeD(), threeD(), fourD()
+def phone_type():
+    return random.choice(["home", "work", "cell"])
 
-def phone_ex1(area, three, four):
+def phone_info():
+    return threeD(), threeD(), fourD(), phone_type()
+
+def phone_ex1(area, three, four,  phone_type ):
     return [f"{area}{three}{four}", f"({area}) {three}-{four}"] 
 
-def phone_ex2(area, three, four):
+def phone_ex2(area, three, four,  phone_type):
     return [f"({area}) {three} {four}", f"area code: {area}, num: {three}{four}"] 
+
+def phone_ex3(area, three, four,  phone_type):
+    return [f"{phone_type}: {area} {three}{four}", f"(+{area}) {three}-{four}, type: {phone_type}"]
+
+def phone_ex4(area, three, four, phone_type ):
+    return [f"{area}-{three}-{four}", f"({area}) {three}{four}"]
+
+def phone_ex5(area, three, four, phone_type):
+    return [f"{phone_type}: {area}-{three}-{four}", f"({area}) {three}{four} ({phone_type})"] 
+
+def phone_ex6(area, three, four,  phone_type):
+    return [f"{phone_type}: {area}{three}{four}", f"({area}) {three}{four}, type={phone_type}"]
 
 #def phone_ex3(area, three, four):
 #    return [f"({area}) {three} {four}", f"Area: {area}, Num: {three}{four}"] 
 
-
-
 def phone_ex(n_io):
     tasks = []
-    for fn in [phone_ex1, phone_ex2]:
+    for fn in [phone_ex1, phone_ex2, phone_ex3, phone_ex4, phone_ex5, phone_ex6]:
         infos = [phone_info() for _ in range(n_io)]
         tasks.append( list(zip(*[fn(*info) for info in infos])))
     return tasks
 
-#### date and time
+####### date and time ######
 def day():
-    return random.choice( range(32) )
+    return random.choice( range(1, 32) )
 
 def weekday():
     return random.choice(["Mon", "Tues", "Wed", "Thurs", "Fri", "Sat", "Sun"])
@@ -116,7 +131,7 @@ def hour():
     return random.choice(range(1,13))
 
 def minute():
-    return str(random.choice(range(7))) + str(random.choice(range(10)))
+    return str(random.choice(range(6))) + str(random.choice(range(10)))
 
 
 def date_info():
@@ -137,22 +152,37 @@ def date_ex4(day, weekday, month, year, hour, minute):
 def date_ex5(day, weekday, month, year, hour, minute):
     return [f"{day}-{month} ({weekday})", f"{weekday} ({month} {day})"]
 
+def date_ex6(day, weekday, month, year, hour, minute):
+    return [f"{day}-{hour}-{year}", f"{hour}/{day}/{year}"]
 
 def date_ex(n_io):
     tasks = []
 
-    for fn in [date_ex1, date_ex2, date_ex3, date_ex4, date_ex5]:
+    for fn in [date_ex1, date_ex2, date_ex3, date_ex4, date_ex5, date_ex6]:
         infos = [date_info() for _ in range(n_io)]
         tasks.append( list(zip(*[fn(*info) for info in infos])))
 
     return tasks
 
 
-if __name__ == '__main__':
-    print (street_ex(4))
-    print (name_ex(4))
-    # print (street_ex(4))
-    tasks = date_ex(4)
-    print(tasks)
 
-    print(phone_ex(4))
+
+if __name__ == '__main__':
+    # print (street_ex(4))
+    # print (name_ex(4))
+    # # print (street_ex(4))
+    # tasks = date_ex(4)
+    # print(tasks)
+
+    # print(phone_ex(4))
+
+    tasks = street_ex(4) + name_ex(4) + phone_ex(4) + date_ex(4)
+
+    import dill
+    with open("hand_made_data.p", 'wb') as h:
+        dill.dump(tasks, h)
+
+    # for task in tasks:
+    #     print("inputs:", task[0])
+    #     print("outputs", task[1])
+    #     print("\n")
