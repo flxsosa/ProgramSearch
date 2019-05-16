@@ -17,11 +17,11 @@ from ROBUT import ALL_BUTTS
 from ROB import get_supervised_sample
 from robut_data import get_supervised_batchsize, GenData, makeTestdata
 
-def load_model():
+def load_model(policy_only=False):
     print(f"is cuda available? {torch.cuda.is_available()}")
     agent = Agent(ALL_BUTTS, value_net=True)
     try:
-        agent.load(args.load_path)
+        agent.load(args.load_path, policy_only=policy_only)
         print("loaded model")
     except FileNotFoundError:
         print ("no saved model found ... training from scratch")
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     print(sys.version)
 
     #load model or create model
-    agent = load_model()
+    agent = load_model(policy_only=True)
     #train
     #train_model_supervised(agent)
 

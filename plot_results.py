@@ -31,6 +31,9 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
+LONGEST = [False, False, False, False, False, True, True, False, False, True, False, True, False, True, False, True, True, True, True, True, False, True, False, False, True, True, False, True, True, False, True, False, True, False, False, True, False, False, True, False, True, False, False, True, False, True, False, True, False, True, False, True, False, True, False, True, False, False, False, True, True, False, True, False, True, False, False, False, False, False, False, False, False, True, False, True, False, False, False, False, True, False, False, True, True, False, True, True, False, False, False, True, True, False, False, False, True, False, False, True] 
+ONLY_LONGEST = False
+
 def percent_solved(results, fn, x):
     tot = 0
     hits = 0
@@ -60,8 +63,21 @@ def plot(file_list, legend_list, filename):
     for file in file_list:
         with open(file, 'rb') as h:
             r = dill.load(h)
+            if ONLY_LONGEST:
+                r = {IO: res for lng, (IO, res) in zip(LONGEST, r.items()) if lng } 
+
+                print("NUMBER OF PROG", len(r))
+
             results_list.append(r)
-    
+
+    EXAMINE = True
+    if EXAMINE:
+        rs = {key: (r1, r2, r3, r4) for key, r1, r2, r3, r4 in zip(results_list[0].keys(), results_list[0].values(), results_list[1].values(), results_list[2].values(), results_list[3].values())} 
+        rlist = list(rs.items())
+        slist = sorted(rlist, key=lambda x: -x[1][0].stats['nodes_expanded'])
+
+        for t in slist: print(t[0], '\n',(t[1][0].solution.pstate.past_buttons if t[1][0].solution else "SMC FAILED"),'\n', ('SAMPLE HIT' if t[1][1].solution else "SAMPLE FAILED"), '\n', t[1][0].stats['nodes_expanded'], '\n')   
+        import pdb; pdb.set_trace()
     titles_fns = [
         ('Nodes expanded', lambda stats: stats['nodes_expanded']),
         #('Policy net runs', lambda stats: stats['policy_runs']),
@@ -81,7 +97,7 @@ def plot(file_list, legend_list, filename):
             #l = int(len(x_axis)/10)
             #ax[i].plot(x_axis[:l], y_axis[:l], label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
             #ax[i].set_title(title)
-            ax[i].legend(loc='lower right')#'best')
+            #ax[i].legend(loc='lower right')#'best')
             #import pdb; pdb.set_trace()
             plt.axes(ax[i])
             plt.xlabel(title)
@@ -91,12 +107,62 @@ def plot(file_list, legend_list, filename):
     plt.savefig(savefile)
 
 if __name__=='__main__':
+    #savefile = 'random_data'
 
+    savefile = 'random_data_long'
+    #random data, longer than 10
+
+    file_list = [
+        './results/smc_random.p',
+        './results/smc_noval_random.p',
+        './results/beam_val_random.p',
+        './results/beam_noval_random.p',
+    ]
+
+    legend_list = [
+        'SMC',
+        'Sample',
+        'Beam w/ value',
+        'Beam w/out value',
+        ]
+
+    #random data
+    # file_list = [
+    #     './results/smc_random.p1557951900',
+    #     './results/smc_noval_random.p1557951907',
+    #     './results/beam_val_random.p1557951789',
+    #     './results/beam_noval_random.p1557951893',
+    # ]
+
+    # legend_list = [
+    #     'SMC',
+    #     'Sample',
+    #     'Beam w/ value',
+    #     'Beam w/out value',
+    #     ]
+
+    # noscratch
+    """
+    file_list = [
+        './results/smcnoprefixprelim.p1557854881',
+        './results/smc_novalnoprefixprelim.p1557854900',
+        './results/beam_valnoprefixprelim.p1557854854',
+        './results/beam_novalnoprefixprelim.p1557854864'
+        ]
+
+    legend_list = [
+        'SMC',
+        'Sample',
+        'Beam w/ value',
+        'Beam w/out value',
+        ]
+    """
+    """
     file_list = [ 
         './results/beam_val.p1557526743',
         './results/beam_noval.p1557526751',
         './results/smc.p1557526764',
-        './results/smc_noval.p1557526776',
+        './results/smc_noval.p1557778857',
         './results/a_star.p1557526718',
         './results/a_star_noval.p1557526718',
         ]
@@ -109,9 +175,9 @@ if __name__=='__main__':
         'A* with value',
         'A* without value'
         ]
+    """
 
-
-    ### Camera-ready:
+    ### workshop:
     # file_list = [
     #                 './results/smc_val_new.p1556099092',
     #                 './results/forward_sample_alpha.p1555577199',
@@ -158,6 +224,6 @@ if __name__=='__main__':
     #                 'a_star, prev value',
     #                 ]
 
-    savefile = 'new_baseline'
+    
 
     plot(file_list, legend_list, savefile)
