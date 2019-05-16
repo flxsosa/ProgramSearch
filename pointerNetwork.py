@@ -837,7 +837,7 @@ class NoExecution(Module):
                 new_command = self.DSL.parseLine(tokenBuffer)
                 if new_command is None: return None
                 tokenBuffer = []
-                for child in new_command.children():
+                for child in set(new_command.children()):
                     del scope[child]
                 scope[new_command] = h
                 if next_symbol == "ENDING": return list(scope.keys())
