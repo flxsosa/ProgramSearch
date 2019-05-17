@@ -36,6 +36,52 @@ def street_ex(n_io):
         tasks.append( list(zip(*[fn(*info) for info in infos])))
     return tasks
 
+# ========================== REVIEWS ==========================
+def review_user():
+    return f"{names_first()[0]}. {names_last()[0]}."
+
+def review_date():
+    return f"{month()}/{year()}"
+
+def review_content():
+    return random.choice(["good", 
+                          "liked it",
+                          "I farted",
+                          "Fun for all",
+                          ])
+def review_id():
+    return random.choice(range(1000, 10000-1))
+
+def review_score():
+    return random.choice([1,2,3,4,5])
+
+def review_info():
+    return review_user(), review_id(), review_date(), review_content(), review_score()
+
+def review_ex1(user, id, date, content, score):
+    return [f"{user} {date} {content} {score}", f"{content}"]
+
+def review_ex2(user, id, date, content, score):
+    return [f"{user} [{id}] comment: {content} {score}", f"{user} said {content}"]
+
+def review_ex3(user, id, date, content, score):
+    return [f"{user} @{id} '{content}' {score}", f"{id} [{content}] {score}"]
+
+def review_ex4(user, id, date, content, score):
+    return [f"{user} {id} '{content}' on {date}", f"{date} {id}"]
+
+def review_ex5(user, id, date, content, score):
+    return [f"on {date} {user}: {content}", f"{content}"]
+
+def review_ex(n_io):
+    tasks = []
+
+    for fn in [review_ex1, review_ex2, review_ex3, review_ex4, review_ex5]:
+        infos = [review_info() for _ in range(n_io)]
+        tasks.append( list(zip(*[fn(*info) for info in infos])))
+
+    return tasks
+
 # ========================= NAMES ============================
 def names_first():
     return random.choice(["Alex", "Sasha", "Taylor", "Jackie", "Isaac", "Norman", "Sarah Lee", "Mary Jane"])
@@ -50,7 +96,7 @@ def names_title():
     return random.choice(["Dr", "Sir", "Mr", "Mrs", "Miss"])
 
 def names_suffix():
-    return random.choice([random.choice(["Esq", "I", "III", "Jr"]), ""])
+    return random.choice([random.choice(["Esq", "I", "III", "Jr."]), ""])
 
 def name_info():
     return names_first(), names_last(), names_middle(), names_title(), names_suffix()
@@ -176,7 +222,7 @@ if __name__ == '__main__':
 
     # print(phone_ex(4))
 
-    tasks = street_ex(4) + name_ex(4) + phone_ex(4) + date_ex(4)
+    tasks = street_ex(4) + name_ex(4) + phone_ex(4) + date_ex(4) + review_ex(4) 
 
     import dill
     with open("hand_made_data.p", 'wb') as h:
