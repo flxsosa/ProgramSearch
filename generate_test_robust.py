@@ -173,38 +173,76 @@ def month():
 def year():
     return random.choice( range(1970, 2030) )
 
-def hour():
+def hours():
     return random.choice(range(1,13))
 
 def minute():
     return str(random.choice(range(6))) + str(random.choice(range(10)))
 
+def AP():
+    return random.choice(["AM", "PM"])
+
 
 def date_info():
-    return day(), weekday(), month(), year(), hour(), minute()
+    return day(), weekday(), month(), year(), hours(), minute(), AP()
 
-def date_ex1(day, weekday, month, year, hour, minute):
+def date_ex1(day, weekday, month, year, hour, minute, AP):
     return [f"{weekday}, {month} {day} {hour}:{minute}", f"{month} {day} at {hour} o'clock"]
 
-def date_ex2(day, weekday, month, year, hour, minute):
-    return [f"{weekday}, {month} {day}-{hour}:{minute}", f"{weekday} at {hour} o'clock"]
+def date_ex2(day, weekday, month, year, hour, minute, AP):
+    return [f"{weekday}, {month} {day}, {hour}:{minute}", f"{weekday} at {hour} o'clock"]
 
-def date_ex3(day, weekday, month, year, hour, minute):
+def date_ex3(day, weekday, month, year, hour, minute, AP):
     return [f"{day} {month} {year}", f"year: {year}; month: {month}"]
 
-def date_ex4(day, weekday, month, year, hour, minute):
+def date_ex4(day, weekday, month, year, hour, minute, AP):
     return [f"{day} {month} {year}", f"{month} {day} ({year})"]
 
-def date_ex5(day, weekday, month, year, hour, minute):
+def date_ex5(day, weekday, month, year, hour, minute, AP):
     return [f"{day}-{month} ({weekday})", f"{weekday} ({month} {day})"]
 
-def date_ex6(day, weekday, month, year, hour, minute):
+def date_ex6(day, weekday, month, year, hour, minute, AP):
     return [f"{day}-{hour}-{year}", f"{hour}/{day}/{year}"]
+
+def date_ex7(day, weekday, month, year, hour, minute, AP):
+    return [f"date: {day} mo: {hour} year: {year}", f"{hour}/{day}/{year}"]
+
+def date_ex8(day, weekday, month, year, hour, minute, AP):
+    return [f"{hour}/{day}/{year}", f"date: {day} mo: {hour} year: {year}"]
+
+def date_ex9(day, weekday, month, year, hour, minute, AP):
+    return [f"{weekday}, {month} {day}, {hour}:{minute} {AP}", f"{weekday} at {hour} {AP}"]
+
+def date_ex10(day, weekday, month, year, hour, minute, AP):
+    return [f"{month} {day}, {hour}:{minute} {AP}", f"{month} {day}, approx. {hour} {AP}"]
+
+def date_ex11(day, weekday, month, year, hour, minute, AP):
+    return [f"{month} {day}, {hour}:{minute} {AP}", f"{month} {day}, at {hour}:{minute} ({AP})"]
+
+def date_ex12(day, weekday, month, year, hour, minute, AP):
+    return [f"{month} {day}, {hour}:{minute} {AP}", f"{hour}:{minute} ({AP}) on {month} {day}"]
+
+def date_ex12(day, weekday, month, year, hour, minute, AP):
+    return [f"{month} {day}, {hour}:{minute} {AP}", f"{month} {day} (at {hour}:{minute} {AP}) "]
+
+def date_ex13(day, weekday, month, year, hour, minute, AP):
+    mo=hours()
+    return [f"{day}/{mo}, {hour}:{minute} {AP}", f"{mo}/{day}, at {hour}:{minute} ({AP})"]
+
+def date_ex14(day, weekday, month, year, hour, minute, AP):
+    mo=hours()
+    return [f"{day}/{mo}, {hour}:{minute} {AP}", f"{hour}:{minute} ({AP}) on {month} {day}"]
+
+def date_ex15(day, weekday, month, year, hour, minute, AP):
+    mo=hours()
+    return [f"{day}/{mo}, {hour}:{minute} {AP}", f"{mo}/{day} (at {hour}:{minute}  {AP}) "]
+
 
 def date_ex(n_io):
     tasks = []
-
-    for fn in [date_ex1, date_ex2, date_ex3, date_ex4, date_ex5, date_ex6]:
+    for fn in [date_ex1, date_ex2, date_ex3, date_ex4, date_ex5, date_ex6, 
+                date_ex7, date_ex8, date_ex9, date_ex10, date_ex11, date_ex12, 
+                date_ex13, date_ex14, date_ex15]:
         infos = [date_info() for _ in range(n_io)]
         tasks.append( list(zip(*[fn(*info) for info in infos])))
 
