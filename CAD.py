@@ -1765,6 +1765,7 @@ def testCSG(m, getProgram, timeout, timestamp, solvers):
 
     twodimensional = True
     def exportProgram(program, path):
+        needTrace = program is not None
         if program is None:
             if twodimensional:
                 program = Difference(Circle(1,1,1),Circle(1,1,1))
@@ -1773,6 +1774,8 @@ def testCSG(m, getProgram, timeout, timestamp, solvers):
                 
         if twodimensional:
             saveMatrixAsImage(program.render(256), path)
+            if needTrace:
+                program.exportDecomposition(f"{path}_trace.png",256)
         else:
             program.show(export=path)            
 
