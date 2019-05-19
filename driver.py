@@ -81,6 +81,7 @@ if __name__ == "__main__":
             s = rs()
             if arguments.td:
                 s.export(f"demo/CAD_{n}_hr.png",256)
+                s.exportDecomposition(f"demo/CAD_{n}_trace.png",256)
                 plot.imshow(s.execute())
                 plot.savefig(f"demo/CAD_{n}_lr.png")
                 print(s)

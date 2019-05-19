@@ -48,6 +48,7 @@ def voxels2dm(vs):
 
     maps.append(np.amax((vs*z), axis=2))
 
+    
     # collapsing Z (behind)
     ds[:,:,:] = np.flip(span)
     maps.append(np.amax((vs*np.flip(z,2)), axis=2))
@@ -135,7 +136,23 @@ module cylindrical(p1,p2,radius)
         cs = self.children()
         if len(cs) == 0: assert False
         return cs[0].dimensionality
-        
+
+    def childrenMasks(self,r=None):
+        import scipy.ndimage.morphology as ndimage
+        if len(self.children()) > 0:
+            return [m
+                    for c in self.children()
+                    for m in c.childrenMasks(r) ]
+        else:
+            
+            i = self.render(r)
+            dilated_outside = i < 0.5
+            for _ in range(3):
+                dilated_outside = ndimage.binary_dilation(dilated_outside)
+            border = (i > 0.5)&dilated_outside
+            return [1.*border]
+            
+    
 
     def execute(self):
         if self.dimensionality == 2:
@@ -195,10 +212,29 @@ module cylindrical(p1,p2,radius)
             return 
             #plot.savefig(f"{export}_d.png")
 
+    def exportDecomposition(self,fn,r):
+        pixels = self.render(r)
+        pixels = 0.5*(1 - np.flip(pixels.T,0))
+
+        childMask = sum(m for m in self.childrenMasks(r)) > 0.5
+        childMask = np.flip(childMask.T,0)
+        
+        i = np.stack([pixels, pixels, pixels],2)
+        for x in range(i.shape[0]):
+            for y in range(i.shape[1]):
+                if childMask[x,y]:
+                    i[x,y,0] = 0.
+                    i[x,y,1] = 1.
+                    i[x,y,2] = 1.
+        
+        saveMatrixAsImage(i,fn)
+
     def export(self,fn,resolution):
-        pixels = self.render(resolution)
+        pixels = 1.*(self.render(resolution) > 0.5)
         assert len(pixels.shape) == 2
-        saveMatrixAsImage(np.flip(pixels.T,0),fn)
+        pixels = 0.5*(1. - np.flip(pixels.T,0))
+        pixels = np.stack([pixels]*3,2)
+        saveMatrixAsImage(pixels,fn)
         
 
     def removeCodeNotChangingProjections(self):
@@ -533,6 +569,7 @@ class Rectangle(CSG):
         self.x3 = x3
         self.y3 = y3
 
+    
     def extent(self):
         xs = [self.x0,self.x1,self.x2,self.x3]
         ys = [self.y0,self.y1,self.y2,self.y3]
@@ -594,6 +631,8 @@ class Circle(CSG):
         self.y = y
 
     def toTrace(self): return [self]
+
+    
 
     def extent(self):
         r = self.d//2 + 1
