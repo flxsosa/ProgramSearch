@@ -194,7 +194,7 @@ if __name__ == "__main__":
                 dataGenerator = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         else:
             if arguments.tools:
-                assert False, "currently no 3-D tools"
+                dataGenerator = make3DTools()
             else:
                 dataGenerator = lambda : random3D(maxShapes=arguments.maxShapes,
                                                   minShapes=arguments.maxShapes,
