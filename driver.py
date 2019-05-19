@@ -77,8 +77,13 @@ if __name__ == "__main__":
         for _ in range(ns):
             rs().execute()
         print(f"{ns/(time.time() - startTime)} (renders + samples)/second")
-        for n in range(10):
-            s = rs()
+        if arguments.tools:
+            if not arguments.td: rs = make3DTools()
+            else: rs = make2DTools()
+        else:
+            rs = [rs() for _ in range(10) ]
+            
+        for n,s in enumerate(rs):
             if arguments.td:
                 s.export(f"demo/CAD_{n}_hr.png",256)
                 s.exportDecomposition(f"demo/CAD_{n}_trace.png",256)

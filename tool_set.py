@@ -1,5 +1,37 @@
 from CAD import *
 
+def make3DTools():
+    def Lego(r,w,h,spacing=12):
+        z = None
+        for x in range(w):
+            for y in range(h):
+                b = Cylinder(r,
+                             r + x*spacing,
+                             r + y*spacing,
+                             12,
+                             r + x*spacing,
+                             r + y*spacing,
+                             12 + 4)
+                if z is None:
+                    z = b
+                else:
+                    z = z + b
+        z = z + Cuboid(0,0,0,
+                       spacing*(w - 1) + 2*r,
+                       spacing*(h - 1) + 2*r,12)
+        return z
+
+        
+    return [Lego(4,w,h,8)
+            for w in range(1,4)
+            for h in range(1,4)
+    ] + \
+    [Lego(4,w,h,12)
+            for w in range(1,3)
+            for h in range(1,3)
+    ]
+                
+
 def make2DTools():
     import os
     os.system("mkdir  -p demo")
@@ -151,3 +183,4 @@ def make2DTools():
 
 if __name__ == '__main__':
     make2DTools()
+    
