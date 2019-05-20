@@ -1,6 +1,51 @@
 from CAD import *
 
 def make3DTools():
+    def cylinderArray(r,nc,nr,spacing=12,yspacing=None,z0=0,z1=12):
+        yspacing = yspacing or spacing
+        z = None
+        for x in range(nc):
+            for y in range(nr):
+                b = Cylinder(r,
+                             r + x*spacing,
+                             r + y*yspacing,
+                             z0,
+                             r + x*spacing,
+                             r + y*yspacing,
+                             z1)
+                if z is None:
+                    z = b
+                else:
+                    z = z + b
+        return z
+
+    def table(height, nc,nr, spacing):
+        z = cylinderArray(4,nc,nr,spacing,z0=0,z1=height)
+        z = z + Cuboid(0,0,height,
+                       spacing*(nc - 1) + 2*4,
+                       spacing*(nr - 1) + 2*4,
+                       height + 4)
+
+        assert z.extent()[1].max() < 32, f"TABLE {height} {nc} {nr} {spacing}"
+        return z
+
+    def chair(z1,r):
+        # r = 2
+        # z1 = 12
+        z = cylinderArray(r,2,2,16,z0=0,z1=z1).translate(2,2,0)
+        z = z + Cuboid(0,0,z1,
+                       20 + 2*r, 20, z1 + 4)
+        z = z + Cuboid(0, 16 + 0,  z1 + 4,
+                       20 + 2*r, 16 + 4, 28)
+        return z
+
+    if True:
+        chairs = [chair(z1,r)
+                for z1 in [8,12] for r in [2] ]
+        tables = [table(height,nc,nr,16)
+                  for nc in [2] for nr in [2] for height in [12,16,20,24] ]
+        return chairs + tables
+    
     def Lego(r,w,h,spacing=12):
         z = None
         for x in range(w):
