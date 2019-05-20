@@ -156,11 +156,11 @@ class RobustFill(nn.Module):
         target = self._tensorToOutput(target)
         return target
 
-    def sampleAndScore(self, batch_inputs=None, n_samples=None, nRepeats=None, vocab_filter=None, init_h=None, autograd=True):
+    def sampleAndScore(self, batch_inputs=None, n_samples=None, nRepeats=None, vocab_filter=None, init_h=None, autograd=True, maxlen=None):
         assert batch_inputs is not None or n_samples is not None
         inputs = self._inputsToTensors(batch_inputs)
         if nRepeats is None:
-            target, score = self._run(inputs, mode="sample", n_samples=n_samples, vocab_filter=vocab_filter, init_h=init_h)
+            target, score = self._run(inputs, mode="sample", n_samples=n_samples, vocab_filter=vocab_filter, init_h=init_h, maxlen=None)
             target = self._tensorToOutput(target)
             if not autograd: score=score.data
             return target, score
@@ -240,7 +240,63 @@ class RobustFill(nn.Module):
         if self.cell_type=="GRU": return cell_state
         if self.cell_type=="LSTM": return cell_state[0]
 
-    def _run(self, inputs, target=None, mode="sample", n_samples=None, vocab_filter=None, init_h=None):
+    def beam_decode(self, batch_inputs=None, beam_size=None, vocab_filter=None, maxlen=None):
+        
+        inputs = self._inputsToTensors(batch_inputs)
+
+        beam = self._run_with_beam(inputs, beam_size=beam_size, vocab_filter=vocab_filter, maxlen=maxlen)
+        outputs = list(zip(*beam))
+        target_tensors, scores = outputs[0], outputs[1] #oy
+
+        targets = []
+        for target in target_tensors:
+            targets.extend(self._tensorToOutput(target))
+        return targets, [score.data for score in scores] #might want a .data here
+
+
+    #what's in a beam?
+    def _run_with_beam(self, inputs, beam_size=10, vocab_filter=None, maxlen=None):
+        #assert batchsize is 1 for now
+
+        #encode to decoder state
+        target, score, decoder_states, active, H, attention_mask, max_length_inputs, batch_size, n_examples = self._encode(inputs, vocab_filter=vocab_filter) #use hack on run
+        beam = [(target, score, decoder_states, active)] 
+
+        max_len = maxlen if maxlen is not None else self.max_length
+        for k in range(max_len):
+            new_beam = []
+            for target, score, decoder_states, active in beam:
+                if not any(active==True):
+                    if len(new_beam) < beam_size:
+                        new_beam.append((target, score, decoder_states, active))  # I think it's fine not to clone here
+                        new_beam = sorted(new_beam, key=lambda entry: -entry[1])
+                    else: #len >= beam_size
+                        if score > new_beam[-1][1]: #the worst score in new_beam
+                            #replace
+                            new_beam[-1] = (target, score, decoder_states, active)
+                            new_beam = sorted(new_beam, key=lambda entry: -entry[1])
+                else:
+                    logsoftmax = self._run_first_half(k, decoder_states, H, attention_mask, max_length_inputs, batch_size, n_examples, vocab_filter=vocab_filter)
+                    for token in list(self.target_vocabulary_index.values()) + [self.v_target]:
+                        #do filtering for these lines 
+                        candidate = self._run_second_half(k, logsoftmax, target.clone(), token, score.clone(), [(ds[0].clone(), ds[1].clone()) for ds in decoder_states], active.clone(), batch_size, n_examples)
+                        if len(new_beam) < beam_size:
+                            new_beam.append(candidate)
+                            new_beam = sorted(new_beam, key=lambda entry: -entry[1])
+                        else: #len >= beam_size
+                            if candidate[1] > new_beam[-1][1]: #the worst score in new_beam
+                                new_beam[-1] = candidate
+                                new_beam = sorted(new_beam, key=lambda entry: -entry[1])
+                        
+            #new_beam = sorted(new_beam, key=lambda entry: -entry[1]) # i think this is right....
+            beam = new_beam
+            assert len(beam) <= beam_size
+        return beam
+
+
+
+
+    def _run(self, inputs, target=None, mode="sample", n_samples=None, vocab_filter=None, init_h=None, maxlen=None):
         """
         :param mode: "score" or "sample"
         :param list[list[LongTensor]] inputs: n_encoders * n_examples * (max length * batch_size)
@@ -248,7 +304,7 @@ class RobustFill(nn.Module):
         :param vocab_filter: batch_size * ... (set of possible outputs)
         Returns output and score
         """
-        assert((mode=="score" and target is not None) or mode=="sample")
+        assert((mode=="score" and target is not None) or mode=="sample" or mode=="encode_only")
 
         if vocab_filter is not None:
             vocab_mask = self.t.new([[v in V for v in self.target_vocabulary] + [True] for V in vocab_filter]).byte() #True for STOP
@@ -265,7 +321,10 @@ class RobustFill(nn.Module):
                 ] for i in range(self.n_encoders)
             ]  # n_encoders * n_examples * (max_length_input * batch_size * v_input+1)
 
-        max_length_target = target.size(0) if target is not None else self.max_length
+        if mode=="encode_only": assert batch_size == 1 #for now
+
+        max_len = maxlen if maxlen else self.max_length
+        max_length_target = target.size(0) if target is not None else max_len
         score = Variable(self._zeros(batch_size))
         if target is not None: target_scatter = Variable(self._zeros(max_length_target, batch_size, self.v_target+1).scatter_(2, target[:, :, None], 1)) # max_length_target * batch_size * v_target+1
 
@@ -320,6 +379,10 @@ class RobustFill(nn.Module):
         if self.no_inputs: decoder_states = [self._decoder_get_init(init_h, batch_size=batch_size)]
         else: decoder_states = [self._decoder_get_init(embeddings[self.n_encoders-1][j]) for j in range(n_examples)] #P
         active = self._ones(batch_size).byte()
+
+        #holy hell what a hack
+        if mode=="encode_only": return target, score, decoder_states, active, H, attention_mask, max_length_inputs, batch_size, n_examples
+
         for k in range(max_length_target):
             FC = []
             for j in range(1 if self.no_inputs else n_examples):
@@ -389,4 +452,58 @@ class RobustFill(nn.Module):
                 out.append(tuple(self.target_vocabulary[x] for x in tensor[:final, i]))
             else:
                 out.append(tuple(self.target_vocabulary[x] for x in tensor[:, i]))
-        return out    
+        return out   
+
+    def _encode(self, inputs, vocab_filter=None):
+        return self._run(inputs, target=None, mode="encode_only", n_samples=None, vocab_filter=vocab_filter)
+
+
+    def attend_for_beam(self, i, j, h, H, attention_mask, max_length_inputs, batch_size):
+        """
+        'general' attention from https://arxiv.org/pdf/1508.04025.pdf
+        :param i: which encoder is doing the attending (or self.n_encoders for the decoder)
+        :param j: Index of example
+        :param h: batch_size * hidden_size
+        """
+        assert(i != 0)
+        scores = self.As[i-1](
+            H[i-1][j].view(max_length_inputs[i-1][j] * batch_size, self.hidden_size),
+            h.view(batch_size, self.hidden_size).repeat(max_length_inputs[i-1][j], 1)
+        ).view(max_length_inputs[i-1][j], batch_size) + attention_mask[i-1][j]
+        c = (F.softmax(scores[:, :, None], dim=0) * H[i-1][j]).sum(0)
+        return c
+
+    def _run_first_half(self, k, decoder_states, H, attention_mask, max_length_inputs, batch_size, n_examples, vocab_filter=None):
+
+        FC = []
+        #syntax_FC = []
+        for j in range(1 if self.no_inputs else n_examples):
+            h = self._cell_get_h(decoder_states[j])
+            p_aug = h if self.no_inputs else torch.cat([h, self.attend_for_beam(self.n_encoders, j, h, H, attention_mask, max_length_inputs, batch_size)], 1)  #will need H and attention_mask for attend fn
+            FC.append(F.tanh(self.W(p_aug)[None, :, :]))
+
+        #Here
+        #print("FC size", FC[0].size())
+        m = torch.max(torch.cat(FC, 0), 0)[0] # batch_size * embedding_size
+        #print("m size", m.size())
+        v = self.V(m)
+
+        if vocab_filter is not None: v = v.masked_fill(1-vocab_mask, float('-inf'))
+        logsoftmax = F.log_softmax(v, dim=1)
+        #if mode=="sample": target[k, :] = torch.multinomial(logsoftmax.data.exp(), 1)[:, 0]
+        return logsoftmax.clone()
+
+
+    def _run_second_half(self, k, logsoftmax, target, token, score, decoder_states, active, batch_size, n_examples):
+
+        #reference: t[:,i] = torch.Tensor([token]), where i is batch index
+        target[k, :] = torch.Tensor([token]*batch_size) #just put it on there
+        #this is where beam stuff goes ... 
+        score = score + choose(logsoftmax, target[k, :]) * Variable(active.float())
+
+        active *= (target[k, :] != self.v_target)
+        for j in range(1 if self.no_inputs else n_examples):
+            target_char_scatter = Variable(self._zeros(batch_size, self.v_target+1).scatter_(1, target[k, :, None], 1))
+            decoder_states[j] = self.decoder_cell(target_char_scatter, decoder_states[j]) 
+
+        return target.clone(), score.clone(), [(ds[0].clone(), ds[1].clone())  for ds in decoder_states], active.clone() 

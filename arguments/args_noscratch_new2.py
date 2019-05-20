@@ -26,8 +26,8 @@ train_iterations = 50000
 
 parallel = True
 n_processes = 8
-save_path = 'models/noscratch.p' #'models/noscratch24k.p' 
-load_path = 'models/noscratch.p' #'models/noscratch24k.p'
+save_path = 'models/noscratch2.p' #'models/noscratch24k.p' 
+load_path = 'models/noscratch2.p' #'models/noscratch24k.p'
 
 encode_past_buttons = True
 past_button_embed_dim = 128

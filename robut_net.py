@@ -14,6 +14,14 @@ import math
 
 import time
 
+import Levenshtein
+#Levenshtein.ratio("hi max", "hi matt")
+
+def edit_distance( env ):
+    gt = env.pstate.outputs
+    cand = [c+s for c, s in zip(env.pstate.committed, env.pstate.scratch)]
+    return sum(Levenshtein.ratio(g, c) for g, c in zip(gt, cand) ), cand
+
 TraceEntry = namedtuple("TraceEntry", "prev_s action reward s done")
 
 class QEntry(object):
@@ -416,7 +424,8 @@ class Agent:
                             batch_size=1024,
                             max_iter=30,
                             verbose=False,
-                            stats=None):
+                            stats=None,
+                            track_edit_distance=False):
         """
         initial_envs is a list of initial envs
         n_rollouts is per initial_env
@@ -430,6 +439,13 @@ class Agent:
                 'value_gpu_runs': 0,
                 'start_time': time.time()
                     }
+
+            if track_edit_distance:
+                env.reset()
+                score, ps = edit_distance( env ) 
+                stats['best_score'] = score
+                stats['best_ps'] = ps
+
 
         env.reset()           
         envs = []
@@ -451,6 +467,12 @@ class Agent:
 
                 _, r, done = env.step(a)
                 stats['nodes_expanded'] += 1
+
+                if track_edit_distance: 
+                    score, ps = edit_distance( env )
+                    if score > stats['best_score']: 
+                        stats['best_score'] = score
+                        stats['best_ps'] = ps
 
                 if r == -1:  
                     if verbose: print ("crasherinoed!")
@@ -478,16 +500,21 @@ class Agent:
         stats['end_time'] = time.time()
         return hit, solution, stats
 
-    def forward_sample_solver(self, env, max_batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False): #TODO, no idea what this number should be
+    def forward_sample_solver(self, env, max_batch_size=1024, max_iter=30, max_nodes_expanded=2*1024*30*10, verbose=False, timeout=None, track_edit_distance=False): #TODO, no idea what this number should be
         stats = None
         batch_size = 1
 
         while (not stats) or stats['nodes_expanded'] <= max_nodes_expanded:
+            if timeout:
+                if stats:
+                    if stats['end_time'] - stats['start_time'] > timeout: break
+
             hit, solution, stats = self.sample_rollout(env, 
                                         batch_size=batch_size,
                                         max_iter=max_iter,
                                         verbose=verbose,
-                                        stats=stats)
+                                        stats=stats,
+                                        track_edit_distance=track_edit_distance)
             if hit:
                 print("success!")
                 return hit, solution, stats
@@ -508,7 +535,8 @@ class Agent:
                         use_value=False,
                         value_filter_size=4000,
                         stats=None,
-                        use_prev_value=False):
+                        use_prev_value=False,
+                        track_edit_distance=False):
 
         assert not (use_value and use_prev_value)
         if not stats:
@@ -520,6 +548,12 @@ class Agent:
                 'value_gpu_runs': 0,
                 'start_time': time.time()
                     }
+
+            if track_edit_distance:
+                env.reset()
+                score, ps = edit_distance( env ) 
+                stats['best_score'] = score
+                stats['best_ps'] = ps
 
         BeamEntry = namedtuple("BeamEntry", "env score")
         env.reset()
@@ -559,6 +593,13 @@ class Agent:
 
                 state.step(action)
                 stats['nodes_expanded'] += 1
+
+                if track_edit_distance: 
+                    score, ps = edit_distance( state )
+                    if score > stats['best_score']: 
+                        stats['best_score'] = score
+                        stats['best_ps'] = ps
+
                 if state.last_step[1] == -1: #reward
                     if verbose: print ("crasherinoed!")
                     continue
@@ -613,7 +654,7 @@ class Agent:
                                 verbose=False,
                                 use_value=False,
                                 value_filter_multiple=2,
-                                use_prev_value=False):
+                                use_prev_value=False, timeout=None, track_edit_distance=False):
 
         beam_size = 1
         stats = None
@@ -625,10 +666,14 @@ class Agent:
                                         use_value=use_value,
                                         value_filter_size=value_filter_multiple*beam_size,
                                         use_prev_value=use_prev_value,
-                                        stats=stats)
+                                        stats=stats,
+                                        track_edit_distance=track_edit_distance)
             if hit:
                 print("success!")
                 return hit, solution, stats
+
+            if timeout:
+                if stats['end_time'] - stats['start_time'] > timeout: break
 
             beam_size *= 2
             print(f"nothing found, doubled beam size to {beam_size}")
@@ -706,8 +751,8 @@ class Agent:
                         max_num_actions_expand=800,
                         beam_size=800,
                         no_value=False,
-                        use_prev_value=False):
-
+                        use_prev_value=False, timeout=None, track_edit_distance=False):
+        env.reset()
         if use_prev_value: assert no_value
 
         stats = {
@@ -716,8 +761,13 @@ class Agent:
             'policy_gpu_runs': 0,
             'value_runs': 0,
             'value_gpu_runs': 0,
-            'start_time': time.time()
+            'start_time': time.time(),
                 }
+
+        if track_edit_distance:
+            best_score, best_ps = edit_distance( env )
+            stats['best_ps']= best_ps,
+            stats['best_score']=best_score
 
         from queue import PriorityQueue
         q = PriorityQueue()
@@ -726,6 +776,10 @@ class Agent:
         q.put(QEntry(0.0, val, env))
 
         while not q.empty() and q.qsize() < max_count: #TODO
+
+            if timeout:
+                if time.time() - stats['start_time'] > timeout: break
+
             toExpand = [ q.get_nowait() for _ in range(min(batch_size, q.qsize()))]
             state_list = [ entry.env.last_step[0] for entry in toExpand]
 
@@ -758,6 +812,12 @@ class Agent:
 
                     e_new.step(action)
                     stats['nodes_expanded'] += 1
+
+                    if track_edit_distance: 
+                        score, ps = edit_distance( e_new )
+                        if score > stats['best_score']: 
+                            stats['best_score'] = score
+                            stats['best_ps'] = ps
 
                     if e_new.last_step[1] == -1: #reward
                         #if verbose: print ("crasherinoed!")
@@ -818,20 +878,28 @@ class Agent:
         return hit, solution, stats
 
 
-    def smc_rollout(self, env, max_beam_size=1000, max_iter=30, verbose=False, max_nodes_expanded=2*1024*30*10): #value_filter_size=4000):
+    def smc_rollout(self, env, max_beam_size=1000, max_iter=30, verbose=False, max_nodes_expanded=2*1024*30*10, timeout=None, sample_only=False, track_edit_distance=False): #value_filter_size=4000):
+        env.reset()
+        if track_edit_distance:
+            best_score, best_ps = edit_distance( env )
+
         stats = {
             'nodes_expanded': 0,
             'policy_runs': 0,
             'policy_gpu_runs': 0,
             'value_runs': 0,
             'value_gpu_runs': 0,
-            'start_time': time.time()
+            'start_time': time.time(),
+            'best_ps': best_ps,
+            'best_score': best_score
                 }
 
         ParticleEntry = namedtuple("ParticleEntry", "env frequency")
 
         n_particles = 1 #1000
         while stats['nodes_expanded'] <= max_nodes_expanded:
+            if timeout:
+                if time.time() - stats['start_time'] > timeout: break
             
             env.reset()
             particles = [ ParticleEntry(env.copy(), n_particles) ] #for _ in range(beam_size)]
@@ -852,7 +920,7 @@ class Agent:
                 lls = self.get_actions(state_list)
                 # print("lls shape", lls.shape)
                 #import pdb; pdb.set_trace()
-            
+
 
                 ps = ntorch.exp(lls)
                 stats['policy_runs'] += len(state_list)
@@ -892,6 +960,12 @@ class Agent:
                         # print(action)
 
                         env_copy.step(action)
+                        if track_edit_distance: 
+                            score, output_strs = edit_distance( env_copy )
+                            if score > stats['best_score']: 
+                                stats['best_score'] = score
+                                stats['best_ps'] = output_strs
+
                         # print ('the result of the step is . . ? ?', env_copy.pstate.past_buttons)
                         # print ('has reward ', env_copy.last_step[1])
                         stats['nodes_expanded'] += 1
@@ -910,21 +984,26 @@ class Agent:
                             return hit, solution, stats
 
                         samples.append(ParticleEntry(env_copy, frequency))
+                sample_freqs = [sample.frequency for sample in samples] 
 
                 #get values for samples
                 new_states = [p.env.last_step[0] for p in samples]
                 if not new_states: break
-                value_ll = self.compute_values(new_states)
-                distances = [ value_ll[{"batch":i, "value":1}].item() for i, _ in enumerate(new_states)] #whatever, TODO 
-                stats['value_gpu_runs'] += 1
-                stats['value_runs'] += len(new_states)
+
+                if sample_only:
+                    distances = [0. for _ in new_states]
+                else:
+                    value_ll = self.compute_values(new_states)
+                    distances = [ value_ll[{"batch":i, "value":1}].item() for i, _ in enumerate(new_states)] #whatever, TODO 
+                    stats['value_gpu_runs'] += 1
+                    stats['value_runs'] += len(new_states)
                 #print('distance', distances[0])
                 #Resample:
                 logWeights = [math.log(p.frequency) + distance for p, distance in zip(samples, distances)] #distance
                 ps = [ math.exp(lw - max(logWeights)) for lw in logWeights ]
                 ps = [p/sum(ps) for p in ps]
                 sampleFrequencies = np.random.multinomial(n_particles, ps)
-
+                #print(sampleFrequencies)
                 population = []
                 for particle, frequency in zip(samples, sampleFrequencies):
                     if frequency > 0:
@@ -932,6 +1011,14 @@ class Agent:
                         population.append(p)
 
                 particles = population
+
+                # for s, freq in zip(particles, sample_freqs):
+                #     print(s.env.pstate.past_buttons)
+                #     print("before reweighting:", freq.item())
+                #     print("after rewighting:", s.frequency)
+                #     print("\tCOMMIT:", s.env.pstate.committed)
+                #     print("\tSCRATCH:", s.env.pstate.scratch, '\n')
+                #import pdb; pdb.set_trace()
              
             if n_particles < max_beam_size:
                 n_particles *= 2

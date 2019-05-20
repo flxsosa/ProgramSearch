@@ -94,7 +94,8 @@ class RobState:
         if len(self.past_buttons) == 0:
             return np.array([0])
         else:
-            return np.array([ALL_BUTTS.index(btn) + 1 for btn in self.past_buttons])
+            # return np.array([ALL_BUTTS.index(btn) + 1 for btn in self.past_buttons])
+            return np.array([ALL_BUTTS_NAME_MAP[btn.name] + 1 for btn in self.past_buttons])
 
     def get_last_btn_type(self):
         last_butt_type = 0 if len(self.past_buttons) == 0 else ALL_BUTTS_TYPES.index(self.past_buttons[-1].__class__) + 1
@@ -185,8 +186,8 @@ class Commit(Button):
         for commit, output in zip(committed_new, pstate.outputs):
             if output == "":
                 continue
-            # if not output.startswith(commit):
-            #     raise CommitPrefixError
+            if not output.startswith(commit):
+                raise CommitPrefixError
         return RobState(pstate.inputs,
                         scratch_new,
                         committed_new,
@@ -728,6 +729,8 @@ ALL_BUTTS_TYPES = [ToCase,
                   ]
 
 ALL_BUTTS = [x for butt_type in ALL_BUTTS_TYPES for x in butt_type.generate_buttons()]
+
+ALL_BUTTS_NAME_MAP = {butt.name: ALL_BUTTS.index(butt) for butt in ALL_BUTTS}
 
 class ROBENV:
 
