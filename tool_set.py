@@ -1,6 +1,41 @@
 from CAD import *
 
 def make3DTools():
+    def car():
+        l1 = 8
+        r = 8
+        l2 = 12
+
+        h1 = 8
+        h2 = r
+
+        Y = 16
+
+        W = 4
+
+        z = Cuboid(0,0,0,
+                   l1 + r + l2,Y,h1)
+        z = z + Cylinder(r,
+                         l1 + r,0,h1,
+                         l1 + r,Y,h1)
+        z = z + Cuboid(l1 + r,0,h1,
+                       l1 + r + l2,Y,h1 + h2)
+        #z = z.translate(4,4,8)
+        z = z + Cylinder(4,
+                         4,0,0,
+                         4,W,0)
+        z = z + Cylinder(4,
+                         4,Y - W,0,
+                         4,Y,0)
+        z = z + Cylinder(4,
+                         l1 + r + l2 - 4,Y - W,0,
+                         l1 + r + l2 - 4,Y,0)
+        z = z + Cylinder(4,
+                         l1 + r + l2 - 4,0,0,
+                         l1 + r + l2 - 4,W,0)
+        
+        return z.translate(0,0,4)
+    return [car()]
     def cylinderArray(r,nc,nr,spacing=12,yspacing=None,z0=0,z1=12):
         yspacing = yspacing or spacing
         z = None

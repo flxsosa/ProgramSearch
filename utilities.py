@@ -10,6 +10,12 @@ import torch.nn as nn
 
 import math
 
+def mean(xs): return sum(xs)/len(xs)
+def percentile(p,xs):
+    return list(sorted(xs))[int(0.5 + p*len(xs))]
+
+def snd(t): return t[1]
+
 def rotationMatrix(x,y,z):
     x = math.pi*x/180.
     y = math.pi*y/180.

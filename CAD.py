@@ -1759,7 +1759,8 @@ def testCSG(m, getProgram, timeout, timestamp, solvers):
                 "bm": lambda : BeamSearch(m),
                 "fs": lambda : ForwardSample(m),
                 "bmv": lambda : BeamSearch(m,criticCoefficient=1.),
-                "noExecution": lambda : ForwardSample_noExecution(m)}
+                "noExecution": lambda : ForwardSample_noExecution(m),
+                "noExecution_bm": lambda : Beam_noExecution(m)}
     solvers = [_solvers[s]() for s in solvers]
     loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
@@ -1773,7 +1774,7 @@ def testCSG(m, getProgram, timeout, timestamp, solvers):
                 program = Difference(Sphere(1,1,1,1),Sphere(1,1,1,1))
                 
         if twodimensional:
-            saveMatrixAsImage(program.render(256), path)
+            program.export(path, 256)
             if needTrace:
                 program.exportDecomposition(f"{path}_trace.png",256)
         else:
@@ -1818,7 +1819,7 @@ def testCSG(m, getProgram, timeout, timestamp, solvers):
                     pickle.dump(bestProgram, handle)
                 exportProgram(bestProgram,
                               "%s/%03d_%s.png"%(outputDirectory,ti,solver.name))
-                if not twodimensional:
+                if not twodimensional and bestProgram is not None:
                     bestProgram.scad("%s/%03d_%s.scad"%(outputDirectory,ti,solver.name))
                 
 
@@ -1954,5 +1955,9 @@ if __name__ == "__main__":
         losses = m.gradientStepTraceBatched(optimizer, [(p,p.toTrace())])
         L = sum(l for ls in losses for l in ls  )
         print(L)
-        if L < 0.2:
-            print(m.sample(p))
+        if L < 0.02:
+            for b in m.beaming(p,B=20, maximumLines=4,maximumTokens=100):
+                print(b)
+            assert False
+            
+            #print(m.sample(p))

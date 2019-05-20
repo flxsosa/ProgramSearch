@@ -862,6 +862,116 @@ class NoExecution(Module):
                 return list(scope.keys())
             if maximumTokens is not None and numberOfTokens > maximumTokens:
                 return list(scope.keys())
+
+    def beaming(self, spec, specEncoding=None, maximumLines=None, maximumTokens=None, B=None):
+        assert B is not None
+        if maximumLines is None:
+            maximumLines = float('inf')
+        if maximumTokens is None:
+            maximumTokens = float('inf')
+        if specEncoding is None:
+            specEncoding = self.specEncoder(spec.execute())
+
+        class Particle:
+            def __init__(self, h, scope, lastOutput, tokenBuffer, ll,
+                         finished=False, numberLines=0, numberTokens=0):
+                self.numberLines = numberLines
+                self.numberTokens = numberTokens
+                self.h, self.scope, self.lastOutput, self.tokenBuffer = h, scope, lastOutput, tokenBuffer
+                self.finished = finished
+                self.ll = ll
+
+            def __str__(self):
+                return f"Particle(scope={list(self.scope.keys())}, lastOutput={self.lastOutput}, tokenBuffer={self.tokenBuffer}, ll={self.ll})"
+
+        population = [Particle(self.initialState(specEncoding),
+                               {},
+                               "STARTING",
+                               [],
+                               0.)]
+        while True:
+            lastOutputIndex = [self.wordToIndex[p.lastOutput if not isinstance(p.lastOutput,Program) else "POINTER"]
+                               for p in population]
+            lastEmbedding = self.embedding(self.tensor(lastOutputIndex))
+            scopeInput = [ p.scope[p.lastOutput] if isinstance(p.lastOutput, Program) else self.device(torch.zeros(self.H))
+                           for p in population]
+            scopeInput = torch.stack(scopeInput)
+            thisInput = torch.cat([lastEmbedding,scopeInput],1)
+
+            o,h = self.model(thisInput.unsqueeze(0),
+                             torch.stack([p.h for p in population]).unsqueeze(0))
+            h = h.squeeze(0)
+            o = o.squeeze(0)
+
+            distribution = self.output(o).cpu()
+            topPredictions = [list(sorted([(word, distribution[b][i].data.item())
+                                           for i,word in enumerate(self.lexicon)],
+                                          key=snd,
+                                          reverse=True))[:B]
+                              for b in range(distribution.size(0))]
+            for b,predictions in enumerate(topPredictions):
+                if any( "POINTER" == word
+                        for word,_ in predictions ):
+                    alternatives = list(population[b].scope.items())
+                    if len(alternatives) == 0: continue
+                    
+
+                    objectEncodings = torch.stack([oe for _,oe in alternatives ])
+                    attention = self.pointerAttention(o[b].unsqueeze(0),objectEncodings).squeeze(0).cpu()
+
+                    pointerProbability = distribution[b][self.wordToIndex["POINTER"]].data.item()
+
+                    topPredictions[b].extend([
+                        (alternative[0], attention[a].data.item() + pointerProbability)
+                        for a,alternative in enumerate(alternatives) ])
+
+            nextgeneration = []
+            for b in range(distribution.size(0)):
+                p = population[b]
+                for word,ll in topPredictions[b]:
+                    if word == "POINTER": continue
+
+                    finished = False
+                    scope = dict(p.scope)
+                    tokenBuffer = list(p.tokenBuffer)
+                    numberLines = p.numberLines
+                    numberTokens = p.numberTokens
+                    if word in {"STARTING","ENDING"}:
+                        numberLines = numberLines + 1
+                        new_command = self.DSL.parseLine(tokenBuffer)
+                        if new_command is None: continue
+                        tokenBuffer = []
+                        for child in set(new_command.children()):
+                            del scope[child]
+                        scope[new_command] = h[b]
+                        if word == "ENDING":
+                             finished = True
+                    else:
+                        tokenBuffer.append(word)
+                        numberTokens = numberTokens + 1
+                    
+                    nextgeneration.append(Particle(h[b], scope, word, tokenBuffer, population[b].ll + ll,
+                                                   finished=finished,
+                                                   numberTokens=numberTokens,
+                                                   numberLines=numberLines))
+
+            for p in nextgeneration:
+                if p.finished:
+                    yield p.ll,list(p.scope.keys())
+
+            nextgeneration.sort(key=lambda p: p.ll, reverse=True)
+            population = [p for p in nextgeneration
+                          if not p.finished and p.numberLines <= maximumLines and p.numberTokens <= maximumTokens]
+            population = population[:B]
+            if len(population) == 0:
+                return 
+            
+             
+            
+
+
+            
+
         
             
 

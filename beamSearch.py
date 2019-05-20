@@ -5,6 +5,32 @@ from exit import *
 
 import time
 
+class Beam_noExecution(Solver):
+    def __init__(self,m):
+        self.model = m
+
+    @property
+    def name(self): return "no_REPL_beam"
+
+    def _infer(self, spec, loss, timeout):
+        maximumLines = len(spec.toTrace()) + 1
+        maximumTokens = sum(len(c.serialize())
+                            for c in spec.toTrace() ) + 2
+
+        t0 = time.time()
+        se = self.model.specEncoder(spec.execute())
+        B = 5
+        exponentialGrowthFactor = 2
+        while time.time() - t0 < timeout:
+            for _,p in self.model.beaming(spec, se,
+                                          maximumLines=maximumLines,
+                                          maximumTokens=maximumTokens,
+                                          B=B):
+                if time.time() - t0 > timeout: break
+                self._report(ProgramGraph.fromRoots(p))
+            B*=exponentialGrowthFactor
+
+            
 class BeamSearch(ExitSolver):
     def __init__(self, model, maximumLength=None, criticCoefficient=0.):
         self.criticCoefficient = criticCoefficient
@@ -79,7 +105,7 @@ class BeamSearch(ExitSolver):
                         print(p)
 
                 for p in population:
-                    if p.finished and not p.reported:
+                    if not p.reported:
                         self._report(p.graph, p.trajectory)
                         p.reported = True
                 if self.maximumLength is not None and self.maximumLength <= max(len(p.graph) for p in children):
