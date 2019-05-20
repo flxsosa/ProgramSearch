@@ -116,6 +116,12 @@ def make2DTools():
                          x*2 - w, y*2 + h,
                          x*2 + w, y*2 + h,
                          x*2 + w, y*2 - h)
+
+    def rectangle2(x,y,w,h):
+        return Rectangle(x*2 - w + 1, y*2 - h + 1,
+                         x*2 - w + 1, y*2 + h + 1,
+                         x*2 + w + 1, y*2 + h + 1,
+                         x*2 + w + 1, y*2 - h + 1)
     def slanted(x,y,w,h):
         x = x*2
         y = y*2
@@ -140,31 +146,33 @@ def make2DTools():
 
     # shovel 
     def shovel():
-        s1 = rectangle(8, 7, 1, 8)
-        s2 = circle(8, 13, 6)
-        s3 = rectangle(8, 3, 3, 1)
-        s4 = rectangle(8, 12, 3, 2)
+        s1 = rectangle(8, 6, 2, 10)
+        s2 = circle(8, 12, 8)
+        s3 = rectangle(8, 10, 4, 4)
+        s4 = rectangle(8, 2, 4, 2)
         return s1 + s2 + s3 + s4
+    # return s1 + s2 + s3 + s4
 
     shovel().export("demo/shovel.png",256)
     everyTool.append(shovel())
 
     # key 
     def key():
-        s1 = rectangle(8, 8, 8, 1)
-        s2 = circle(13, 8, 8)
-        s3 = circle(13, 8, 4)
-        s4 = rectangle(5, 8, 3, 2)
-        s5 = rectangle(5, 8, 1, 2)
-        return s1 + (s2 - s3) + (s4 - s5)
+        s1 = rectangle(8, 8, 8, 2)
+        s2 = circle(12, 8, 8)
+        s3 = circle(12, 8, 4)
+        s4 = slanted(4, 7, 1, 1)
+        s5 = slanted(6, 6, 1, 1)
+        s6 = slanted(8, 6, 1, 1)
+        return s1 + (s2 - s3) + s4 + s5 + s6
 
     key().export("demo/key.png",256)
     everyTool.append(key())
 
     # hammer 
     def hammer():
-        s1 = rectangle(9, 8, 6, 2)
-        s2 = rectangle(5, 8, 3, 5)
+        s1 = rectangle(10, 8, 6, 2)
+        s2 = rectangle(6, 8, 4, 6)
         return s1 + s2
 
     hammer().export("demo/hammer.png",256)
@@ -172,26 +180,29 @@ def make2DTools():
 
     # plier 
     def plier():
-        s1 = rectangle(6, 8, 8, 1)
+        s1 = rectangle(6, 8, 10, 2)
         s2 = slanted(10, 8, 5, 1)
         s3 = circle(12, 8, 8)
-        s4 = rectangle(14, 6, 3, 3)
-        return s1 + s2 + (s3 - s4)
+        s4 = rectangle(14, 6, 4, 4)
+        s5 = slanted(12, 4, 2, 2)
+        #return s4 + s5
+        return s1 + s2 + (s3 - (s4 - s5))
 
     plier().export("demo/plier.png",256)
     everyTool.append(plier())
 
-    # double_wrench 
-    def double_wrench():
-        s1 = slanted(11, 4, 7, 1)
-        s2 = circle(12, 4, 6)
-        s3 = rectangle(12, 4, 1, 1)
-        s4 = circle(4, 12, 6)
-        s5 = rectangle(4, 13, 1, 2)
-        return s1 + (s2 - s3) + (s4 - s5)
+    # umbrella 
+    def umbrella():
+        s1 = circle(8, 6, 24)
+        s3 = rectangle(8, 10, 20, 8)
+        s4 = rectangle2(8, 8, 1, 7)
+        s5 = circle(7,12,8)
+        s7 = circle(7,12,4)
+        s6 = rectangle(7,10,4,4)
+        return (s1 - s3) + s4 + (s5 -s7 - s6)
 
-    double_wrench().export("demo/double_wrench.png",256)
-    everyTool.append(double_wrench())
+    umbrella().export("demo/umbrella.png",256)
+    everyTool.append(umbrella())
 
     # mag 
     def mag():
@@ -227,5 +238,15 @@ def make2DTools():
     return everyTool
 
 if __name__ == '__main__':
-    make2DTools()
+    progs = make2DTools()
+    import re
+    for i, p in enumerate(progs):
+        p_str = str(p)
+        #print (p_str)
+        nums = [int(s) for s in re.findall('\\d+', p_str)]
+        #print (nums)
+        parity_even = [x % 2 == 0 for x in nums]
+        assert (all(parity_even))
+        print (f"shape {i} passed even coordinate check")
+
     
