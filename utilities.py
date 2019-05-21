@@ -16,6 +16,10 @@ def percentile(p,xs):
 
 def snd(t): return t[1]
 
+def stringToFile(fn,s):
+    with open(fn,"w") as handle:
+        handle.write(s)
+
 def rotationMatrix(x,y,z):
     x = math.pi*x/180.
     y = math.pi*y/180.

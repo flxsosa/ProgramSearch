@@ -8,6 +8,11 @@ rcParams.update({'figure.autolayout': True})
 
 import pickle
 
+def export_legend(legend, filename="figures/graphics_legend.png"):
+    fig  = legend.figure
+    fig.canvas.draw()
+    bbox  = legend.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(filename, dpi="figure", bbox_inches=bbox)
 
 if __name__ == "__main__":
     import argparse
@@ -37,6 +42,7 @@ if __name__ == "__main__":
 
         
     plot.figure(figsize=(4,3))
+    #plot.subplot(211)
     #plot.tight_layout();
     plot.ylabel("Intersection over Union")
     plot.xlabel("Time (seconds)")
@@ -61,12 +67,15 @@ if __name__ == "__main__":
         ys = [rewardAtTime(t,s) for t in ts ]
         ys = [mean(y) for y in ys ]
         plot.semilogx(ts,ys,label=name[s],linewidth=3,basex=10)
-    plot.legend()
+
+
         
 
     if arguments.export:
         plot.savefig(arguments.export)
+        export_legend(plot.legend())
     else:
+        plot.legend()
         plot.show()
 
     

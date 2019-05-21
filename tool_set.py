@@ -362,6 +362,7 @@ def make2DTools():
 
     comrad().export("demo/comrad.png",256)
     everyTool.append(comrad())
+    return [comrad()]
     return everyTool
 
 if __name__ == '__main__':

@@ -1,8 +1,12 @@
+from utilities import *
 from programGraph import *
 from API import *
 from pointerNetwork import *
 
+import os
 import time
+
+INSTRUMENT = False
 
 class SMC(Solver):
     def __init__(self, model, _=None,
@@ -19,6 +23,8 @@ class SMC(Solver):
     def name(self): return "SMC_value"
     
     def _infer(self, spec, loss, timeout):
+        global INSTRUMENT
+        
         startTime = time.time()
         numberOfParticles = self.initialParticles
         
@@ -29,6 +35,9 @@ class SMC(Solver):
         
         allObjects = set()
 
+        if INSTRUMENT:
+            os.system("mkdir  -p experimentOutputs/SMC")
+            
         class Particle():
             def __init__(self, trajectory, frequency, finished=False):
                 self.frequency = frequency
@@ -51,7 +60,8 @@ class SMC(Solver):
 
         while time.time() - startTime < timeout:
             population = [Particle(tuple([]), numberOfParticles)]
-            for _ in range(self.maximumLength):
+            if INSTRUMENT: os.system(f"mkdir  -p experimentOutputs/SMC/{numberOfParticles}")
+            for generation in range(self.maximumLength):
                 sampleFrequency = {} # map from (trajectory, finished) to frequency
                 newObjects = set()
                 for p in population:
@@ -65,6 +75,10 @@ class SMC(Solver):
                                 newObjects.add(newObject)
                             
                         sampleFrequency[newKey] = sampleFrequency.get(newKey, 0) + 1
+
+                if INSTRUMENT:
+                    os.system(f"mkdir  -p experimentOutputs/SMC/{numberOfParticles}/generation{generation}")
+                
                         
                 for o in newObjects: allObjects.add(o)
                 objectEncodings.registerObjects([(o,spec) for o in newObjects])
@@ -72,6 +86,8 @@ class SMC(Solver):
                 for t,f in sampleFrequency:
                     if f or True:
                         self._report(ProgramGraph(t))
+
+                        
 
                 # Convert trajectories to particles
                 samples = [Particle(t, frequency, finished=finished)
@@ -91,8 +107,27 @@ class SMC(Solver):
 
                 population = []
                 print("Samples:")
+                childIndex = 0
                 for particle, frequency in sorted(zip(samples, sampleFrequencies),
                                                   key=lambda sf: sf[1]):
+                    if INSTRUMENT:
+                        childIndex += 1
+                        trajectory = '\n'.join([str(ptt) for ptt in particle.trajectory])
+                        stringToFile(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}.txt",
+                                     f"""
+Hello Felix! I am a program.
+                                     this is how many times I was originally sampled (how many parents gave birth to me): {particle.frequency}
+                                     but then Darwin a.k.a.the value function stepped in and changed my frequency to: {frequency}
+                                     this is how much Darwin a.k.a.the value function liked me: {-particle.distance}
+here is my source code:
+{particle.graph.prettyPrint(letters=True)}
+
+and here is a trace of every command that gave rise to me:
+                                     {trajectory}
+""")
+                        for ri,pr in enumerate(particle.graph.objects()):
+                            pr.export(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}_canvas{ri}.png",
+                                      256)
                     particle.frequency = frequency
                     if frequency > 0.3*numberOfParticles:
                         print(particle)
