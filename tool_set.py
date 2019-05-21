@@ -1,6 +1,90 @@
 from CAD import *
 
 def make3DTools():
+    def cup():
+        r1 = 12
+        r2 = 8
+        l1 = 20
+        bottom_thickness = 4
+        x1, y1, z1 = 12, 12, 4
+
+        cup_body = Cylinder(r1, x1, y1, z1, 
+                                x1, y1, z1 + l1)
+
+        cup_hole = Cylinder(r2, x1, y1, z1 + bottom_thickness, 
+                                x1, y1, z1 + l1)
+
+        r3 = 8
+        r4 = 4
+        zz = 16
+        yy = 12
+        xx = 24
+        cup_handle = Cylinder(r3, xx, yy - 4, zz,
+                                  xx, yy + 4, zz)
+        cup_handle_hole = Cylinder(r4, xx, yy - 4, zz,
+                                       xx, yy + 4, zz)
+
+        return cup_body + (cup_handle - cup_handle_hole)- cup_hole 
+
+    def bob():
+        body = Cuboid(8, 8, 8,
+                      24,16,28)
+        arm1 = Cuboid(24, 8, 16,
+                      24+8, 8 + 4, 16 + 4)
+        arm2 = Cuboid(0, 8, 16,
+                      8, 8 + 4, 16 + 4)
+        leg1 = Cuboid(8, 8, 0,
+                      8 + 4, 8 + 4, 0 + 8)
+        leg2 = Cuboid(12 + 8, 8, 0,
+                      12 + 8 + 4, 8 + 4, 0 + 8)
+        smile = Sphere(16, 8, 20, 4)
+        smile_sub = Cuboid(12, 4, 20,
+                           12+8, 4 + 8, 20 + 8) 
+
+        return body + arm1 + arm2 + leg1 + leg2 - (smile - smile_sub)
+
+    def glass():
+        x, y = 12,12
+        body = Cylinder(8, x, y, 28,
+                           x, y, 20)
+        body1 = Sphere(x, y, 16, 8)
+        body_sub = Cylinder(4, x, y, 28,
+                               x, y, 20)
+        bot1 = Sphere(x, y, 12, 4)
+        bot2 = Sphere(x, y, 4, 8)
+        bot_sub = Cuboid(0, 0, 0, 20, 20, 4)
+        return (body + body1 - body_sub) + bot1 + (bot2 - bot_sub)
+
+    def cake():
+        x, y = 12,12
+        body = Cylinder(12, x, y, 16,
+                            x, y, 4)
+        cut1 = Cuboid(0, 0, 0,
+                      28, 8, 20)
+        cut2 = Cuboid(0, 0, 0,
+                      12, 28, 20)
+        cherry = Sphere(16, 16, 20, 4)
+        return body - cut1 - cut2 + cherry
+
+    def lamp():
+        x, y = 12,12
+        light = Cylinder(8, x, y, 24,
+                            x, y, 16)
+        light1 = Sphere(x, y, 24, 8)
+
+        stem = Cylinder(12, x, y-4, 12,
+                            x, y, 12)
+        stem_sub = Cylinder(8, x, y-4, 12,
+                               x, y, 12)
+        stem_half = Cuboid(0, 0, 0,
+                           x, 28, 28)
+        bot = Cylinder(8, x, y, 0,
+                          x, y, 4)
+
+        return light + light1 + (stem - stem_sub - stem_half) + bot
+
+
+
     def car():
         l1 = 8
         r = 8
@@ -35,7 +119,8 @@ def make3DTools():
                          l1 + r + l2 - 4,W,0)
         
         return z.translate(0,0,4)
-    return [car()]
+    # return [car()]
+
     def cylinderArray(r,nc,nr,spacing=12,yspacing=None,z0=0,z1=12):
         yspacing = yspacing or spacing
         z = None
@@ -79,7 +164,7 @@ def make3DTools():
                 for z1 in [8,12] for r in [2] ]
         tables = [table(height,nc,nr,16)
                   for nc in [2] for nr in [2] for height in [12,16,20,24] ]
-        return chairs + tables
+        furnitures = chairs + tables
     
     def Lego(r,w,h,spacing=12):
         z = None
@@ -109,7 +194,14 @@ def make3DTools():
     [Lego(4,w,h,12)
             for w in range(1,3)
             for h in range(1,3)
-    ]
+    ] + \
+    furnitures + \
+    [car()] +\
+    [cake()] +\
+    [lamp()] +\
+    [glass()] +\
+    [bob()] +\
+    [cup()] 
                 
 
 def make2DTools():
