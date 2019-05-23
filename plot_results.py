@@ -132,7 +132,7 @@ def plot(file_list, legend_list, filename):
     titles_fns = [
         ('Nodes expanded', lambda stats: stats['nodes_expanded']),
         #('Policy net runs', lambda stats: stats['policy_runs']),
-        ('Time', lambda stats: stats['end_time'] - stats['start_time']),
+        ('Time (seconds)', lambda stats: stats['end_time'] - stats['start_time']),
         #('Value net runs', lambda stats: stats['value_runs'])
             ]
 
@@ -143,7 +143,7 @@ def plot(file_list, legend_list, filename):
         x_axis = compute_x_axis(results_list, fn, title, granularity=200)
         for results, legend in zip(results_list, legend_list):
 
-            y_axis = [percent_solved(results, fn, x) for x in x_axis]
+            y_axis = [percent_solved(results, fn, x)*100. for x in x_axis]
             ax[i].semilogx(x_axis, y_axis, label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
             #l = int(len(x_axis)/10)
             #ax[i].plot(x_axis, y_axis, label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
@@ -151,8 +151,9 @@ def plot(file_list, legend_list, filename):
             ax[i].legend(loc='upper left')#'best')
             #import pdb; pdb.set_trace()
             plt.axes(ax[i])
+            #plt.title("String Editing Programs")
             plt.xlabel(title)
-            plt.ylabel("Fraction of problems solved")
+            plt.ylabel("% of problems solved")
 
     savefile='plots/' + filename + str(time.time()) + '.eps'
     plt.savefig(savefile)
@@ -161,7 +162,7 @@ if __name__=='__main__':
     #savefile = 'random_data'
     #savefile = 'noscratch30sec'
 
-    savefile = 'withprefix120secall'
+    savefile = 'withprefix120sec_all'
 
     # file_list = [ 
     #     './results/beam_val.p1557526743',
@@ -209,16 +210,18 @@ if __name__=='__main__':
         './results/sample_all_prefix.p',
         './results/beam_val_all_prefix.p',
         './results/beam_all_prefix.p',
+        './results/rb_baseline_sample.p',
         './results/a_star_all_prefix.p',
-        './results/a_star_noval_all_prefix.p'
+        './results/a_star_noval_all_prefix.p',
         ]
 
     legend_list = [
     'SMC',
-    'Sample',
-    'Beam with value',
+    'Policy Rollout',
+    'Beam w/ value',
     'Beam w/out value',
-    'A*',
+    'Robustfill',
+    'A* w/ value',
     'A* w/out value'
     ]
 

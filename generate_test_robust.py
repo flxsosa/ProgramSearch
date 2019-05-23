@@ -100,10 +100,10 @@ def review_ex(n_io):
 
 # ========================= NAMES ============================
 def names_first():
-    return random.choice(["Alex", "Sasha", "Taylor", "Jackie", "Isaac", "Norman", "Sarah Lee", "Mary Jane"]) #"Sam", "Paul", "Stacy"
+    return random.choice(["Alex", "Sasha", "Taylor", "Jackie", "Isaac", "Norman", "Sarah Lee", "Mary Jane"])
 
 def names_last():
-    return random.choice(["Lennon", "Smith", "Einstein", "Schmidhuber", "MacDonald", "McCormick"]) #"Jones", "Kent", "Green", "Carroll"
+    return random.choice(["Lennon", "Smith", "Einstein", "Schmidhuber", "MacDonald", "McCormick"]) 
 
 def names_middle():
     return random.choice([names_last(), ""])
@@ -172,8 +172,6 @@ def phone_ex5(area, three, four, phone_type):
 def phone_ex6(area, three, four,  phone_type):
     return [f"{phone_type}: {area}{three}{four}", f"({area}) {three}{four}, type={phone_type}"]
 
-#def phone_ex3(area, three, four):
-#    return [f"({area}) {three} {four}", f"Area: {area}, Num: {three}{four}"] 
 
 def phone_ex(n_io):
     tasks = []
@@ -287,13 +285,6 @@ def date_ex(n_io):
 
 
 if __name__ == '__main__':
-    # print (street_ex(4))
-    # print (name_ex(4))
-    # # print (street_ex(4))
-    # tasks = date_ex(4)
-    # print(tasks)
-
-    # print(phone_ex(4))
 
     tasks = date_ex(4) + street_ex(4) + name_ex(4) + phone_ex(4) + review_ex(4) 
     tasks = tasks + date_ex(4) + street_ex(4) + name_ex(4) + phone_ex(4) + review_ex(4) 
@@ -307,8 +298,3 @@ if __name__ == '__main__':
     import dill
     with open("full_dataset.p", 'wb') as h:
         dill.dump(tasks, h)
-
-    # for task in tasks:
-    #     print("inputs:", task[0])
-    #     print("outputs", task[1])
-    #     print("\n")

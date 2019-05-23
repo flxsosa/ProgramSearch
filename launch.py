@@ -100,7 +100,7 @@ git pull
 
     # Google image already has these modules loaded
     preamble += "git submodule update --init --recursive\n"
-
+    preamble += "pip install python-levenshtein\n"
     #SYNCing ..
     if upload:
         # This is probably a terribly insecure idea...

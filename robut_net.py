@@ -981,6 +981,9 @@ class Agent:
                             hit = True
                             solution = env_copy
                             stats['end_time'] = time.time()
+
+                            ####printing success###
+                            print(env_copy.pstate.past_buttons)
                             return hit, solution, stats
 
                         samples.append(ParticleEntry(env_copy, frequency))

@@ -130,7 +130,17 @@ def save_random_test(n):
 
 if __name__ == '__main__':
 
-    tasks, ps = save_random_test(100)
+    from ROB import get_supervised_sample
+
+    lens = [len(get_supervised_sample()[0]) for i in range(6000)]
+
+    avg = sum(lens)/len(lens)
+    print("avg", avg)
+    print("max", max(lens))
+
+    #tasks, ps = save_random_test(100)
+
+
 
     # tasks = makeTestdata(synth=True, challenge=True, max_num_ex=4)
 

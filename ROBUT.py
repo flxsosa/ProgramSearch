@@ -665,8 +665,7 @@ class GetSpan6(Button):
 
     def f(self, input_str, r1, i1, b1, r2, i2, b2):
         """
-        all complaints of this function please send to mnye@mit.edu
-        evanthebouncy took no part in this :v
+        sorry
         """
         return input_str[[m.end() for m in re.finditer(r1[0], input_str)][i1] if b1 == "End" else [m.start() for m in re.finditer(r1[0], input_str)][i1] : [m.end() for m in re.finditer(r2[0], input_str)][i2] if b2 == "End" else [m.start() for m in re.finditer(r2[0], input_str)][i2]]
 

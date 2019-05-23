@@ -240,11 +240,11 @@ class RobustFill(nn.Module):
         if self.cell_type=="GRU": return cell_state
         if self.cell_type=="LSTM": return cell_state[0]
 
-    def beam_decode(self, batch_inputs=None, beam_size=None, vocab_filter=None, maxlen=None):
+    def beam_decode(self, batch_inputs=None, beam_size=None, vocab_filter=None, maxlen=None, dp=False, env=None):
         
         inputs = self._inputsToTensors(batch_inputs)
 
-        beam = self._run_with_beam(inputs, beam_size=beam_size, vocab_filter=vocab_filter, maxlen=maxlen)
+        beam = self._run_with_beam(inputs, beam_size=beam_size, vocab_filter=vocab_filter, maxlen=maxlen, dp=dp, env=env)
         outputs = list(zip(*beam))
         target_tensors, scores = outputs[0], outputs[1] #oy
 
@@ -255,11 +255,12 @@ class RobustFill(nn.Module):
 
 
     #what's in a beam?
-    def _run_with_beam(self, inputs, beam_size=10, vocab_filter=None, maxlen=None):
+    def _run_with_beam(self, inputs, beam_size=10, vocab_filter=None, maxlen=None, dp=False, env=None):
+        if env: env.reset()
         #assert batchsize is 1 for now
 
         #encode to decoder state
-        target, score, decoder_states, active, H, attention_mask, max_length_inputs, batch_size, n_examples = self._encode(inputs, vocab_filter=vocab_filter) #use hack on run
+        target, score, decoder_states, active, H, attention_mask, max_length_inputs, batch_size, n_examples = self._encode(inputs, vocab_filter=vocab_filter, maxlen=maxlen) #use hack on run
         beam = [(target, score, decoder_states, active)] 
 
         max_len = maxlen if maxlen is not None else self.max_length
@@ -279,7 +280,31 @@ class RobustFill(nn.Module):
                     logsoftmax = self._run_first_half(k, decoder_states, H, attention_mask, max_length_inputs, batch_size, n_examples, vocab_filter=vocab_filter)
                     for token in list(self.target_vocabulary_index.values()) + [self.v_target]:
                         #do filtering for these lines 
+                        action = () if token == self.v_target else (self.target_vocabulary[token],) 
+
+                        if dp:
+                            if k == 0:
+                                partial_program = action
+                            else:
+                                partial_program = self._tensorToOutput(target[:k])[0] + action
+
+                            
+                            
+                            failed=False
+                            e = env.copy()
+                            for action in partial_program:
+                                e.step(action)
+
+                                if e.last_step[1] == -1:
+                                    failed=True
+                                    break  
+                            if failed:
+                                #import pdb; pdb.set_trace()       
+                                continue 
+
                         candidate = self._run_second_half(k, logsoftmax, target.clone(), token, score.clone(), [(ds[0].clone(), ds[1].clone()) for ds in decoder_states], active.clone(), batch_size, n_examples)
+                        #should be able to easily check candidates, because 
+      
                         if len(new_beam) < beam_size:
                             new_beam.append(candidate)
                             new_beam = sorted(new_beam, key=lambda entry: -entry[1])
@@ -454,8 +479,8 @@ class RobustFill(nn.Module):
                 out.append(tuple(self.target_vocabulary[x] for x in tensor[:, i]))
         return out   
 
-    def _encode(self, inputs, vocab_filter=None):
-        return self._run(inputs, target=None, mode="encode_only", n_samples=None, vocab_filter=vocab_filter)
+    def _encode(self, inputs, vocab_filter=None, maxlen=None):
+        return self._run(inputs, target=None, mode="encode_only", n_samples=None, vocab_filter=vocab_filter, maxlen=maxlen)
 
 
     def attend_for_beam(self, i, j, h, H, attention_mask, max_length_inputs, batch_size):
