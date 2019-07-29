@@ -70,7 +70,7 @@ def make3DTools():
         x, y = 12,12
         light = Cylinder(8, x, y, 24,
                             x, y, 16)
-        light1 = Sphere(x, y, 24, 8)
+        light1 = Sphere(x, y, 20, 8)
 
         stem = Cylinder(12, x, y-4, 12,
                             x, y, 12)
@@ -82,7 +82,8 @@ def make3DTools():
                           x, y, 4)
 
         return light + light1 + (stem - stem_sub - stem_half) + bot
-
+    return [lamp()]
+    return [lamp(),glass(),cake(),bob(),cup()]
 
 
     def car():
@@ -362,7 +363,6 @@ def make2DTools():
 
     comrad().export("demo/comrad.png",256)
     everyTool.append(comrad())
-    return [comrad()]
     return everyTool
 
 if __name__ == '__main__':

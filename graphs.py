@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--timeout","-t",type=int,default=None)
     parser.add_argument("--export","-e",type=str,default=None)
     parser.add_argument("--title","-n",type=str,default=None)
+    parser.add_argument("--log","-l",action='store_true',default=False)
     arguments = parser.parse_args()
 
     solverToResult = {}
@@ -39,12 +40,28 @@ if __name__ == "__main__":
                       for r_ in r )
         print("setting timeout to",timeout)
 
-
+    for s,rs in solverToResult.items():
+        L = 0.05
+        print(f"Solver {s} gets a program of length:")
+        print(max(len(r.program.nodes)
+            for r_ in rs
+            for r in r_ 
+            if r.loss <= L
+        ))
+        print(f"and the biggest number of tokens is")
+        print(max(sum(len(l.serialize()) for l in r.program.nodes )
+            for r_ in rs
+            for r in r_ 
+            if r.loss <= L
+        ))
         
-    plot.figure(figsize=(4,3))
+    plot.figure(figsize=(3.5,2.5))
     #plot.subplot(211)
     #plot.tight_layout();
-    plot.ylabel("Intersection over Union")
+    if '2' in arguments.title:
+        plot.ylabel("Intersection over Union")
+    else:
+        plot.ylabel("")
     plot.xlabel("Time (seconds)")
     plot.ylim([0,1])
     if arguments.title:
@@ -63,10 +80,13 @@ if __name__ == "__main__":
     ordering = dict(zip(ordering,range(len(ordering))))
     for s in sorted(solverToResult.keys(),
                     key=lambda s: ordering[s]):
-        ts = np.arange(0,timeout,0.1)
+        ts = np.arange(1 if arguments.log else 0,timeout,0.1)
         ys = [rewardAtTime(t,s) for t in ts ]
         ys = [mean(y) for y in ys ]
-        plot.semilogx(ts,ys,label=name[s],linewidth=3,basex=10)
+        if not arguments.log:
+            plot.plot(ts,ys,label=name[s],linewidth=3)#,basex=10)
+        else:
+            plot.semilogx(ts,ys,label=name[s],linewidth=3,basex=10)
 
 
         

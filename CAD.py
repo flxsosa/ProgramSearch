@@ -1751,7 +1751,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 
 
-def testCSG(m, getProgram, timeout, timestamp, solvers):
+def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0):
     random.seed(0)
     oneParent = m.oneParent
     print(f"One parent restriction?  {oneParent}")
@@ -1789,6 +1789,11 @@ def testCSG(m, getProgram, timeout, timestamp, solvers):
         specs = getProgram
     else:
         specs = [getProgram() for _ in range(30) ]
+
+    random.seed(solverSeed)
+    torch.manual_seed(solverSeed + 1)
+    np.random.seed(solverSeed + 2)
+    
     twodimensional = len(specs[0].execute().shape) == 2
     for ti,spec in enumerate(specs):
         print("Trying to explain the program:")

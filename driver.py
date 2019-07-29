@@ -3,6 +3,10 @@ from tool_set import *
 import matplotlib.pyplot as plot
 
 
+import numpy as np
+import torch
+import random
+
 from datetime import datetime
 
 
@@ -23,6 +27,8 @@ if __name__ == "__main__":
                         help="Number of rounds of self attention to perform upon objects in scope")
     parser.add_argument("--heads", default=2, type=int,
                         help="Number of attention heads")
+    parser.add_argument("--seed", default=0, type=int,
+                        help="Random seed")
     parser.add_argument("--hidden", "-H", type=int, default=512,
                         help="Size of hidden layers")
     parser.add_argument("--timeout", default=5, type=float,
@@ -42,8 +48,6 @@ if __name__ == "__main__":
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
-
-
 
     if arguments.render:
         for path in arguments.render:
@@ -207,4 +211,5 @@ if __name__ == "__main__":
                 dataGenerator,
                 arguments.timeout,
                 solvers=arguments.solvers,
-                timestamp=timestamp)
+                timestamp=timestamp,
+                solverSeed=arguments.seed)
