@@ -29,6 +29,8 @@ if __name__ == "__main__":
                         help="Number of attention heads")
     parser.add_argument("--seed", default=0, type=int,
                         help="Random seed")
+    parser.add_argument("--ntest", default=30, type=int,
+                        help="size of testing set")
     parser.add_argument("--hidden", "-H", type=int, default=512,
                         help="Size of hidden layers")
     parser.add_argument("--timeout", default=5, type=float,
@@ -212,4 +214,5 @@ if __name__ == "__main__":
                 arguments.timeout,
                 solvers=arguments.solvers,
                 timestamp=timestamp,
-                solverSeed=arguments.seed)
+                solverSeed=arguments.seed,
+                n_test=ntest)

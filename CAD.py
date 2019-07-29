@@ -1751,7 +1751,7 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
 
 
 
-def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0):
+def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30):
     random.seed(0)
     oneParent = m.oneParent
     print(f"One parent restriction?  {oneParent}")
@@ -1788,7 +1788,7 @@ def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0):
     if isinstance(getProgram, list):
         specs = getProgram
     else:
-        specs = [getProgram() for _ in range(30) ]
+        specs = [getProgram() for _ in range(n_test) ]
 
     random.seed(solverSeed)
     torch.manual_seed(solverSeed + 1)

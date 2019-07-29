@@ -11,6 +11,9 @@ import torch.nn as nn
 import math
 
 def mean(xs): return sum(xs)/len(xs)
+def standardDeviation(xs):
+    u = mean(xs)
+    return mean([ (x - u)**2 for x in xs ])**0.5
 def percentile(p,xs):
     return list(sorted(xs))[int(0.5 + p*len(xs))]
 
