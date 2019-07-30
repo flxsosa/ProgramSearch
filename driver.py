@@ -215,4 +215,4 @@ if __name__ == "__main__":
                 solvers=arguments.solvers,
                 timestamp=timestamp,
                 solverSeed=arguments.seed,
-                n_test=ntest)
+                n_test=arguments.ntest)
