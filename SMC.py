@@ -62,6 +62,8 @@ class SMC(Solver):
             population = [Particle(tuple([]), numberOfParticles)]
             if INSTRUMENT: os.system(f"mkdir  -p experimentOutputs/SMC/{numberOfParticles}")
             for generation in range(self.maximumLength):
+                if time.time() - startTime > timeout: break
+                
                 sampleFrequency = {} # map from (trajectory, finished) to frequency
                 newObjects = set()
                 for p in population:

@@ -28,28 +28,34 @@ if __name__ == "__main__":
     for fn in arguments.checkpoints:
         with open(fn,"rb") as handle:
             for solver, results in pickle.load(handle):
-                if solver in solverToResult:
-                    assert False
-                solverToResult[solver] = results
+                if solver == "no_REPL_beam": continue
+                
+                if solver not in solverToResult:
+                    solverToResult[solver] = [results]
+                else:
+                    solverToResult[solver].append(results)
 
     timeout = arguments.timeout
     if timeout is None:
         timeout = max(r_.time
-                      for rs in solverToResult.values()
+                      for rss in solverToResult.values()
+                      for rs in rss 
                       for r in rs
                       for r_ in r )
         print("setting timeout to",timeout)
 
-    for s,rs in solverToResult.items():
+    for s,rss in solverToResult.items():
         L = 0.05
         print(f"Solver {s} gets a program of length:")
         print(max(len(r.program.nodes)
+                  for rs in rss 
             for r_ in rs
             for r in r_ 
             if r.loss <= L
         ))
         print(f"and the biggest number of tokens is")
         print(max(sum(len(l.serialize()) for l in r.program.nodes )
+                  for rs in rss 
             for r_ in rs
             for r in r_ 
             if r.loss <= L
@@ -68,8 +74,10 @@ if __name__ == "__main__":
         plot.title(arguments.title)
 
     def rewardAtTime(t,solver):
-        return [1 - min([r.loss for r in rs if r.time <= t] + [1.])
-                for rs in solverToResult[solver] ]
+        """Returns a list of rewards, one for each random seed"""
+        return [mean([1 - min([r.loss for r in rs if r.time <= t] + [1.])
+                     for rs in rss ])
+                for rss in solverToResult[solver]] 
 
     ordering = ["SMC_value","forwardSample","beam_value","beam","no_REPL"]
     name = {"SMC_value": "SMC",
@@ -82,14 +90,20 @@ if __name__ == "__main__":
                     key=lambda s: ordering[s]):
         ts = np.arange(1 if arguments.log else 0,timeout,0.1)
         ys = [rewardAtTime(t,s) for t in ts ]
-        ys = [mean(y) for y in ys ]
+        us = [mean(y) for y in ys ]
+        deviations = [10*standardDeviation(y) for y in ys ]
         if not arguments.log:
-            plot.plot(ts,ys,label=name[s],linewidth=3)#,basex=10)
+            plot.plot(ts,us,label=name[s],linewidth=1.5)#,basex=10)
+            if "beam" not in s:
+                print(s,deviations)
+                plot.fill_between(ts,
+                                  [max(u - deviation, 0.)
+                                   for u,deviation in zip(us,deviations) ],
+                                  [min(u + deviation, 1.)
+                                   for u,deviation in zip(us,deviations) ],
+                                  alpha=0.3)
         else:
-            plot.semilogx(ts,ys,label=name[s],linewidth=3,basex=10)
-
-
-        
+            plot.semilogx(ts,ys,label=name[s],linewidth=3,basex=10)        
 
     if arguments.export:
         plot.savefig(arguments.export)

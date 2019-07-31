@@ -1831,6 +1831,7 @@ def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30)
     names = [s.name for s in solvers]
     with open(f"{outputDirectory}/testResults.pickle","wb") as handle:
         pickle.dump(list(zip(names, testResults)),handle)
+    print(f"Exported to:\n{outputDirectory}/testResults.pickle")
     plotTestResults(testResults, timeout,
                     defaultLoss=1.,
                     names=names,
