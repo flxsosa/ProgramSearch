@@ -136,7 +136,7 @@ def plot(file_list, legend_list, filename):
         #('Value net runs', lambda stats: stats['value_runs'])
             ]
 
-    fig, ax = plt.subplots(1, len(titles_fns), figsize=(6*len(titles_fns), 6))
+    fig, ax = plt.subplots(1, len(titles_fns), figsize=(6*len(titles_fns), 4)) #used to be 6
 
     for i, (title, fn) in enumerate(titles_fns):
 
@@ -144,11 +144,20 @@ def plot(file_list, legend_list, filename):
         for results, legend in zip(results_list, legend_list):
 
             y_axis = [percent_solved(results, fn, x)*100. for x in x_axis]
-            ax[i].semilogx(x_axis, y_axis, label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
+            if legend == 'Robustfill' and title == 'Nodes expanded':
+                lastz = 0
+                for z in reversed(range(len(y_axis))):
+                    if z == len(y_axis) - 1: continue
+                    if y_axis[z] < y_axis[z+1]:
+                        limit = z + 1
+                        break
+                ax[i].semilogx(x_axis[:limit], y_axis[:limit], label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
+            else:
+                ax[i].semilogx(x_axis, y_axis, label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
             #l = int(len(x_axis)/10)
             #ax[i].plot(x_axis, y_axis, label=legend, linewidth=6.0, linestyle='-')#, marker="o") #, c='C6')
             #ax[i].set_title(title)
-            ax[i].legend(loc='upper left')#'best')
+            #ax[i].legend(loc='upper left')#'best')
             #import pdb; pdb.set_trace()
             plt.axes(ax[i])
             #plt.title("String Editing Programs")
@@ -204,15 +213,38 @@ if __name__=='__main__':
 
 
 
+#main paper files #######################:
+    # savefile = 'withprefix120sec_all_short'
+    # file_list = [
+    #     './results/smc_all_prefix.p',
+    #     './results/sample_all_prefix.p',
+    #     './results/beam_val_all_prefix.p',
+    #     './results/beam_all_prefix.p',
+    #     './results/rb_baseline_sample.p',
+    #     './results/a_star_all_prefix.p',
+    #     './results/a_star_noval_all_prefix.p',
+    #     ]
 
+    # legend_list = [
+    # 'SMC',
+    # 'Policy Rollout',
+    # 'Beam w/ value',
+    # 'Beam w/out value',
+    # 'Robustfill',
+    # 'A* w/ value',
+    # 'A* w/out value'
+    # ]
+
+#Supplement figure#################:
+    savefile = 'supp_all'
     file_list = [
-        './results/smc_all_prefix.p',
-        './results/sample_all_prefix.p',
-        './results/beam_val_all_prefix.p',
-        './results/beam_all_prefix.p',
-        './results/rb_baseline_sample.p',
-        './results/a_star_all_prefix.p',
-        './results/a_star_noval_all_prefix.p',
+        './results/smc_all_prefixdeadlinekevin.p',
+        './results/sample_all_prefixdeadlinekevin.p',
+        './results/beam_val_all_prefixdeadlinekevin.p',
+        './results/beam_all_prefixdeadlinekevin.p',
+        './results/rb_baseline_beamdeadlinekevin.p',
+        './results/a_star_all_prefixdeadlinekevin.p',
+        './results/a_star_noval_all_prefixdeadlinekevin.p',
         ]
 
     legend_list = [
@@ -224,6 +256,9 @@ if __name__=='__main__':
     'A* w/ value',
     'A* w/out value'
     ]
+
+
+
 
     # savefile = 'random_data_long'
     # #random data, longer than 10
