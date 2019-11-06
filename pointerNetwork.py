@@ -750,16 +750,18 @@ class NoExecution(Module):
 
 
     def programLikelihood(self, trace, specEncoding):
-        scope = {} # map from program to attention key
+        scope = [] # map from program to attention key
         h = self.initialState(specEncoding)
 
         L = []
         for command_index, command in enumerate(trace):
             last_command = command_index == len(trace) - 1
             tokens = ["STARTING"] + list(command.serialize()) + ["ENDING" if last_command else "STARTING"]
+            #import pdb; pdb.set_trace()
+            print(tokens)
             symbolSequence = [self.wordToIndex[t if not isinstance(t,Program) else "POINTER"]
                               for t in tokens]
-            
+            print(symbolSequence)
             # inputSequence : L x H
             inputSequence = self.tensor(symbolSequence)
             outputSequence = self.tensor(symbolSequence[1:])
@@ -769,7 +771,7 @@ class NoExecution(Module):
             objectInputs = self.device(torch.zeros(len(symbolSequence) - 1, self.H))
             for t, p in enumerate(tokens):
                 if isinstance(p, Program):
-                    objectInputs[t] = scope[p]
+                    objectInputs[t] = dict(scope)[p]
                     
             inputSequence = torch.cat([inputSequence, objectInputs], 1).unsqueeze(1)
 
@@ -780,7 +782,7 @@ class NoExecution(Module):
 
             thisLikelihood = 0.
             if any( isinstance(t,Program) for t in tokens ):
-                alternatives = list(scope.items())
+                alternatives = scope #list(scope.items())
                 objectEncodings = torch.stack([oe for _,oe in alternatives])
                 objects = [o for o,_ in alternatives]                
                 attention = self.pointerAttention(o, objectEncodings)
@@ -791,9 +793,12 @@ class NoExecution(Module):
                         assert symbolSequence[T + 1] == self.wordToIndex["POINTER"]
 
             # remove children from scope
+            #import pdb; pdb.set_trace()
             for child in command.children():
-                del scope[child]
-            scope[command] = h
+                #del scope[child]
+                scope = [(k,v) for k,v in scope if k is not child]
+            #scope[command] = h
+            scope.append((command,h))
 
             # sequence log likelihood ignoring pointer values
             sll = -F.nll_loss(self.output(o), outputSequence, reduce=True, size_average=False)
@@ -937,9 +942,13 @@ class NoExecution(Module):
                     numberLines = p.numberLines
                     numberTokens = p.numberTokens
                     if word in {"STARTING","ENDING"}:
+                        #print(tokenBuffer)
                         numberLines = numberLines + 1
                         new_command = self.DSL.parseLine(tokenBuffer)
-                        if new_command is None: continue
+                        if new_command is None: 
+                            # print('you failed at parsing')
+                            # print(tokenBuffer)
+                            continue
                         tokenBuffer = []
                         for child in set(new_command.children()):
                             del scope[child]

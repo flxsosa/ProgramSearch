@@ -1950,11 +1950,31 @@ def getTrainingData(path):
         return p
 
     return getData
-        
+
+
+#oh boy abstraction!!
+
+class Ab_Rectangle(Rectangle):
+    def serialize(self):
+        return (self.__class__.token,)
+
+class Ab_Circle(Circle):
+    def serialize(self):
+        return (self.__class__.token,)
+
+class Ab_Loop2(Loop2):
+    def serialize(self):
+        return (self.__class__.token,)
+
+
+
+dsl_2d_abstraction = DSL([Union, Difference, Intersection, Ab_Loop2, Ab_Rectangle, Ab_Circle])
+
+
 if __name__ == "__main__":
-    m = NoExecution(SpecEncoder(), dsl_2d)
-    p = Union(Circle(1,2,3),
-              Circle(2,21,9))
+    m = NoExecution(SpecEncoder(), dsl_2d_abstraction)
+    p = Union(Ab_Circle(1,2,3),
+              Ab_Circle(2,21,9))
 
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     while True:
@@ -1962,8 +1982,9 @@ if __name__ == "__main__":
         L = sum(l for ls in losses for l in ls  )
         print(L)
         if L < 0.02:
-            for b in m.beaming(p,B=20, maximumLines=4,maximumTokens=100):
+            for b in m.beaming(p, B=20, maximumLines=4,maximumTokens=100):
                 print(b)
+            print('hi')
             assert False
             
             #print(m.sample(p))
