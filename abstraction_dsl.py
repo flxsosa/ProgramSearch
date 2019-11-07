@@ -147,13 +147,34 @@ class NoExecutionSimpleObjectEncoder(Module):
         objectEncodings = h
         return objectEncodings
 
+
+def set_sampling_equivalent(a, b):
+    """
+    Evan-style sampling-based reward. 
+    converts abstract progs a and b to sets
+    """
+    # find
+    pass 
+
+
+def JankySamplingR(spec, program):
+    """
+    Evan-style sampling-based reward. 
+    """
+    if len(program) == 0 or len(program) > len(spec.toTrace()): return False
+    for o in program.objects():
+        if set_sampling_equivalent(o,spec.abstract()): return True
+    return False
+
+
+
 if __name__ == "__main__":
     #m = AbstractNoExecution(SpecEncoder(), dsl_2d_abstraction)
 
     concrete_p = Difference(Circle(1,2,3),
               Rectangle(2,3,4,4,4,4,3,3))
 
-    concrete_p = Union(Circle(1,3,3),
+    concrete_p2 = Difference(Circle(1,3,3),
               Circle(2,21,9))
     print(concrete_p)
 
@@ -173,17 +194,22 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     while True:
-        losses = m.gradientStepTraceBatched(optimizer, [(concrete_p, p.toTrace())])
+        losses = m.gradientStepTraceBatched(optimizer, [ 
+            (concrete_p2, concrete_p2.abstract().toTrace()) ])
         L = sum(l for ls in losses for l in ls  )
         print(L)
-        if L < .1:
+        if L < 1.387:
 
-            fs = ForwardSample(m)
-            samps = []
-            for i in range(10):
-                samps.append(fs.rollout(concrete_p))
-            # for b in m.beaming(concrete_p, B=20, maximumLines=4,maximumTokens=100):
-            #     print(b)
+            # fs = ForwardSample(m)
+            # samps = []
+            # for i in range(10):
+            #     samps.append(fs.rollout(concrete_p))
+
+            from beamSearch import BeamSearch
+            bs = BeamSearch(m)
+            sols = bs.infer(concrete_p2, lambda s, p: 0 ,5)
+            assert False
+
             print('hi')
             for s in samps:                                                                                                                                                                
                 if s: print(s.prettyPrint())

@@ -11,14 +11,21 @@ THURSDAY:
 	- [ ] modules?? - seems like an optimization at this point ...
 
 - [ ] better reward fn
-	- [ ] simplification
-	- [ ] online gradient descent
+	- [ ] simplification - will ask Eric
+	- [ ] online gradient descent - how fast
 
-- [ ] hack to use noExecution policy but AbstractPointerNet distance?
+- [ ] hack to use noExecution policy but AbstractPointerNet distance? - seems like an optimization at this point
 
 - [ ] fix symmetry problem 
 		- summation issue???
 		- reward is off ... 
+		- what are the non-parses in the sampling?
+		- can try beam to make myself feel better
+		- are objectencodings converging to zero? - no, dont think so
+		- are objectencodings actually working? check eq - seems so ... 
+		- ask kevin: does graph rename and reorder vars for viewing pleasure?
+
+- [ ] test batching ...
 
 - [ ] why is AbstractPointerNet worse than noExecution?
 	- hyp1: just bc of 
@@ -52,6 +59,7 @@ Need to add to noExecution:
 		- [ ] just use a standard text - based encoder
 		hard mode:
 		- [ ] for each dsl element, model should have an abstract module for encoding it. SHOULD THIS JUST BE THE OBJECT ENCODER for policy prediciton too??
+
 
 Subclass+modify a2c.py so it is abstract
 	modify scopeEncoding or don't use it ...

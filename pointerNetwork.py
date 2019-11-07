@@ -476,6 +476,7 @@ class ProgramPointerNetwork(Module):
     def initialHidden(self, objectEncodings, specEncoding):
         if objectEncodings is None:
             objectEncodings = self.device(torch.zeros(self.objectsDimensionality))
+            #print('nothing in scope')
         else:
             objectEncodings = objectEncodings.sum(0)
         return self._initialHidden(torch.cat([specEncoding, objectEncodings]))
@@ -512,11 +513,12 @@ class ProgramPointerNetwork(Module):
             # Gather together objects in scope
             objectsInScope = list(currentGraph.objects(oneParent=self.oneParent))
             scope = scopeEncoding.encoding(spec, objectsInScope)
+            import pdb; pdb.set_trace()
             object2pointer = {o: Pointer(i)
                               for i, o  in enumerate(objectsInScope)}
 
             h0 = self.initialHidden(scope, specEncoding)
-            def substitutePointers(serialization):
+            def substitutePointers(serialization): #XXX TODO assumes untrueness
                 return [object2pointer.get(token, token)
                         for token in serialization]
             lls.append(self.decoder.logLikelihood(h0,
