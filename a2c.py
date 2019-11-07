@@ -102,9 +102,14 @@ class A2C:
                         reinforcedLikelihoods.append(ll*(frequency/successfulTrajectories))
                 if successfulTrajectories == 0:
                     # mix imitation with REINFORCE
-                    ll = self.model.traceLogLikelihood(spec, spec.toTrace(),
-                                                       scopeEncoding=objectEncodings,
-                                                       specEncoding=specEncodings[si])[0]
+                    if self.model.abstract:
+                        ll = self.model.traceLogLikelihood(spec, spec.abstract().toTrace(),
+                                   scopeEncoding=objectEncodings,
+                                   specEncoding=specEncodings[si])[0]
+                    else:
+                        ll = self.model.traceLogLikelihood(spec, spec.toTrace(),
+                                                           scopeEncoding=objectEncodings,
+                                                           specEncoding=specEncodings[si])[0]
                     reinforcedLikelihoods.append(ll)
             if reinforcedLikelihoods:
                 policy_loss = -sum(reinforcedLikelihoods)/len(reinforcedLikelihoods)
@@ -123,6 +128,9 @@ class A2C:
             lastUpdate += 1
             
             if lastUpdate%updateFrequency == 1:
+                print()
+                print()
+                print("*********************")
                 print(f"Average value loss: {sum(value_losses)/len(value_losses)}")
                 if policy_losses:
                     print(f"Average policy loss: {sum(policy_losses)/len(policy_losses)}")

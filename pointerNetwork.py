@@ -139,8 +139,13 @@ class LineDecoder(Module):
     def logLikelihood_hidden(self, initialState, target, objectEncodings=None, objectKeys=None):
         objectKeys = self.getKeys(objectEncodings, objectKeys)
         
-        symbolSequence = [self.wordToIndex[t if not isinstance(t,Pointer) else "POINTER"]
+        try:
+            symbolSequence = [self.wordToIndex[t if not isinstance(t,Pointer) else "POINTER"]
                           for t in ["STARTING"] + target + ["ENDING"] ]
+        except KeyError:
+            print("key error has occurred")
+            import pdb; pdb.set_trace()
+
         
         # inputSequence : L x H
         inputSequence = self.tensor(symbolSequence[:-1])
@@ -378,10 +383,15 @@ class ScopeEncoding():
         self.owner = owner
         self.object2index = {}
         self.objectEncoding = None
+        self.abstract = self.owner.abstract
 
     def registerObject(self, o, s):
         if (o,s) in self.object2index: return self
-        oe = self.owner.objectEncoder(s.execute(), o.execute())
+        if self.abstract:
+            oe = self.owner.objectEncoder(s.execute(), o)
+        else:
+            oe = self.owner.objectEncoder(s.execute(), o.execute())
+        
         if self.objectEncoding is None:
             self.objectEncoding = oe.view(1,-1)
         else:
@@ -393,7 +403,11 @@ class ScopeEncoding():
         os = [o for o in objectsAndSpecs if o not in self.object2index ]
         if len(os) == 0: return self
         os = list(set(os))
-        encodings = self.owner.objectEncoder([s.execute() for _,s in os ],
+        if self.abstract:
+            encodings = self.owner.objectEncoder([s.execute() for _,s in os ],
+                                             [o for o,_ in os])        
+        else:
+            encodings = self.owner.objectEncoder([s.execute() for _,s in os ],
                                              [o.execute() for o,_ in os])
         if self.objectEncoding is None:
             self.objectEncoding = encodings
@@ -417,14 +431,14 @@ class ScopeEncoding():
 class ProgramPointerNetwork(Module):
     """A network that looks at the objects in a ProgramGraph and then predicts what to add to the graph"""
     def __init__(self, objectEncoder, specEncoder, DSL, oneParent=True,
-                 H=256, attentionRounds=1, heads=4):
+                 H=256, attentionRounds=1, heads=4, abstract=False):
         """
         specEncoder: Module that encodes spec to initial hidden state of RNN
         objectEncoder: Module that encodes (spec, object) to features we attend over
         oneParent: Whether each node in the program graph is constrained to have no more than one parent
         """
         super(ProgramPointerNetwork, self).__init__()
-
+        self.abstract=abstract
         self.DSL = DSL
         self.oneParent = oneParent
         self.objectEncoder = objectEncoder
@@ -487,7 +501,8 @@ class ProgramPointerNetwork(Module):
     def traceLogLikelihood(self, spec, trace, scopeEncoding=None, specEncoding=None):
         scopeEncoding = scopeEncoding or ScopeEncoding(self).\
                         registerObjects([(o,spec)
-                                         for o in set(trace)])
+                                      for o in set(trace)])
+
         currentGraph = ProgramGraph([])
         specEncoding = specEncoding if specEncoding is not None else self.specEncoder(spec.execute())
         lls = []
@@ -505,8 +520,8 @@ class ProgramPointerNetwork(Module):
                 return [object2pointer.get(token, token)
                         for token in serialization]
             lls.append(self.decoder.logLikelihood(h0,
-                                                  substitutePointers(obj.serialize()) if not finalMove else obj,
-                                                  encodedInputs=scope))
+                              substitutePointers(obj.serialize()) if not finalMove else obj,
+                              encodedInputs=scope))
             if not finalMove:
                 currentGraph = currentGraph.extend(obj)
         return sum(lls), lls        
@@ -758,10 +773,8 @@ class NoExecution(Module):
             last_command = command_index == len(trace) - 1
             tokens = ["STARTING"] + list(command.serialize()) + ["ENDING" if last_command else "STARTING"]
             #import pdb; pdb.set_trace()
-            print(tokens)
             symbolSequence = [self.wordToIndex[t if not isinstance(t,Program) else "POINTER"]
                               for t in tokens]
-            print(symbolSequence)
             # inputSequence : L x H
             inputSequence = self.tensor(symbolSequence)
             outputSequence = self.tensor(symbolSequence[1:])
@@ -966,6 +979,7 @@ class NoExecution(Module):
 
             for p in nextgeneration:
                 if p.finished:
+                    #print(list(p.scope.keys())[0].serialize())
                     yield p.ll,list(p.scope.keys())
 
             nextgeneration.sort(key=lambda p: p.ll, reverse=True)

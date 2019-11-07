@@ -2,6 +2,7 @@ from CAD import *
 from tool_set import *
 import matplotlib.pyplot as plot
 
+from abstraction_dsl import NoExecutionSimpleObjectEncoder
 
 import numpy as np
 import torch
@@ -44,12 +45,19 @@ if __name__ == "__main__":
     parser.add_argument("--noExecution", default=False, action='store_true')
     parser.add_argument("--rotate", default=False, action='store_true')
     parser.add_argument("--solvers",default=["fs"],nargs='+')
+    parser.add_argument("--train_abstraction", default=False, action='store_true')
+    #^only applies to training the noexecution model now
 
     timestamp = datetime.now().strftime('%FT%T')
     print(f"Invoking @ {timestamp} as:\n\tpython {' '.join(sys.argv)}")
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
+
+    if arguments.train_abstraction:
+        #assert arguments.noExecution
+        #assert arguments.mode == "imitation"
+        assert arguments.td #2d
 
     if arguments.render:
         for path in arguments.render:
@@ -113,6 +121,8 @@ if __name__ == "__main__":
             arguments.checkpoint += "_viewpoints"
         if arguments.attention > 0:
             arguments.checkpoint += f"_attention{arguments.attention}_{arguments.heads}"
+        if arguments.train_abstraction:
+            arguments.checkpoint += "_abstraction"
         if not arguments.td:
             if not arguments.rotate:
                 arguments.checkpoint += "_noRotate"
@@ -137,8 +147,12 @@ if __name__ == "__main__":
             training = lambda : random3D(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes,
                                          rotate=arguments.rotate)
         else:
-            dsl = dsl_2d
-            oe = ObjectEncoder()
+            if arguments.train_abstraction:
+                dsl = dsl_2d_abstraction
+                oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+            else:
+                dsl = dsl_2d
+                oe = ObjectEncoder()
             se = SpecEncoder()
             training = lambda : randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
 
@@ -155,19 +169,30 @@ if __name__ == "__main__":
                                           oneParent=arguments.oneParent,
                                           attentionRounds=arguments.attention,
                                           heads=arguments.heads,
-                                          H=arguments.hidden)
+                                          H=arguments.hidden,
+                                          abstract=arguments.train_abstraction)
         trainCSG(m, training,
                  trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
-                 checkpoint=arguments.checkpoint)
+                 checkpoint=arguments.checkpoint, train_abstraction=arguments.train_abstraction )
     elif arguments.mode == "critic":
         assert arguments.resume is not None, "You need to specify a checkpoint with --resume, which bootstraps the policy"
         m = torch.load(arguments.resume)
+        print('loaded model ... ')
         critic = A2C(m)
-        def R(spec, program):
-            if len(program) == 0 or len(program) > len(spec.toTrace()): return False
-            for o in program.objects():
-                if o.IoU(spec) > 0.95: return True
-            return False
+
+        if arguments.train_abstraction:
+            def R(spec, program):
+                if len(program) == 0 or len(program) > len(spec.toTrace()): return False
+                for o in program.objects():
+                    if o == spec.abstract(): return True
+                return False
+        else:
+            def R(spec, program):
+                if len(program) == 0 or len(program) > len(spec.toTrace()): return False
+                for o in program.objects():
+                    if o.IoU(spec) > 0.95: return True
+                return False
+
         if arguments.td:
             training = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         else:

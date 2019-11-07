@@ -609,6 +609,9 @@ class Rectangle(CSG):
             return (x - p[0])*(p[1] - q[1]) - (y - p[1])*(p[0] - q[0])
         return 1.*((halfPlane(p0,p1) <= 0.)&(halfPlane(p1,p2) <= 0)&(halfPlane(p2,p3) <= 0)&(halfPlane(p3,p0) <= 0))
 
+
+    def abstract(self):
+        return Ab_Rectangle() #TODO import situation ...
     # def flipX(self):
     #     return Rectangle(RESOLUTION - self.x1, self.y0,
     #                       RESOLUTION - self.x0, self.y1)
@@ -653,6 +656,7 @@ class Circle(CSG):
 
     def __eq__(self, o):
         return isinstance(o, Circle) and self.serialize() == o.serialize()
+
     def __hash__(self):
         return hash(self.serialize())
 
@@ -680,6 +684,9 @@ class Circle(CSG):
         r = self.d/2
 
         return 1.*(distance2 <= (r/RESOLUTION)*(r/RESOLUTION))
+
+    def abstract(self):
+        return Ab_Circle()
 
 class Union(CSG):
     token = '+'
@@ -763,6 +770,11 @@ class Union(CSG):
         b = 1.*(self.elements[1].render(r))
         return a + b - a*b        
 
+    def abstract(self): #todo import situation
+        return Union(
+            self.elements[0].abstract(),
+            self.elements[1].abstract())
+
 class Difference(CSG):
     token = '-'
     type = arrow(tCSG, tCSG, tCSG)
@@ -843,6 +855,11 @@ class Difference(CSG):
         b = 1.*self.b.render(r)
         return np.clip(a - b,
                        0., 1.)
+
+    def abstract(self): #todo import situation
+        return Difference(
+            self.a.abstract(),
+            self.b.abstract())
 
 class Intersection(CSG):
     token = '*'
@@ -927,6 +944,11 @@ class Intersection(CSG):
         b = 1.*self.b.render(r)
         return np.clip(a*b,
                        0., 1.)
+
+    def abstract(self): #todo import situation
+        return Intersection(
+            self.a.abstract(),
+            self.b.abstract())
 
         
 class Loop2(CSG):
@@ -1719,8 +1741,8 @@ def randomScene(resolution=32, maxShapes=3, minShapes=1, verbose=False, export=N
     
     return s
 
-def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
-    print("cuda?",m.use_cuda)
+def trainCSG(m, getProgram, trainTime=None, checkpoint=None, train_abstraction=False):
+    print("cuda?", m.use_cuda)
     assert checkpoint is not None, "must provide a checkpoint path to export to"
     sys.stdout.flush()
     
@@ -1737,7 +1759,11 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None):
     while trainTime is None or time.time() - startTime < trainTime:
         sys.stdout.flush()
         ss = [getProgram() for _ in range(B)]
-        ls = m.gradientStepTraceBatched(optimizer, [(s, s.toTrace())
+        if train_abstraction:
+            ls = m.gradientStepTraceBatched(optimizer, [(s, s.abstract().toTrace())
+                                                    for s in ss])
+        else:
+            ls = m.gradientStepTraceBatched(optimizer, [(s, s.toTrace())
                                                     for s in ss])
         for l in ls:
             totalLosses.append(sum(l))
@@ -1951,30 +1977,51 @@ def getTrainingData(path):
 
     return getData
 
-
-#oh boy abstraction!!
+####oh boy abstraction!!
 
 class Ab_Rectangle(Rectangle):
+    type = tCSG
+
+    def __init__(self):
+        super(Rectangle, self).__init__()
+
     def serialize(self):
         return (self.__class__.token,)
+
+    def __str__(self):
+        return "tAb_rect"
+
+    def _render(self, r=None):
+        assert False
+
+    def __hash__(self): return id(self)
 
 class Ab_Circle(Circle):
+    type = tCSG
+
+    def __init__(self):
+        super(Circle, self).__init__()
+
     def serialize(self):
         return (self.__class__.token,)
 
-class Ab_Loop2(Loop2):
-    def serialize(self):
-        return (self.__class__.token,)
+    def __str__(self):
+        return "tAb_circ"
 
+    def _render(self, r=None):
+        assert False
 
+    def __hash__(self): return id(self)
 
-dsl_2d_abstraction = DSL([Union, Difference, Intersection, Ab_Loop2, Ab_Rectangle, Ab_Circle])
+dsl_2d_abstraction = DSL([Union, Difference, Intersection, Ab_Rectangle, Ab_Circle]) #No Loops
 
 
 if __name__ == "__main__":
     m = NoExecution(SpecEncoder(), dsl_2d_abstraction)
     p = Union(Ab_Circle(1,2,3),
               Ab_Circle(2,21,9))
+
+
 
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
     while True:

@@ -152,8 +152,8 @@ def binary_cross_entropy(y,t, epsilon=10**-10, average=True):
     B = y.size(0)
     log_yes_probability = y
     log_no_probability = torch.log(1 - y.exp() + epsilon)
-    assert torch.all(log_yes_probability <= 0.)
-    assert torch.all(log_no_probability <= 0.)
+    assert torch.ByteTensor.all(log_yes_probability <= 0.)
+    assert torch.ByteTensor.all(log_no_probability <= 0.)
     correctYes = t
     correctNo = 1 - t
     ce = -(correctYes*log_yes_probability + correctNo*log_no_probability).sum()
