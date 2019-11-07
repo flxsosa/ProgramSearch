@@ -513,7 +513,7 @@ class ProgramPointerNetwork(Module):
             # Gather together objects in scope
             objectsInScope = list(currentGraph.objects(oneParent=self.oneParent))
             scope = scopeEncoding.encoding(spec, objectsInScope)
-            import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
             object2pointer = {o: Pointer(i)
                               for i, o  in enumerate(objectsInScope)}
 

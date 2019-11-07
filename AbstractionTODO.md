@@ -28,8 +28,14 @@ THURSDAY:
 - [ ] test batching ...
 
 - [ ] why is AbstractPointerNet worse than noExecution?
-	- hyp1: just bc of 
+	- hyp1: just bc of hidden state
 	- hyp2: only having a decoder makes it train better
+
+
+what do i actually want to test?
+- [ ] can we learn to successfully judge sketches?
+- [ ] what is the right way to train a sketch judger?
+- [ ] what is the correct form of a sketch judger?
 
 
 
