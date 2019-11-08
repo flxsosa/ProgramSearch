@@ -16,7 +16,7 @@ THURSDAY:
 
 - [ ] hack to use noExecution policy but AbstractPointerNet distance? - seems like an optimization at this point
 
-- [ ] fix symmetry problem 
+- [ ] fix symmetry problem + scoping issues
 		- summation issue???
 		- reward is off ... 
 		- what are the non-parses in the sampling?
@@ -24,8 +24,7 @@ THURSDAY:
 		- are objectencodings converging to zero? - no, dont think so
 		- are objectencodings actually working? check eq - seems so ... 
 		- ask kevin: does graph rename and reorder vars for viewing pleasure?
-
-- [ ] test batching ...
+		- my thing breaks programGraph. idk when program graph is used tho
 
 - [ ] why is AbstractPointerNet worse than noExecution?
 	- hyp1: just bc of hidden state
@@ -38,6 +37,7 @@ what do i actually want to test?
 - [ ] what is the correct form of a sketch judger?
 
 
+Test currently training system!!
 
 
 ********

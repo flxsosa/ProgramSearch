@@ -171,13 +171,13 @@ def JankySamplingR(spec, program):
 if __name__ == "__main__":
 
 
-    concrete_p = Difference(Circle(1,2,3),
+    concrete_p2 = Difference(Circle(1,2,3),
               Rectangle(2,3,4,4,4,4,3,3))
-    concrete_p2 = Difference(Circle(1,3,3),
-              Circle(2,21,9))
-    print(concrete_p)
-    p = concrete_p.abstract()
-    print(p)
+    # concrete_p2 = Difference(Circle(1,3,3),
+    #           Circle(2,21,9))
+    # print(concrete_p)
+    # p = concrete_p.abstract()
+    # print(p)
 
     oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
     se = SpecEncoder()
@@ -199,7 +199,7 @@ if __name__ == "__main__":
         L2 = sum(l for ls in losses2 for l in ls  )
         print("l2:", L2)
 
-        if L2 < .2: #1.387:
+        if L2 < .1: #1.387:
 
             # fs = ForwardSample(m)
             # samps = []
@@ -210,17 +210,22 @@ if __name__ == "__main__":
             # bs = BeamSearch(m)
             # sols = bs.infer(concrete_p2, lambda s, p: 0 ,5)
 
+            objectEncodings = ScopeEncoding(m)
+
             B = []
-            for b in m2.beaming(concrete_p2, B=20, maximumLines=4,maximumTokens=100):
+            for b in m2.beaming(concrete_p2, B=10, maximumLines=4,maximumTokens=100):
                 B.append(b)
                 print(b)
 
+                objects = b[1]
+                objEncodings = objectEncodings.encoding(concrete_p2, objects)
+                #print(objEncodings.shape)
+                specEncodings = m.specEncoder(concrete_p2.execute()) #m.specEncoder(np.array([concrete_p2.execute()] ) )
+                #print(specEncodings.shape)
 
-            objectEncodings = ScopeEncoding(m)
-            oe = objectEncodings.encoding(spec, objects)
-            specEncodings = m.specEncoder(np.array([s.execute() for s in specs ]))
-
-            
+                dist = m.distance(objEncodings, specEncodings)
+                print("DISTANCE", dist.item())
+                print()
 
             assert False
 
