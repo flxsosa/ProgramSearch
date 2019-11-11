@@ -181,7 +181,7 @@ if __name__ == "__main__":
         critic = A2C(m)
 
         if arguments.train_abstraction:
-            R = ExactMatchTreeR(spec, program)
+            R = lambda spec, program: ExactMatchTreeR(spec, program)
         else:
             def R(spec, program):
                 if len(program) == 0 or len(program) > len(spec.toTrace()): return False
