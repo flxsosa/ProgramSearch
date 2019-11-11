@@ -108,7 +108,7 @@ class SMC(Solver):
                 sampleFrequencies = np.random.multinomial(numberOfParticles, ps)
 
                 population = []
-                print("Samples:")
+                #print("Samples:")
                 childIndex = 0
                 for particle, frequency in sorted(zip(samples, sampleFrequencies),
                                                   key=lambda sf: sf[1]):

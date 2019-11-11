@@ -2,7 +2,7 @@ from CAD import *
 from tool_set import *
 import matplotlib.pyplot as plot
 
-from abstraction_dsl import NoExecutionSimpleObjectEncoder
+from abstraction_dsl import NoExecutionSimpleObjectEncoder, ExactMatchTreeR
 
 import numpy as np
 import torch
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             print(f"Resuming checkpoint {arguments.resume}")
         else:
             if arguments.noExecution:
-                m = NoExecution(se,dsl)
+                m = NoExecution(se,dsl, abstract=arguments.train_abstraction)
             else:
                 m = ProgramPointerNetwork(oe, se, dsl,
                                           oneParent=arguments.oneParent,
@@ -181,11 +181,7 @@ if __name__ == "__main__":
         critic = A2C(m)
 
         if arguments.train_abstraction:
-            def R(spec, program):
-                if len(program) == 0 or len(program) > len(spec.toTrace()): return False
-                for o in program.objects():
-                    if o == spec.abstract(): return True
-                return False
+            R = ExactMatchTreeR(spec, program)
         else:
             def R(spec, program):
                 if len(program) == 0 or len(program) > len(spec.toTrace()): return False
@@ -240,4 +236,5 @@ if __name__ == "__main__":
                 solvers=arguments.solvers,
                 timestamp=timestamp,
                 solverSeed=arguments.seed,
-                n_test=arguments.ntest)
+                n_test=arguments.ntest,
+                abstraction=arguments.train_abstraction)

@@ -706,8 +706,9 @@ class ProgramPointerNetwork(Module):
 
 class NoExecution(Module):
     """A baseline that does not use execution guidance"""    
-    def __init__(self, specEncoder, DSL, H=512):
+    def __init__(self, specEncoder, DSL, H=512, abstract=False):
         super(NoExecution, self).__init__()
+        self.abstract = abstract
         self.DSL = DSL
         self.specEncoder = specEncoder
 

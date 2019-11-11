@@ -1777,7 +1777,8 @@ def trainCSG(m, getProgram, trainTime=None, checkpoint=None, train_abstraction=F
 
 
 
-def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30):
+def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30, abstraction=False):
+    from abstraction_dsl import ExactMatchTreeR
     random.seed(0)
     oneParent = m.oneParent
     print(f"One parent restriction?  {oneParent}")
@@ -1788,12 +1789,17 @@ def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30)
                 "noExecution": lambda : ForwardSample_noExecution(m),
                 "noExecution_bm": lambda : Beam_noExecution(m)}
     solvers = [_solvers[s]() for s in solvers]
-    loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
+
+    if abstraction:
+        #this is a hack here .. TODO fix
+        loss = lambda spec, program: 0. if ExactMatchTreeR(spec, program) else 1. #TODO
+    else:
+        loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 
     twodimensional = True
-    def exportProgram(program, path):
+    def exportProgram(program, path, is_abstract=False):
         needTrace = program is not None
-        if program is None:
+        if (program is None) or is_abstract:
             if twodimensional:
                 program = Difference(Circle(1,1,1),Circle(1,1,1))
             else:
@@ -1825,7 +1831,8 @@ def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30)
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()
-        
+        #import pdb; pdb.set_trace()
+
         exportProgram(spec, "%s/%03d.png"%(outputDirectory,ti))
         with open("%s/%03d_spec.pickle"%(outputDirectory,ti),"wb") as handle:
             pickle.dump(spec, handle)
@@ -1845,11 +1852,14 @@ def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30)
                 if len(obs) == 0:
                     bestProgram = None
                 else:
-                    bestProgram = max(obs, key=lambda bp: bp.IoU(spec))
+                    if abstraction:
+                        bestProgram = max(obs, key=lambda bp: 1. if bp == spec.abstract() else 0.) #TODO
+                    else:
+                        bestProgram = max(obs, key=lambda bp: bp.IoU(spec)) 
                 with open("%s/%03d_%s.pickle"%(outputDirectory,ti,solver.name),"wb") as handle:
                     pickle.dump(bestProgram, handle)
                 exportProgram(bestProgram,
-                              "%s/%03d_%s.png"%(outputDirectory,ti,solver.name))
+                              "%s/%03d_%s.png"%(outputDirectory,ti,solver.name), is_abstract=abstraction)
                 if not twodimensional and bestProgram is not None:
                     bestProgram.scad("%s/%03d_%s.scad"%(outputDirectory,ti,solver.name))
                 

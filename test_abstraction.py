@@ -18,10 +18,12 @@ if __name__=='__main__':
 
     for i in range(1):
         spec = dataGenerator()
-        print(spec)
+        print("SPEC:", spec)
+
+        print("ABSTRACT TARGET:", spec.abstract())
 
         B = []
-        for ll, objects in m.beaming(spec, B=10, maximumLines=4,maximumTokens=100):
+        for ll, objects in m.beaming(spec, B=10, maximumLines=10,maximumTokens=100):
             B.append((ll, objects))
             print(ll, objects)
 

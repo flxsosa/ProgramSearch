@@ -3,7 +3,7 @@ from CAD import *
 
 from pointerNetwork import *
 
-
+from programGraph import ProgramGraph
 
 class AbstractNoExecution(NoExecution):
     #modify init so that it has a _distance module
@@ -156,7 +156,6 @@ def set_sampling_equivalent(a, b):
     # find
     pass 
 
-
 def JankySamplingR(spec, program):
     """
     Evan-style sampling-based reward. 
@@ -166,7 +165,25 @@ def JankySamplingR(spec, program):
         if set_sampling_equivalent(o,spec.abstract()): return True
     return False
 
+#finite difference seach reward??
+#o.IoU(spec) > 0.95: return True
 
+def FiniteDiffR(spec, program):
+    #finite diffence search based R
+    concretize_r
+
+    return False
+
+def ExactMatchR(spec, program):
+    #may be NP complete
+    pass
+
+def ExactMatchTreeR(spec, program):
+    if len(program) == 0 or len(program) > len(spec.toTrace()): return False
+    specGraph = ProgramGraph.fromRoot(spec.abstract(), oneParent=True).prettyPrint()
+    for o in program.objects():
+        if ProgramGraph.fromRoot(o, oneParent=True).prettyPrint() == specGraph: return True
+    return False
 
 if __name__ == "__main__":
 

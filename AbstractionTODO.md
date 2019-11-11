@@ -1,20 +1,69 @@
 Abstraction TODO:
 
-THURSDAY:
 
-- [X] figure out how to load my stuff --resume
-- [X] train an easy value fun
-	for now, R will use:
-	spec.abstract() == p ... not sure if good!!
+Building:
+- [X] build out proper eval so I can compare super easily!!!!!
+
+- [ ] train noexecution with value
+- [ ] test noexecution with value? - what does this even look like ?
+
+- [ ] better reward fn
+	- [ ] simplification - will ask Eric
+	- [ ] online gradient descent - how fast?
+	- [ ] random sampling?
 
 - [ ] begin to work on better abstraction
 	- [ ] modules?? - seems like an optimization at this point ...
 
-- [ ] better reward fn
-	- [ ] simplification - will ask Eric
-	- [ ] online gradient descent - how fast
+- [ ] hack training to use noExecution policy but AbstractPointerNet distance? - seems like an optimization at this point
 
-- [ ] hack to use noExecution policy but AbstractPointerNet distance? - seems like an optimization at this point
+- [X] proper train and test situation??
+- [X] fix symbolic symmetry bug in training somehow!!! 
+
+- [ ] fix nn symmetry bug - positional encoding??? - kinda a bad hack ...
+
+- [ ] retrain critic with this new info
+
+
+##FRIDAY:
+
+1) scale up to compare to CAD fully - should get testing fully set up.
+	a) compare dumb abstraction with good abstraction.
+	b) Mess with value function objective to determine correct form.
+
+
+#Real RL question: what is the difference between rollout training and something hacky w swapping or contrast?
+	- RL is probably the correct unbiased situation i want for my search algo
+
+
+First goal: distinguish structure and params
+	Can i compare well with kevin's CAD synthesis when using no REPL?
+	- 	form of value fun & how to train?
+
+Second goal: no struct + param distinction 
+	- "any way search"
+	- what does reward fn look like??? What is policy supervision?
+
+
+Formulating+testing:
+- [ ] can we learn to successfully judge sketches?
+- [ ] what is the right way to train a sketch judger?
+- [ ] what is the correct form of a sketch judger?
+
+ways to train value fun:
+- [ ] Simplest, maybe best: Reinforce on prob of correctness. 
+	- initial observation - doesn't seem to change much over the course of rollout ... is basically a judge of hardness ...
+- [ ] train on "if it is possible?" - doesn't mean anything on program graph bc you can always start over. Can we do it on individual program tree?
+	What did armando say: "top down better for big programs", ""
+
+
+Debugging:
+- [ ] fix symmetry issue
+
+
+
+***
+Other goals:
 
 - [ ] fix symmetry problem + scoping issues
 		- summation issue???
@@ -31,13 +80,16 @@ THURSDAY:
 	- hyp2: only having a decoder makes it train better
 
 
-what do i actually want to test?
-- [ ] can we learn to successfully judge sketches?
-- [ ] what is the right way to train a sketch judger?
-- [ ] what is the correct form of a sketch judger?
+
+THURSDAY:
+- [X] figure out how to load my stuff --resume
+- [X] train an easy value fun
+	for now, R will use:
+	spec.abstract() == p ... not sure if good!!
 
 
 Test currently training system!!
+- [X] build simple demo script
 
 
 ********
