@@ -1,6 +1,7 @@
 import os
 import pickle
 import numpy as np
+from collections import deque
 
 from API import *
 
@@ -171,7 +172,7 @@ module cylindrical(p1,p2,radius)
     def IoU(self, other):
         if isinstance(other, CSG): other = other.execute()
         return (self.execute()*other).sum()/(self.execute() + other - self.execute()*other).sum()
-    
+
     def removeDeadCode(self): return self
 
     def depthMaps(self, r=None):
@@ -612,15 +613,18 @@ class Rectangle(CSG):
 
     def abstract(self):
         return Ab_Rectangle() #TODO import situation ...
-    # def flipX(self):
-    #     return Rectangle(RESOLUTION - self.x1, self.y0,
-    #                       RESOLUTION - self.x0, self.y1)
 
-    # def flipY(self):
-    #     return Rectangle(self.x0, RESOLUTION - self.y1,
-    #     			   self.x1, RESOLUTION - self.y0)
-
-class Circle(CSG):
+    def get_params(self):
+        return deque([self.x0,
+                self.y0,
+                self.x1,
+                self.y1,    
+                self.x2,    
+                self.y2,            
+                self.x3,            
+                self.y3])
+        
+class Circle(CSG):      
     token = 'tc'
     type = arrow(integer(0, RESOLUTION - 1),
                  integer(0, RESOLUTION - 1),
@@ -635,7 +639,6 @@ class Circle(CSG):
 
     def toTrace(self): return [self]
 
-    
 
     def extent(self):
         r = self.d//2 + 1
@@ -687,6 +690,9 @@ class Circle(CSG):
 
     def abstract(self):
         return Ab_Circle()
+
+    def get_params(self):
+        return deque([self.x, self.y, self.d])
 
 class Union(CSG):
     token = '+'
@@ -775,6 +781,23 @@ class Union(CSG):
             self.elements[0].abstract(),
             self.elements[1].abstract())
 
+    def _diff_render(self, params, r=None):
+        r = r or RESOLUTION
+        a = self.elements[0]._diff_render(params, r=r)
+        b = self.elements[1]._diff_render(params, r=r)
+        return a + b - a*b   
+
+    def get_param_count(self):
+        return self.elements[0].get_param_count() + self.elements[1].get_param_count()
+
+    def concretize(self, params):
+        return Union(
+            self.elements[0].concretize(params),
+            self.elements[1].concretize(params))
+
+    def get_params(self):
+        return self.elements[0].get_params() + self.elements[1].get_params()
+
 class Difference(CSG):
     token = '-'
     type = arrow(tCSG, tCSG, tCSG)
@@ -860,6 +883,20 @@ class Difference(CSG):
         return Difference(
             self.a.abstract(),
             self.b.abstract())
+
+    def _diff_render(self, params, r=None):
+        a = self.a._diff_render(params, r=r)
+        b = self.b._diff_render(params, r=r)
+        return torch.clamp(a-b, min=0., max=1.)   
+
+    def get_param_count(self):
+        return self.a.get_param_count() + self.b.get_param_count()
+
+    def concretize(self, params):
+        return Difference(self.a.concretize(params), self.b.concretize(params))
+
+    def get_params(self):
+        return self.a.get_params() + self.b.get_params()
 
 class Intersection(CSG):
     token = '*'
@@ -2006,6 +2043,41 @@ class Ab_Rectangle(Rectangle):
 
     def __hash__(self): return id(self)
 
+    def get_param_count(self):
+        return 8
+
+    def _diff_render(self, parameters, r=None):
+        params = [parameters.popleft() for _ in range(8)]
+        #params = parameters 
+
+        # a hack, ask eric for nice version ...
+        r = r or RESOLUTION
+        x, y = np.indices((r,r))/float(r)
+
+        x = torch.tensor(x).float()
+        y = torch.tensor(y).float()
+
+        p0 = torch.stack((params[0], params[1]))/RESOLUTION
+        p1 = torch.stack((params[2], params[3]))/RESOLUTION
+        p2 = torch.stack((params[4], params[5]))/RESOLUTION
+        p3 = torch.stack((params[6], params[7]))/RESOLUTION
+
+        def halfPlane(p,q):
+            nonlocal x, y
+            return (x - p[0])*(p[1] - q[1]) - (y - p[1])*(p[0] - q[0])
+
+        def leq_zero(t):
+            out =  torch.sigmoid((-t)*10000 )
+            return out
+            #return torch.sigmoid(100.* (out-.1))
+
+        return leq_zero(halfPlane(p0,p1))*leq_zero(halfPlane(p1,p2))*leq_zero(halfPlane(p2,p3))*leq_zero(halfPlane(p3,p0))
+        #return 1.*((halfPlane(p0,p1) <= 0.)&(halfPlane(p1,p2) <= 0)&(halfPlane(p2,p3) <= 0)&(halfPlane(p3,p0) <= 0))
+
+    def concretize(self, params):
+        parameters = [params.popleft() for _ in range(8)]
+        return Rectangle(*parameters)
+
 class Ab_Circle(Circle):
     type = tCSG
 
@@ -2022,6 +2094,38 @@ class Ab_Circle(Circle):
         assert False
 
     def __hash__(self): return id(self)
+
+    def get_param_count(self):
+        return 3
+
+    def _diff_render(self, params, r=None):
+        #differentiable rendering
+        tx, ty, td = [params.popleft() for _ in range(3)]
+
+        r = r or RESOLUTION
+        x, y = np.indices((r,r))/float(r)
+
+        x = torch.tensor(x).float()
+        y = torch.tensor(y).float()
+
+        dx = (x - tx/RESOLUTION)
+        dy = (y - ty/RESOLUTION)
+        distance2 = dx*dx + dy*dy
+
+        r = td/2   
+        #import pdb; pdb.set_trace()
+        out = torch.sigmoid(10000*((r/RESOLUTION)*(r/RESOLUTION) - distance2) ).float()
+        return out 
+        #return torch.sigmoid(100. * (out - .1)) #oh god oh god
+        #return F.sigmoid(1000000/1.*( (r/RESOLUTION)*(r/RESOLUTION) - distance2) ).float()
+        #return (1.*(distance2 <= (r/RESOLUTION)*(r/RESOLUTION))).float()
+
+    def concretize(self, params):
+        x, y, d = [params.popleft() for _ in range(3)]
+        return Circle(x, y, d)
+
+
+
 
 dsl_2d_abstraction = DSL([Union, Difference, Intersection, Ab_Rectangle, Ab_Circle]) #No Loops
 

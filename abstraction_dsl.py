@@ -170,7 +170,9 @@ def JankySamplingR(spec, program):
 
 def FiniteDiffR(spec, program):
     #finite diffence search based R
-    concretize_r
+
+    
+    concreteized = program.concretize(params)
 
     return False
 

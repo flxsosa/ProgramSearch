@@ -4,13 +4,25 @@ Abstraction TODO:
 Building:
 - [X] build out proper eval so I can compare super easily!!!!!
 
-- [ ] train noexecution with value
+- [ ] train value with noExecution - 
 - [ ] test noexecution with value? - what does this even look like ?
+
+
+- [ ] differentiable rendering:
+	- [ ] fix the off by one errors of the sigmoid
+	- [ ] find a cleaner way to thread params through the system
+	- [X] implement get_param_count
+	- [X] implement get and set params
+	- [ ] put limits on differentiating so nothing goes out of bounds
+	- [ ] implement something more sophisticated so rectangles and such have reasonable sizes
+	- [ ] implement random sampling
+
+
 
 - [ ] better reward fn
 	- [ ] simplification - will ask Eric
-	- [ ] online gradient descent - how fast?
 	- [ ] random sampling?
+	- [X] prettyPrint
 
 - [ ] begin to work on better abstraction
 	- [ ] modules?? - seems like an optimization at this point ...
@@ -18,11 +30,16 @@ Building:
 - [ ] hack training to use noExecution policy but AbstractPointerNet distance? - seems like an optimization at this point
 
 - [X] proper train and test situation??
-- [X] fix symbolic symmetry bug in training somehow!!! 
 
+- [X] fix symbolic symmetry bug in training - prettyPrint
 - [ ] fix nn symmetry bug - positional encoding??? - kinda a bad hack ...
 
-- [ ] retrain critic with this new info
+- [X] retrain critic with this new info
+
+- [ ] compare with non-abstract version
+- [ ] find a way to test on IoU for real
+
+- [X] train a normal network - in imitation phase now
 
 
 ##FRIDAY:
