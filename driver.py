@@ -149,7 +149,8 @@ if __name__ == "__main__":
         else:
             if arguments.train_abstraction:
                 dsl = dsl_2d_abstraction
-                oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+                # oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+                oe = NMObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
             else:
                 dsl = dsl_2d
                 oe = ObjectEncoder()
