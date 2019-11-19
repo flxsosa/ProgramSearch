@@ -148,6 +148,68 @@ class NoExecutionSimpleObjectEncoder(Module):
         return objectEncodings
 
 
+class NMN(Module):
+    def __init__(self, operator, H=512):
+        super(NMN, self).__init__()
+
+        if operator.type.isArrow:
+            n_args = len(operator.type.arguments)
+            #can just do a stack I think ...
+
+        else:
+            self.params = nn.Parameter(512)
+        
+        self.finalize()
+
+    def forward(self):
+        pass
+        #TODO .. api of this
+
+
+class NMObjectEncoder(Module):
+    """
+    ModuleEncoder, unbatched for now
+    """
+    def __init__(self, specEncoder, DSL, H=512):
+        super(NMObjectEncoder, self).__init__()
+        self.specEncoder = specEncoder
+        #self.initialState = nn.Linear(self.specEncoder.outputDimensionality, H)
+        self.lexicon = DSL.lexicon
+
+        #
+        self.modules = nn.ModuleDict()
+        for op in DSL.operators:
+            self.modules[op.token] = NMN(op)
+
+        #self.embedding = nn.Embedding(len(self.lexicon), H)
+        #self.wordToIndex = {w: j for j,w in enumerate(self.lexicon) }
+        #self.model = nn.GRU(H,H,1)
+        self.H = H
+        self.outputDimensionality = H
+        self.finalize()
+
+    def forward(self, spec, obj):
+        """
+        spec is a list of specs
+        obj is a list of objs
+
+        basic idea: slurp up obj encoding. for now probably don't use spec??
+        unbatched for now
+        """
+        def apply(p):
+            #recursive helper fn
+            if not p.type.isArrow:
+                return self.modules[p.token]
+            else:
+                return self.modules[p.token](map(apply, p.children()))
+
+        for o in obj:
+            out = apply(o)
+        return out
+
+
+
+
 def set_sampling_equivalent(a, b):
     """
     Evan-style sampling-based reward. 
@@ -171,7 +233,7 @@ def JankySamplingR(spec, program):
 def FiniteDiffR(spec, program):
     #finite diffence search based R
 
-    
+
     concreteized = program.concretize(params)
 
     return False

@@ -7,17 +7,16 @@ Building:
 - [ ] train value with noExecution - 
 - [ ] test noexecution with value? - what does this even look like ?
 
+- [ ] make the final reward fn!!!
 
 - [ ] differentiable rendering:
 	- [ ] fix the off by one errors of the sigmoid
 	- [ ] find a cleaner way to thread params through the system
 	- [X] implement get_param_count
 	- [X] implement get and set params
-	- [ ] put limits on differentiating so nothing goes out of bounds
+	- [X] put limits on differentiating so nothing goes out of bounds - clamp
 	- [ ] implement something more sophisticated so rectangles and such have reasonable sizes
 	- [ ] implement random sampling
-
-
 
 - [ ] better reward fn
 	- [ ] simplification - will ask Eric

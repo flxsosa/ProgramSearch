@@ -64,7 +64,7 @@ class DSL:
             lexicon.sort(key=lambda z: (str(z.__class__),z))
             
         self.lexicon = lexicon
-        print(self.lexicon)
+        #print(self.lexicon)
         self.operators = operators
 
         self.tokenToOperator = {o.token: o

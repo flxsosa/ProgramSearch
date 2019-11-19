@@ -24,6 +24,9 @@ def test_full():
 
 		print(i, score)
 
+def clip_params(params):
+	for p in params:
+		p.data.clamp_(min=0, max=RESOLUTION) 
 
 def test_simple():
 	# spec = Circle(1,2,3)
@@ -32,9 +35,9 @@ def test_simple():
 	# td = Parameter(torch.tensor(4.))
 	# params = [tx, ty, td]
 	from collections import deque
-	spec = Union(Circle(1,2,5),
-	          Circle(2,21,9))
-
+	spec = Union(Circle(4,5,10),
+				Rectangle(14,2,14,30,26,30,26,2))
+	spec.export('spec.png', 32)
 	#spec=Rectangle(14,2,14,30,26,30,26,2)
 
 	abstract_prog = spec.abstract()
@@ -47,7 +50,8 @@ def test_simple():
 	params = deque([Parameter(torch.tensor(random.choice(range(RESOLUTION))).float()) 
 						for _ in range(param_count)])
 
-	#params = deque( [Parameter(torch.tensor(x).float()) for x in old_params])
+	params = deque( [Parameter(torch.tensor(x + random.choice(range(-2, 2))).float())
+					 for x in old_params])
 	#params = deque([Parameter(torch.tensor(x).float()) for x in [14,3,14,30,26,30,26,3]]) #whatever
 
 	optimizer = optim.Adam(params, lr=0.5)
@@ -60,11 +64,11 @@ def test_simple():
 		(-score).backward(retain_graph=True)
 		optimizer.step()
 		print(i, score)
-
+		clip_params(params)
 
 	new_concrete = abstract_prog.concretize(deque(round(param.item()) for param in params))
 	print("concrete IoU:", new_concrete.IoU(spec))
-
+	new_concrete.export('found.png', 32)
 	print(params)
 
 if __name__=='__main__':

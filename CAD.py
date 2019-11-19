@@ -2132,9 +2132,10 @@ dsl_2d_abstraction = DSL([Union, Difference, Intersection, Ab_Rectangle, Ab_Circ
 
 if __name__ == "__main__":
     m = NoExecution(SpecEncoder(), dsl_2d_abstraction)
-    p = Union(Ab_Circle(1,2,3),
-              Ab_Circle(2,21,9))
+    p = Union(Ab_Circle(),
+              Ab_Circle())
 
+    assert 0
 
 
     optimizer = torch.optim.Adam(m.parameters(), lr=0.001, eps=1e-3, amsgrad=True)
