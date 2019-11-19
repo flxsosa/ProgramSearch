@@ -149,20 +149,38 @@ class NoExecutionSimpleObjectEncoder(Module):
 
 
 class NMN(Module):
-    def __init__(self, operator, H=512):
+    def __init__(self, operator, H=128):
         super(NMN, self).__init__()
+        self.operator = operator
+    
 
         if operator.type.isArrow:
             n_args = len(operator.type.arguments)
+            self.n_args = n_args
             #can just do a stack I think ...
+            if n_args == 1:
+                self.params = nn.Sequential(nn.Linear(H, H), nn.ReLU())
+
+            elif n_args == 2:
+                self.params = nn.Sequential(nn.Linear(2*H, H), nn.ReLU())
+            else:
+                assert False, "more than two inputs not supported"
 
         else:
-            self.params = nn.Parameter(512)
+            self.n_args = 0
+            self.params = nn.Parameter(torch.randn(H))
         
         self.finalize()
 
-    def forward(self):
-        pass
+    def forward(self, *args):
+        if self.n_args == 0:
+            return self.params
+        else: 
+            inp = torch.cat(args, 0) #TODO i think this is correct dim
+            out = self.params(inp)
+            return out
+
+
         #TODO .. api of this
 
 
@@ -177,9 +195,9 @@ class NMObjectEncoder(Module):
         self.lexicon = DSL.lexicon
 
         #
-        self.modules = nn.ModuleDict()
+        self.fn_modules = nn.ModuleDict()
         for op in DSL.operators:
-            self.modules[op.token] = NMN(op)
+            self.fn_modules[op.token] = NMN(op, H)
 
         #self.embedding = nn.Embedding(len(self.lexicon), H)
         #self.wordToIndex = {w: j for j,w in enumerate(self.lexicon) }
@@ -199,13 +217,15 @@ class NMObjectEncoder(Module):
         def apply(p):
             #recursive helper fn
             if not p.type.isArrow:
-                return self.modules[p.token]
+                return self.fn_modules[p.token]()
             else:
-                return self.modules[p.token](map(apply, p.children()))
+                return self.fn_modules[p.token](*map(apply, p.children()))
 
-        for o in obj:
-            out = apply(o)
-        return out
+        out = []
+        for o in obj: #this is a batch, I believe
+            # ideally should memoize so I'm not redoing work here
+            out.append( apply(o) )
+        return torch.stack(out, dim=0)
 
 
 
