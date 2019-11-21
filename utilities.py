@@ -160,6 +160,18 @@ def binary_cross_entropy(y,t, epsilon=10**-10, average=True):
     if average: ce = ce/B
     return ce
 
+
+def triplet_loss(positivePredictions, negativePredictions, alpha=0.1)
+    # idk what alpha is good
+    # make sure signs are correct
+    losses = torch.max(0, positivePredictions - negativePredictions + alpha)
+    return losses.sum()
+
+def getOE(spec, traceObjs, scopeEncoding)
+    g = ProgramGraph(traceObjs)
+    objectsInScope = g.objects(oneParent=self.oneParent)
+    oe = scopeEncoding.encoding(spec, objectsInScope)
+    return oe
     
 def load_checkpoint(fn):
     """wrapper over torch.load which places checkpoints on the CPU if a GPU is not available"""

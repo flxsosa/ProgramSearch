@@ -1,5 +1,17 @@
 Abstraction TODO:
 
+- [ ] kevin reweights policy RL so that it doesn't give more score to easier things by normalizing by number of hit trajectories.
+- [ ] it seems that there is a small bug in kevin's code, he sums value losses but averages policy losses in a batch.
+
+
+- [ ] implement contrastive divergence/triplet loss
+	- [ ] quadruple triplet loss ...
+	- [ ] figure out how to get it in code
+	- [ ] probably recoding A2C
+	- [ ] question: is .toTrace() the same as matching the program graph?? if so, then I can feel fine about the RL loss
+
+
+	- [ ] writing sampling code?
 
 Building:
 - [X] build out proper eval so I can compare super easily!!!!!

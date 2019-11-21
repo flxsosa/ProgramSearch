@@ -532,8 +532,8 @@ class ProgramPointerNetwork(Module):
         """Returns [policy losses]"""
         return self.gradientStepTraceBatched(optimizer, [(spec, trace)])[0]
     
-    def gradientStepTraceBatched(self, optimizer, specsAndTraces):
-        """Returns [[policy losses]]"""
+    def computePolicyLossTraceBatched(self, optimizer, specsAndTraces):
+        """Returns loss_tensor scalar, [[policy losses]]"""
         self.zero_grad()
 
         scopeEncoding = ScopeEncoding(self)
@@ -551,7 +551,13 @@ class ProgramPointerNetwork(Module):
                                               scopeEncoding=scopeEncoding)
             totalLikelihood.append(ll)
             losses.append([-l.data.item() for l in lls])
-        (-sum(totalLikelihood)).backward()
+        loss_tensor = -sum(totalLikelihood)
+        return loss_tensor, losses, specEncodings
+
+    def gradientStepTraceBatched(self, optimizer, specsAndTraces):
+        """Returns [[policy losses]]"""
+        loss_tensor, losses, _ = self.computePolicyLossTraceBatched(optimizer, specsAndTraces)
+        loss_tensor.backward()
         optimizer.step()
         return losses
 

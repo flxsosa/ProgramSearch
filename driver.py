@@ -2,7 +2,7 @@ from CAD import *
 from tool_set import *
 import matplotlib.pyplot as plot
 
-from abstraction_dsl import NoExecutionSimpleObjectEncoder, ExactMatchTreeR
+from abstraction_dsl import NoExecutionSimpleObjectEncoder, ExactMatchTreeR, NMObjectEncoder
 
 import numpy as np
 import torch
