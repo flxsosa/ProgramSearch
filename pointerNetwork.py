@@ -552,7 +552,7 @@ class ProgramPointerNetwork(Module):
             totalLikelihood.append(ll)
             losses.append([-l.data.item() for l in lls])
         loss_tensor = -sum(totalLikelihood)
-        return loss_tensor, losses, specEncodings
+        return loss_tensor, losses, specEncodings, scopeEncoding
 
     def gradientStepTraceBatched(self, optimizer, specsAndTraces):
         """Returns [[policy losses]]"""
@@ -709,6 +709,146 @@ class ProgramPointerNetwork(Module):
                 if line is None:  continue
                 yield (line, ll)
 
+    def getOE(self, spec, traceObjs, scopeEncoding):
+        g = ProgramGraph(traceObjs)
+        objectsInScope = g.objects(oneParent=self.oneParent)
+        oe = scopeEncoding.encoding(spec, objectsInScope)
+        return oe, objectsInScope
+        
+    def gradientStepContrastiveBatched(self,
+                                        optimizer,
+                                        specsPosNegTraces,
+                                        loss_mode='cross_entropy',
+                                        example_mode='posNegTraces', iteration=None):
+        """specsPosNegTraces is an object of form: #TODO"""
+
+        if example_mode == 'posNegSpecs':
+            return gradientStepContrastiveBatchedPosNegSpecs(optimizer, 
+                                                            specsPosNegTraces, 
+                                                            loss_mode=loss_mode, 
+                                                            example_mode=example_mode)
+
+        # in this version, we have positive and negative trace examples
+        # compute policy loss
+        specsAndPositiveTraces = [(spec, posTrace) for spec, posTrace, _ in specsPosNegTraces] #this changes per mode
+        policy_loss, policy_losses_list, specEncodings, scopeEncoding = self.computePolicyLossTraceBatched(
+                                                                                    optimizer,
+                                                                                    specsAndPositiveTraces)
+
+        # register negative examples
+        scopeEncoding.registerObjects([(o,spec) #this changes per mode
+                                   for spec, _, negTrace in specsPosNegTraces
+                                   for o in negTrace ]) 
+        distanceInput = []
+        valueTrainingTargets = []
+        distanceInputObjects = []
+        for b, (spec, posTrace, negTrace) in enumerate(specsPosNegTraces):
+
+            #how does this work? can i just do:
+            for t in range(len(posTrace)+1):
+                traceObjs = posTrace[:t]
+                oe_pos, objectsInScope = self.getOE(spec, traceObjs, scopeEncoding)
+                distanceInput.append((specEncodings[b], oe_pos))
+                distanceInputObjects.append((spec, objectsInScope))
+                valueTrainingTargets.append(1.0)
+
+            if negTrace == posTrace: 
+                #could put this inside the trace loop ... 
+                #is this the same as what kevin said?
+                continue
+
+
+
+            for t in range(len(negTrace)+1):
+                traceObjs = negTrace[:t]
+
+                oe_neg, objectsInScope = self.getOE(spec, traceObjs, scopeEncoding)
+
+                if any((spec, objectsInScope) == di and valueTrainingTargets[i] == 1. for i, di in enumerate(distanceInputObjects)): #and in positive group ...
+                    continue
+                distanceInput.append((specEncodings[b], oe_neg))
+                distanceInputObjects.append((spec, objectsInScope))
+                valueTrainingTargets.append(0.0)
+
+        #compute value loss
+        distancePredictions = self.batchedDistance([oe for se,oe in distanceInput],
+                                                         [se for se,oe in distanceInput])
+        distanceTargets = self.tensor(valueTrainingTargets) #TODO
+        # if iteration == 500:
+        #     import pdb; pdb.set_trace()
+        #     # nPos = distancePredictions[distanceTargets == 1.]
+        #     # print(nPos)
+        #     # posInput = distanceInput[:nPos]
+        #     # negInput = distanceInput[nPos:]
+        #     # print(len(negInput))
+        #     # for i in negInput: print(i in posInput)
+
+        if loss_mode=='cross_entropy':
+            value_loss = binary_cross_entropy(-distancePredictions, distanceTargets, average=False) #does this mean it's not a sum??
+        elif loss_mode == 'triplet':
+            #NB: will only work if trace has same number of objects cannonicallized the same way or something ...
+            # BIG HACK, they happen to line up bc of previous code
+
+            positivePredictions = distancePredictions[distanceTargets == 1.]
+            negativePredictions = distancePredictions[distanceTargets == 0.]
+
+            value_loss = triplet_loss(positivePredictions, negativePredictions)
+        else: assert False, f"mode {mode} not implemented"
+
+        (value_loss + policy_loss).backward()
+        optimizer.step()
+        return policy_loss.cpu().data.item(), value_loss.cpu().data.item(), policy_losses_list
+
+    def gradientStepContrastiveBatchedPosNegSpecs(self, optimizer, PosNegSpecsAndTraces, loss_mode='cross_entropy'):
+        """specsPosNeg is an object of form: #TODO"""
+        # in this version, we have positive and negative Specs, and a single set of Traces
+
+        # compute policy loss
+        PosSpecsAndTraces = [(spec, trace) for posSpec, _, posTrace, in PosNegSpecsAndTraces] #this changes per mode
+        policy_loss, policy_losses_list, posSpecEncodings, scopeEncoding = self.computePolicyLossTraceBatched(optimizer, PosSpecsAndTraces)
+
+
+        #compute negative spec encodings:
+        negSpecRenderings = np.array([s.execute()
+                                       for _,s , _ in PosNegSpecsAndTraces ])
+        negSpecEncodings = self.specEncoder(negSpecRenderings)
+
+        # register negative specexamples
+        scopeEncoding.registerObjects([(o,spec) #this changes per mode
+                                   for _, negSpec, trace in PosNegSpecsAndTraces
+                                   for o in trace ])
+        distanceInput = []
+        valueTrainingTargets = []
+        for b, (posSpec, negSpec, trace) in enumerate(specsPosNeg):
+            #how does this work? can i just do:
+            for t in range(len(trace)+1):
+                traceObjs = trace[:t]
+                oe_pos = self.getOE(posSpec, traceObjs, scopeEncoding)
+                distanceInput.append((posSpecEncodings[b], oe_pos))
+                valueTrainingTargets.append(1.)
+
+                oe_neg = self.getOE(negSpec, traceObjs, scopeEncoding)
+                distanceInput.append((negSpecEncodings[b], oe_neg))
+                valueTrainingTargets.append(0.)
+
+        #compute value loss
+        distancePredictions = self.batchedDistance([oe for se,oe in distanceInput],
+                                                         [se for se,oe in distanceInput])
+        distanceTargets = self.tensor(valueTrainingTargets)
+
+        if loss_mode=='cross_entropy':
+            value_loss = binary_cross_entropy(-distancePredictions, distanceTargets, average=False) #does this mean it's not a sum??
+        elif loss_mode == 'triplet':
+            # BIG HACK, they happen to line up bc of previous code
+            positivePredictions = distancePredictions[distanceTargets == 1.]
+            negativePredictions = distancePredictions[distanceTargets == 0.]
+
+            value_loss = triplet_loss(positivePredictions, negativePredictions)
+        else: assert False, f"mode {mode} not implemented"
+        #todo
+        (value_loss + policy_loss).backward()
+        optimizer.step()
+        return policy_loss.cpu().data.item(), value_loss.cpu().data.item(), policy_losses_list
 
 class NoExecution(Module):
     """A baseline that does not use execution guidance"""    

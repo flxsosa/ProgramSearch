@@ -2129,12 +2129,27 @@ class Ab_Circle(Circle):
 
 dsl_2d_abstraction = DSL([Union, Difference, Intersection, Ab_Rectangle, Ab_Circle]) #No Loops
 
+#todo: this is a hack!!
+ops = (Union, Difference, Ab_Circle, Ab_Rectangle)
+def changeTopLevel(prog, operators=ops):
+    """
+    used for mutating programs. in CAD.py for import reasons
+    """
+    candidateOps = [op for op in operators if str(op.type)==str(prog.type) and type(prog) != op]
+    # print("PROG", prog)
+    # print("cands", candidateOps)
+    if candidateOps == []:
+        import pdb; pdb.set_trace()
+    op = random.choice(candidateOps)
+    return op(*prog.children())
 
 if __name__ == "__main__":
     m = NoExecution(SpecEncoder(), dsl_2d_abstraction)
     p = Union(Ab_Circle(),
               Ab_Circle())
 
+    from a2cAbstract import mutate
+    print(mutate(p))
     assert 0
 
 

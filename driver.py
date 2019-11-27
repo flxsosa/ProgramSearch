@@ -9,6 +9,7 @@ import torch
 import random
 
 from datetime import datetime
+from contrastive import trainAbstractContrastive
 
 
 
@@ -46,6 +47,9 @@ if __name__ == "__main__":
     parser.add_argument("--rotate", default=False, action='store_true')
     parser.add_argument("--solvers",default=["fs"],nargs='+')
     parser.add_argument("--train_abstraction", default=False, action='store_true')
+    parser.add_argument("--contrastive", default=False, action='store_true')
+    parser.add_argument("--contrastive_loss_mode", type=str, default='cross_entropy')
+    parser.add_argument("--contrastive_example_mode", type=str, default='posNegTraces')
     #^only applies to training the noexecution model now
 
     timestamp = datetime.now().strftime('%FT%T')
@@ -172,9 +176,18 @@ if __name__ == "__main__":
                                           heads=arguments.heads,
                                           H=arguments.hidden,
                                           abstract=arguments.train_abstraction)
-        trainCSG(m, training,
-                 trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
-                 checkpoint=arguments.checkpoint, train_abstraction=arguments.train_abstraction )
+
+        if arguments.contrastive:
+            trainAbstractContrastive(m, training, 
+                trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
+                checkpoint=arguments.checkpoint, train_abstraction=arguments.train_abstraction,
+                loss_mode=arguments.contrastive_loss_mode,
+                example_mode=arguments.contrastive_example_mode)
+
+        else:
+            trainCSG(m, training,
+                     trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
+                     )
     elif arguments.mode == "critic":
         assert arguments.resume is not None, "You need to specify a checkpoint with --resume, which bootstraps the policy"
         m = torch.load(arguments.resume)
