@@ -781,10 +781,10 @@ class Union(CSG):
             self.elements[0].abstract(),
             self.elements[1].abstract())
 
-    def _diff_render(self, params, r=None):
+    def _diff_render(self, params, r=None, temp=10000):
         r = r or RESOLUTION
-        a = self.elements[0]._diff_render(params, r=r)
-        b = self.elements[1]._diff_render(params, r=r)
+        a = self.elements[0]._diff_render(params, r=r, temp=temp)
+        b = self.elements[1]._diff_render(params, r=r, temp=temp)
         return a + b - a*b   
 
     def get_param_count(self):
@@ -884,9 +884,9 @@ class Difference(CSG):
             self.a.abstract(),
             self.b.abstract())
 
-    def _diff_render(self, params, r=None):
-        a = self.a._diff_render(params, r=r)
-        b = self.b._diff_render(params, r=r)
+    def _diff_render(self, params, r=None, temp=10000):
+        a = self.a._diff_render(params, r=r, temp=temp)
+        b = self.b._diff_render(params, r=r, temp=temp)
         return torch.clamp(a-b, min=0., max=1.)   
 
     def get_param_count(self):
@@ -2046,7 +2046,7 @@ class Ab_Rectangle(Rectangle):
     def get_param_count(self):
         return 8
 
-    def _diff_render(self, parameters, r=None):
+    def _diff_render(self, parameters, r=None, temp=10000):
         params = [parameters.popleft() for _ in range(8)]
         #params = parameters 
 
@@ -2067,7 +2067,7 @@ class Ab_Rectangle(Rectangle):
             return (x - p[0])*(p[1] - q[1]) - (y - p[1])*(p[0] - q[0])
 
         def leq_zero(t):
-            out =  torch.sigmoid((-t)*10000 )
+            out =  torch.sigmoid((-t)*temp )
             return out
             #return torch.sigmoid(100.* (out-.1))
 
@@ -2098,7 +2098,7 @@ class Ab_Circle(Circle):
     def get_param_count(self):
         return 3
 
-    def _diff_render(self, params, r=None):
+    def _diff_render(self, params, r=None, temp=10000):
         #differentiable rendering
         tx, ty, td = [params.popleft() for _ in range(3)]
 
@@ -2114,7 +2114,7 @@ class Ab_Circle(Circle):
 
         r = td/2   
         #import pdb; pdb.set_trace()
-        out = torch.sigmoid(10000*((r/RESOLUTION)*(r/RESOLUTION) - distance2) ).float()
+        out = torch.sigmoid(temp*((r/RESOLUTION)*(r/RESOLUTION) - distance2) ).float()
         return out 
         #return torch.sigmoid(100. * (out - .1)) #oh god oh god
         #return F.sigmoid(1000000/1.*( (r/RESOLUTION)*(r/RESOLUTION) - distance2) ).float()
