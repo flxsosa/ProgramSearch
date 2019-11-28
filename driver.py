@@ -50,6 +50,7 @@ if __name__ == "__main__":
     parser.add_argument("--contrastive", default=False, action='store_true')
     parser.add_argument("--contrastive_loss_mode", type=str, default='cross_entropy')
     parser.add_argument("--contrastive_example_mode", type=str, default='posNegTraces')
+    parser.add_argument("--nonmodular", action='store_true')
     #^only applies to training the noexecution model now
 
     timestamp = datetime.now().strftime('%FT%T')
@@ -57,6 +58,9 @@ if __name__ == "__main__":
     
     arguments = parser.parse_args()
     arguments.translate = not arguments.noTranslate
+
+    if arguments.nonmodular:
+        assert arguments.train_abstraction
 
     if arguments.train_abstraction:
         #assert arguments.noExecution
@@ -153,8 +157,10 @@ if __name__ == "__main__":
         else:
             if arguments.train_abstraction:
                 dsl = dsl_2d_abstraction
-                # oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
-                oe = NMObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+                if arguments.nonmodular:
+                    oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+                else:
+                    oe = NMObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
             else:
                 dsl = dsl_2d
                 oe = ObjectEncoder()
