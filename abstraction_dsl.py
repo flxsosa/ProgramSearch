@@ -100,9 +100,12 @@ def serialize_and_flatten(prog):
 class NoExecutionSimpleObjectEncoder(Module):
     """Encodes a 2d object"""
     def __init__(self, specEncoder, DSL, H=512):
+        #specEncoder can be None, meaning you dont use the spec at all to encode objects
         super(NoExecutionSimpleObjectEncoder, self).__init__()
         self.specEncoder = specEncoder
-        self.initialState = nn.Linear(self.specEncoder.outputDimensionality, H)
+        if self.specEncoder:
+            self.initialState = nn.Linear(self.specEncoder.outputDimensionality, H)
+
         self.lexicon = DSL.lexicon
         self.embedding = nn.Embedding(len(self.lexicon), H)
 
@@ -117,10 +120,12 @@ class NoExecutionSimpleObjectEncoder(Module):
 
     def forward(self, spec, obj):
         #don't use spec, just there for the API
-        if type(spec) is list:
-            specRenderings = np.array(spec)
-        else: assert False
-        h = self.initialState(self.specEncoder(specRenderings)) #oy jeez
+        if self.specEncoder:
+            if type(spec) is list:
+                specRenderings = np.array(spec)
+            else: assert False
+
+            h = self.initialState(self.specEncoder(specRenderings)) #oy jeez
         #idk if obj is a list of objs... presuably it ususaly is 
         tokens_list = [ serialize_and_flatten(o) for o in obj]
 
@@ -137,8 +142,10 @@ class NoExecutionSimpleObjectEncoder(Module):
             print("padding issues, not in correct order")
             import pdb; pdb.set_trace()
 
-
-        _,h = self.model(packed_inputSequence, h.unsqueeze(0)) #dims
+        if self.specEncoder:
+            _,h = self.model(packed_inputSequence, h.unsqueeze(0)) #dims
+        else:
+            _,h = self.model(packed_inputSequence) #dims
         unperm_idx, _ = zip(*sorted(enumerate(idxs), key = lambda x: x[1]))
         h = h[:, unperm_idx, :]
         h = h.squeeze(0)
@@ -191,6 +198,7 @@ class NMObjectEncoder(Module):
     def __init__(self, specEncoder, DSL, H=512):
         super(NMObjectEncoder, self).__init__()
         self.specEncoder = specEncoder
+        assert specEncoder is None
         #self.initialState = nn.Linear(self.specEncoder.outputDimensionality, H)
         self.lexicon = DSL.lexicon
 
@@ -262,10 +270,16 @@ def ExactMatchR(spec, program):
     #may be NP complete
     pass
 
-def ExactMatchTreeR(spec, program):
+def ExactMatchTreeR(spec, program, concreteProgram=False):
     if len(program) == 0 or len(program) > len(spec.toTrace()): return False
     specGraph = ProgramGraph.fromRoot(spec.abstract(), oneParent=True).prettyPrint()
+    # if concreteProgram: #if the program is actually concrete
+    #     for o in program.abstract().objects():
+    #         if ProgramGraph.fromRoot(o, oneParent=True).prettyPrint() == specGraph: return True
+    #     return False 
+    # else: 
     for o in program.objects():
+        if concreteProgram: o = o.abstract()
         if ProgramGraph.fromRoot(o, oneParent=True).prettyPrint() == specGraph: return True
     return False
 

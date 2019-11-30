@@ -1828,8 +1828,7 @@ def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30,
     solvers = [_solvers[s]() for s in solvers]
 
     if abstraction:
-        #this is a hack here .. TODO fix
-        loss = lambda spec, program: 0. if ExactMatchTreeR(spec, program) else 1. #TODO
+        loss = lambda spec, program: 0. if ExactMatchTreeR(spec, program, concreteProgram=not m.abstract) else 1. #TODO
     else:
         loss = lambda spec, program: 1-max( o.IoU(spec) for o in program.objects() ) if len(program) > 0 else 1.
 

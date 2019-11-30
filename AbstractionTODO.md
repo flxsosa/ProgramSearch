@@ -1,5 +1,28 @@
 Abstraction TODO:
 
+
+- [X] test out graphs.py
+- [X] modify graphs.py so it has the correct names
+- [X] modify driver.py so it can name experimentOutput subdirs
+- [X] make test_and_plot.py script 
+- [ ] test full REPL comparison
+- [ ] add timestamping to new script so it doesn't overwrite
+- [ ] run a bunch of new tests with more objects and perhaps more time?
+- [ ] make the plot I wanted
+
+- nonmodular seems to beat modular. could be because of specEncoding as rnn init.
+	- [ ] test theory by retraining nonmodular wihtout specEncoding as rnn init
+	- [ ] find a way to incorporate that goodness into modular version
+
+
+# this is rnnEncoder and noExecution (both abstract)
+python graphs.py experimentOutputs/2019-11-12T14:28:36/testResults.pickle experimentOutputs/2019-11-25T12:02:50/testResults.pickle experimentOutputs/2019-11-30T11:33:52/testResults.pickle experimentOutputs/2019-11-30T11:53:59/testResults.pickle --names abs_modular_rl abs_modular abs_non_modular no_REPL -t 10 -e figures/testgraph.png -n testgraph
+
+
+
+sbatch execute_gpu_1080.sh python driver.py imitation --2d --train_abstraction --contrastive --nonmodular
+
+
 - [ ] kevin reweights policy RL so that it doesn't give more score to easier things by normalizing by number of hit trajectories.
 - [ ] it seems that there is a small bug in kevin's code, he sums value losses but averages policy losses in a batch.
 

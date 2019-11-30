@@ -22,12 +22,18 @@ if __name__ == "__main__":
     parser.add_argument("--export","-e",type=str,default=None)
     parser.add_argument("--title","-n",type=str,default=None)
     parser.add_argument("--log","-l",action='store_true',default=False)
+    parser.add_argument("--names", type=str, nargs='+', default="") #if need custom names
     arguments = parser.parse_args()
 
     solverToResult = {}
-    for fn in arguments.checkpoints:
+    for i, fn in enumerate(arguments.checkpoints):
         with open(fn,"rb") as handle:
-            for solver, results in pickle.load(handle):
+            r = pickle.load(handle)
+            if arguments.names: assert len(r) == 1
+            for solver, results in r:
+                if arguments.names:
+                    solver = arguments.names[i]
+
                 if solver == "no_REPL_beam": continue
                 
                 if solver not in solverToResult:
@@ -79,12 +85,20 @@ if __name__ == "__main__":
                      for rs in rss ])
                 for rss in solverToResult[solver]] 
 
-    ordering = ["SMC_value","forwardSample","beam_value","beam","no_REPL"]
+    ordering = ["abs_non_modular", "abs_modular_rl", "abs_modular", "full_repl", 
+                "SMC_value", "forwardSample","beam_value","beam","no_REPL"]
+
     name = {"SMC_value": "SMC",
             "forwardSample": "policy rollout",
             "beam_value": "beam w/ value",
             "beam": "beam w/o value",
-            "no_REPL": "no REPL"}
+            "no_REPL": "no REPL",
+            "abs_non_modular": "SMC, non-modular abstract REPL (with spec in objectEnc)",
+            "abs_modular": "SMC, modular abstract REPL",
+            "full_repl": "SMC, full symbolic REPL (RL training) ",
+            "abs_modular_rl": "SMC, modular abstract REPL (RL training)"
+            }
+
     ordering = dict(zip(ordering,range(len(ordering))))
     for s in sorted(solverToResult.keys(),
                     key=lambda s: ordering[s]):

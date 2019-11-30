@@ -51,6 +51,8 @@ if __name__ == "__main__":
     parser.add_argument("--contrastive_loss_mode", type=str, default='cross_entropy')
     parser.add_argument("--contrastive_example_mode", type=str, default='posNegTraces')
     parser.add_argument("--nonmodular", action='store_true')
+    parser.add_argument("--outputFolder", default="", type=str)
+    parser.add_argument("--specInOE", action='store_true')
     #^only applies to training the noexecution model now
 
     timestamp = datetime.now().strftime('%FT%T')
@@ -158,9 +160,17 @@ if __name__ == "__main__":
             if arguments.train_abstraction:
                 dsl = dsl_2d_abstraction
                 if arguments.nonmodular:
-                    oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+                    if arguments.specInOE:
+                        oe = NoExecutionSimpleObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+                    else:
+                        oe = NoExecutionSimpleObjectEncoder(None, dsl_2d_abstraction)
                 else:
-                    oe = NMObjectEncoder(SpecEncoder(), dsl_2d_abstraction)
+                    if arguments.specInOE:
+                        assert False
+                        oe = NMObjectEncoder(SpecEncoder(), dsl_2d_abstraction) #TODO not implemented yet
+                    else:
+                        # no spec in OE
+                        oe = NMObjectEncoder(None, dsl_2d_abstraction)
             else:
                 dsl = dsl_2d
                 oe = ObjectEncoder()
@@ -254,7 +264,7 @@ if __name__ == "__main__":
                 dataGenerator,
                 arguments.timeout,
                 solvers=arguments.solvers,
-                timestamp=timestamp,
+                timestamp=arguments.outputFolder if arguments.outputFolder else timestamp,
                 solverSeed=arguments.seed,
                 n_test=arguments.ntest,
                 abstraction=arguments.train_abstraction)
