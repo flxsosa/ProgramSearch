@@ -2142,6 +2142,26 @@ def changeTopLevel(prog, operators=ops):
     op = random.choice(candidateOps)
     return op(*prog.children())
 
+def rewrite(prog):
+    #rewrites only at top level for now
+    if type(prog) == Difference: #if sub rewrite applies, do it
+        if type(prog.children()[1]) == Union:
+            x = prog.children()[0]
+            y = prog.children()[1].children()[0]
+            z = prog.children()[1].children()[1]
+            return Difference(Difference(x, y), z)
+
+        elif type(prog.children()[0]) == Difference:
+            x = prog.children()[0].children()[0]
+            y = prog.children()[0].children()[1]
+            z = prog.children()[1]
+            return Difference(x, Union(y, z))  
+
+    if type(prog) == Union: #if union rewrite applies, do it
+        return Union(*reversed(prog.children()))
+    return type(prog)(*map(rewrite, prog.children()))
+
+
 if __name__ == "__main__":
     m = NoExecution(SpecEncoder(), dsl_2d_abstraction)
     p = Union(Ab_Circle(),

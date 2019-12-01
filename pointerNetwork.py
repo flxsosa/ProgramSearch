@@ -417,15 +417,17 @@ class ScopeEncoding():
             self.object2index[o] = len(self.object2index)
         return self
 
-    def encoding(self, spec, objects):
+    def encoding(self, spec, objects, preAttn=False):
         """Takes as input a spec and O objects (as a list) and returns a OxE tensor of their encodings.
         If the owner has a self attention module, also applies the attention module.
         If objects is the empty list then return None"""
+        #preAttn returns raw vectors before attention is applied
         if len(objects) == 0: return None
         self.registerObjects([(o,spec) for o in objects])
         objectIndices = self.owner.device(torch.tensor([self.object2index[(o,spec)]
                                                         for o in objects ]))
         preAttention = self.objectEncoding[objectIndices]
+        if preAttn: return preAttention
         return self.owner.selfAttention(preAttention)
             
 class ProgramPointerNetwork(Module):
@@ -709,19 +711,19 @@ class ProgramPointerNetwork(Module):
                 if line is None:  continue
                 yield (line, ll)
 
-    def getOE(self, spec, traceObjs, scopeEncoding):
+    def getOE(self, spec, traceObjs, scopeEncoding, preAttn=False):
         g = ProgramGraph(traceObjs)
         objectsInScope = g.objects(oneParent=self.oneParent)
-        oe = scopeEncoding.encoding(spec, objectsInScope)
+        oe = scopeEncoding.encoding(spec, objectsInScope, preAttn=preAttn)
         return oe, objectsInScope
         
     def gradientStepContrastiveBatched(self,
                                         optimizer,
                                         specsPosNegTraces,
                                         loss_mode='cross_entropy',
-                                        example_mode='posNegTraces', iteration=None):
+                                        example_mode='posNegTraces', iteration=None, vector_loss_type=None, alpha=0.2):
         """specsPosNegTraces is an object of form: #TODO"""
-
+        from contrastive import getRewrite
         if example_mode == 'posNegSpecs':
             return gradientStepContrastiveBatchedPosNegSpecs(optimizer, 
                                                             specsPosNegTraces, 
@@ -742,6 +744,10 @@ class ProgramPointerNetwork(Module):
         distanceInput = []
         valueTrainingTargets = []
         distanceInputObjects = []
+
+        posVectors = []
+        negVectors = []
+        rewrittenPosVectors = []
         for b, (spec, posTrace, negTrace) in enumerate(specsPosNegTraces):
 
             #how does this work? can i just do:
@@ -757,8 +763,6 @@ class ProgramPointerNetwork(Module):
                 #is this the same as what kevin said?
                 continue
 
-
-
             for t in range(len(negTrace)+1):
                 traceObjs = negTrace[:t]
 
@@ -769,6 +773,23 @@ class ProgramPointerNetwork(Module):
                 distanceInput.append((specEncodings[b], oe_neg))
                 distanceInputObjects.append((spec, objectsInScope))
                 valueTrainingTargets.append(0.0)
+
+            if vector_loss_type is not None:
+                traceObjs = posTrace
+                oe_pos, objectsInScope = self.getOE(spec, traceObjs, scopeEncoding, preAttn=True)
+                assert len(objectsInScope) == 1 #because there should be one object at the end
+                posVectors.append(oe_pos)
+
+                traceObjs = negTrace
+                oe_neg, objectsInScope = self.getOE(spec, traceObjs, scopeEncoding, preAttn=True)
+                assert len(objectsInScope) == 1 #because there should be one object at the end
+                negVectors.append(oe_neg)
+
+                traceObjs = getRewrite(spec).toTrace()
+                #if traceObjs == posTrace: continue #if it's the same
+                oe_pos, objectsInScope = self.getOE(spec, traceObjs, scopeEncoding, preAttn=True)
+                assert len(objectsInScope) == 1 #because there should be one object at the end
+                rewrittenPosVectors.append(oe_pos)
 
         #compute value loss
         distancePredictions = self.batchedDistance([oe for se,oe in distanceInput],
@@ -792,12 +813,35 @@ class ProgramPointerNetwork(Module):
             positivePredictions = distancePredictions[distanceTargets == 1.]
             negativePredictions = distancePredictions[distanceTargets == 0.]
 
-            value_loss = triplet_loss(positivePredictions, negativePredictions)
+            value_loss = triplet_loss(positivePredictions, negativePredictions, alpha=alpha)
         else: assert False, f"mode {mode} not implemented"
 
-        (value_loss + policy_loss).backward()
+        vector_loss = 0.
+
+        if vector_loss_type == 'triplet':
+            posVector = torch.cat(posVectors, dim=0)
+            assert posVector.shape[0] == len(posVectors)
+            negVector = torch.cat(negVectors, dim=0)
+            assert negVector.shape[0] == len(negVectors)
+            rewrittenPosVector = torch.cat(rewrittenPosVectors, dim=0)
+            assert rewrittenPosVector.shape[0] == len(posVectors)
+
+            posRewriteNorms = torch.norm(posVector - rewrittenPosVector, p=2, dim=1)
+            negRewriteNorms = torch.norm(posVector - negVector , p=2, dim=1)
+
+            vector_loss = triplet_loss(posRewriteNorms, negRewriteNorms)
+        elif vector_loss_type == 'norm':
+            posVector = torch.cat(posVectors, dim=0)
+            assert posVector.shape[0] == len(posVectors)
+            rewrittenPosVector = torch.cat(rewrittenPosVectors, dim=0)
+            assert rewrittenPosVector.shape[0] == len(rewrittenPosVector)
+
+            posRewriteNorms = torch.norm(posVector - rewrittenPosVector, p=2, dim=1)
+            vector_loss = posRewriteNorms.sum()
+
+        (value_loss + policy_loss + vector_loss).backward()
         optimizer.step()
-        return policy_loss.cpu().data.item(), value_loss.cpu().data.item(), policy_losses_list
+        return policy_loss.cpu().data.item(), value_loss.cpu().data.item(), vector_loss.cpu().data.item(), policy_losses_list
 
     def gradientStepContrastiveBatchedPosNegSpecs(self, optimizer, PosNegSpecsAndTraces, loss_mode='cross_entropy'):
         """specsPosNeg is an object of form: #TODO"""

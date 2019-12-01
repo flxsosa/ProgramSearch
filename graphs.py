@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
     if arguments.export:
         plot.savefig(arguments.export)
-        export_legend(plot.legend())
+        export_legend(plot.legend(), filename=arguments.export+'legend.png')
     else:
         plot.legend()
         plot.show()

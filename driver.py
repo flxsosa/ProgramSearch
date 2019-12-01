@@ -50,9 +50,11 @@ if __name__ == "__main__":
     parser.add_argument("--contrastive", default=False, action='store_true')
     parser.add_argument("--contrastive_loss_mode", type=str, default='cross_entropy')
     parser.add_argument("--contrastive_example_mode", type=str, default='posNegTraces')
+    parser.add_argument("--vector_loss_type", type=str, default=None)
     parser.add_argument("--nonmodular", action='store_true')
     parser.add_argument("--outputFolder", default="", type=str)
     parser.add_argument("--specInOE", action='store_true')
+    parser.add_argument("--alpha", type=float, default=0.2)
     #^only applies to training the noexecution model now
 
     timestamp = datetime.now().strftime('%FT%T')
@@ -198,7 +200,8 @@ if __name__ == "__main__":
                 trainTime=arguments.trainTime*60*60 if arguments.trainTime else None,
                 checkpoint=arguments.checkpoint, train_abstraction=arguments.train_abstraction,
                 loss_mode=arguments.contrastive_loss_mode,
-                example_mode=arguments.contrastive_example_mode)
+                example_mode=arguments.contrastive_example_mode,
+                vector_loss_type=arguments.vector_loss_type, alpha=arguments.alpha)
 
         else:
             trainCSG(m, training,

@@ -46,6 +46,7 @@ def test_simple():
 	from collections import deque
 	spec = Union(Circle(4,5,10),
 				Difference(Rectangle(14,2,14,30,26,30,26,2), Circle(14,14,5)))
+
 	spec.export('spec.png', 32)
 	#spec=Rectangle(14,2,14,30,26,30,26,2)
 
@@ -94,4 +95,13 @@ def ParamSearchR(spec, program, timeout=2):
 
 
 if __name__=='__main__':
-	test_simple()
+	#test_simple()
+	from programGraph import ProgramGraph
+	spec = Union(Circle(4,5,10),
+				Difference(Rectangle(14,2,14,30,26,30,26,2), Circle(14,14,5)))
+
+	traceObjs = spec.abstract().toTrace()
+	g = ProgramGraph(traceObjs)
+	objectsInScope = g.objects(oneParent=True)
+
+

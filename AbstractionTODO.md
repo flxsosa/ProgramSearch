@@ -3,7 +3,8 @@ Abstraction TODO:
 
 - nonmodular seems to beat modular. could be because of specEncoding as rnn init.
 	- [X] test theory by retraining nonmodular wihtout specEncoding as rnn init
-		- [ ] add this to testing:
+		- [ ] add this to testing
+	- [ ] see if the effect goes away for harder problems + longer time - running now
 	- [ ] find a way to incorporate that goodness into modular version --- at the root? should think about this
 
 - [ ] triplet loss
@@ -19,11 +20,6 @@ Abstraction TODO:
 - [X] add timestamping to new script so it doesn't overwrite
 - [X] run a bunch of new tests with more objects and perhaps more time?
 - [X] make the plot I wanted
-
-
-
-
-
 
 
 

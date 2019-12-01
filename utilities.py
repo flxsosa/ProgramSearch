@@ -161,10 +161,10 @@ def binary_cross_entropy(y,t, epsilon=10**-10, average=True):
     return ce
 
 
-def triplet_loss(positivePredictions, negativePredictions, alpha=0.1):
+def triplet_loss(positivePredictions, negativePredictions, alpha=0.2):
     # idk what alpha is good
     # make sure signs are correct
-    losses = torch.max(0, positivePredictions - negativePredictions + alpha)
+    losses = torch.clamp(positivePredictions - negativePredictions + alpha, min=0.)
     return losses.sum()
     
 def load_checkpoint(fn):
