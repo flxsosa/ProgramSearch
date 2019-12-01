@@ -25,16 +25,3 @@ cmd = f"python graphs.py {testResults} --names {names} -t 20 -e figures/graph{ti
 print(cmd)
 os.system(cmd)
 
-#sbatch execute_gpu_1080.sh python driver.py imitation --2d --train_abstraction --contrastive --vector_loss_type norm --checkpoint AbstractContrastiveNormVecLoss.pickle --trainTime 48
-#15675749
-#sbatch execute_gpu_1080.sh python driver.py imitation --2d --train_abstraction --contrastive --vector_loss_type triplet --checkpoint AbstractContrastiveTripletVecLossAlpha05.pickle --alpha 0.05 --trainTime 48
-#15675858
-#sbatch execute_gpu_1080.sh python driver.py imitation --2d --train_abstraction --contrastive --vector_loss_type triplet --checkpoint AbstractContrastiveTripletVecLossAlpha2.pickle --alpha 0.2 --trainTime 48
-#15675818
-#sbatch execute_gpu_1080.sh python driver.py imitation --2d --train_abstraction --contrastive --vector_loss_type triplet --checkpoint AbstractContrastiveTripletVecLossAlpha1.pickle --alpha 1.0 --trainTime 48
-#15675859
-#sbatch execute_gpu_1080.sh python driver.py imitation --2d --train_abstraction --contrastive --vector_loss_type triplet --checkpoint AbstractContrastiveTripletVecLossAlpha5.pickle --alpha 5.0 --trainTime 48
-#15675873
-
-#sbatch execute_gpu_1080.sh python driver.py imitation --2d --train_abstraction --contrastive --checkpoint AbstractContrastive.pickle --trainTime 48
-#15676197

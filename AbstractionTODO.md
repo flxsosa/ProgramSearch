@@ -1,16 +1,22 @@
 Abstraction TODO:
+	
+- [X] implement triplet loss on vectors
+- [X] run triplet+norm loss on vectors
+- [ ] test 48 triplet+norm+normal runs 
+	- [ ] train all another 48h
+- [ ] test nonmodular w/out specEnc
+	- [ ] incorporate specEnc into modular version?
 
-
-- nonmodular seems to beat modular. could be because of specEncoding as rnn init.
-	- [X] test theory by retraining nonmodular wihtout specEncoding as rnn init
-		- [ ] add this to testing
-	- [ ] see if the effect goes away for harder problems + longer time - running now
-	- [ ] find a way to incorporate that goodness into modular version --- at the root? should think about this
-
-- [ ] triplet loss
-- [ ] bias experiment
 - [ ] e-graph
+- [ ] bias experiment
+- [ ] learning an actual comparator on vectors?
 
+
+- [ ] fix hacky rewrites - can recurse if necessary
+- [ ] fix hacky mutations?
+- [ ] triplet loss on spec?
+
+#####
 
 - [X] test out graphs.py
 - [X] modify graphs.py so it has the correct names
@@ -22,8 +28,6 @@ Abstraction TODO:
 - [X] make the plot I wanted
 
 
-
-##
 - [ ] kevin reweights policy RL so that it doesn't give more score to easier things by normalizing by number of hit trajectories.
 - [ ] it seems that there is a small bug in kevin's code, he sums value losses but averages policy losses in a batch.
 
