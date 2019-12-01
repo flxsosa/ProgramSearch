@@ -841,7 +841,7 @@ class ProgramPointerNetwork(Module):
 
         (value_loss + policy_loss + vector_loss).backward()
         optimizer.step()
-        return policy_loss.cpu().data.item(), value_loss.cpu().data.item(), vector_loss.cpu().data.item(), policy_losses_list
+        return policy_loss.cpu().data.item(), value_loss.cpu().data.item(), vector_loss.cpu().data.item() if vector_loss_type else vector_loss, policy_losses_list
 
     def gradientStepContrastiveBatchedPosNegSpecs(self, optimizer, PosNegSpecsAndTraces, loss_mode='cross_entropy'):
         """specsPosNeg is an object of form: #TODO"""
