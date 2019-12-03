@@ -3,7 +3,8 @@ from datetime import datetime
 
 #TODO add timeout stuff so can rerun
 timestamp = datetime.now().strftime('%FT%T')
-timestamp += '40obj30secTriplet'
+#timestamp = '2019-12-03T10:49:12'
+#timestamp += '40obj30secTriplet'
 
 # checkpoints = [
 # ('abs_modular', '2d_imitation_abstraction_2019-11-23T17:53:35.pickle', 'SMC'),
@@ -26,13 +27,13 @@ checkpoints = [
 
 
 for name, checkpoint, solver in checkpoints:
-	os.system(f"python driver.py test --2d --train_abstraction --checkpoint checkpoints/{checkpoint} --solvers {solver} --timeout 30 --outputFolder {name}{timestamp} --maxShapes 40")
+	os.system(f"python driver.py test --2d --train_abstraction --checkpoint checkpoints/{checkpoint} --solvers {solver} --timeout 30 --outputFolder {name}{timestamp} --maxShapes 30")
 
 names, _, _ = zip(*checkpoints)
 testResults = " ".join(f"experimentOutputs/{name}{timestamp}/testResults.pickle" for name in names)
 names = " ".join(names)
 
-cmd = f"python graphs.py {testResults} --names {names} -t 20 -e figures/graph{timestamp}.png -n testgraph"
+cmd = f"python graphs.py {testResults} --names {names} -t 30 -e figures/graph30SEC{timestamp}.png -n testgraph"
 print(cmd)
 os.system(cmd)
 

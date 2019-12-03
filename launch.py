@@ -19,7 +19,7 @@ def branch():
 def launchGoogleCloud(size, name, gpuType, gpuCount):
 
     name = name.replace('_','-').replace('.','-').lower()
-    snapshot = "containedcuda2"
+    snapshot = "max-abstraction-repl"
 
     #os.system(f"gcloud compute --project tenenbaumlab disks create {name} --size 30 --zone us-east1-b --source-snapshot dreamcoder-jan26 --type pd-standard")
     os.system(f"gcloud compute --project tenenbaumlab disks create {name} --size 100 --zone us-east1-c --source-snapshot {snapshot} --type pd-standard")
@@ -80,7 +80,7 @@ def sendCommand(
 
     preamble = f"""#!/bin/bash
 source ~/.bashrc
-cd ~/ProgramSearch
+cd ~/REPLAbstraction
 {copyCheckpoint}
 git fetch
 git checkout {br}
@@ -94,7 +94,7 @@ git pull
 # """
 #         preamble = cp_str + preamble
 
-    preamble += "mv ~/patch ~/ProgramSearch/patch\n"
+    preamble += "mv ~/patch ~/REPLAbstraction/patch\n"
     preamble += "git apply patch ; mkdir jobs\n"
 
     if upload:
@@ -201,9 +201,9 @@ def launchExperiment(
         shutdown)
     if tail: #TODO
         ssh(address, f""" \
-                    mkdir -p ProgramSearch/jobs && \
-                    touch ProgramSearch/jobs/{job_id} && \
-                    tail -f -n+0 ProgramSearch/jobs/{job_id} \
+                    mkdir -p REPLAbstraction/jobs && \
+                    touch REPLAbstraction/jobs/{job_id} && \
+                    tail -f -n+0 REPLAbstraction/jobs/{job_id} \
 """)
 
 
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument('-u', "--upload",
                         default={
-                            "mnye": "mnye@openmind7.mit.edu:/om/user/mnye/ProgramSearch",
+                            "mnye": "mnye@openmind7.mit.edu:/om/user/mnye/REPLAbstraction",
                             "ellisk": "ellisk@openmind7.mit.edu:/om2/user/ellisk/ProgramSearch",
                         }.get(user(), None))
     parser.add_argument('-z', "--size",
