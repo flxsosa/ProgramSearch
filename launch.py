@@ -80,7 +80,7 @@ def sendCommand(
 
     preamble = f"""#!/bin/bash
 source ~/.bashrc
-cd ~/REPLAbstraction
+cd ~/ProgramSearch
 {copyCheckpoint}
 git fetch
 git checkout {br}
@@ -94,7 +94,7 @@ git pull
 # """
 #         preamble = cp_str + preamble
 
-    preamble += "mv ~/patch ~/REPLAbstraction/patch\n"
+    preamble += "mv ~/patch ~/ProgramSearch/patch\n"
     preamble += "git apply patch ; mkdir jobs\n"
 
     if upload:
@@ -201,9 +201,9 @@ def launchExperiment(
         shutdown)
     if tail: #TODO
         ssh(address, f""" \
-                    mkdir -p REPLAbstraction/jobs && \
-                    touch REPLAbstraction/jobs/{job_id} && \
-                    tail -f -n+0 REPLAbstraction/jobs/{job_id} \
+                    mkdir -p ProgramSearch/jobs && \
+                    touch ProgramSearch/jobs/{job_id} && \
+                    tail -f -n+0 ProgramSearcj/jobs/{job_id} \
 """)
 
 
