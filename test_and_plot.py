@@ -30,3 +30,4 @@ os.system(cmd)
 #python driver.py test --2d --train_abstraction --checkpoint checkpoints/2d_imitation_abstraction_2019-11-23T17:53:35.pickle --solvers fs --timeout 20 --maxShapes 30
 
 #python driver.py test --2d --train_abstraction --checkpoint checkpoints/2d_critic_abstraction_2019-11-22T11:42:53.pickle --solvers fs --outputFolder fs_NonContrastive --timeout 20 --maxShapes 30
+#python driver.py test --2d --train_abstraction --checkpoint checkpoints/nonmodularAbstractContrastiveNoSpecInOE.pickle --solvers SMC --timeout 30 --outputFolder abs_non_modular2019-11-30T18:32:1840obj30sec --maxShapes 40
