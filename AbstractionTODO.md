@@ -11,10 +11,9 @@ Abstraction TODO:
 - [ ] bias experiment
 - [ ] learning an actual comparator on vectors?
 
-
-- [ ] fix hacky rewrites - can recurse if necessary
-- [ ] fix hacky mutations?
-- [ ] triplet loss on spec?
+- [ ] fix hacky rewrites - can recurse if necessary - ASK ARMANDO
+- [ ] fix hacky mutations? - seem to be fine idk
+- [ ] triplet loss with spec?
 
 #####
 

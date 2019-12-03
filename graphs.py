@@ -85,7 +85,7 @@ if __name__ == "__main__":
                      for rs in rss ])
                 for rss in solverToResult[solver]] 
 
-    ordering = ["abs_non_modular", "abs_modular_rl", "abs_modular", "full_repl", 
+    ordering = ["abs_non_modular", "abs_non_modular_withSpec", "abs_modular_rl", "abs_modular", "full_repl", 
                 "SMC_value", "forwardSample","beam_value","beam","no_REPL"]
 
     name = {"SMC_value": "SMC",
@@ -93,10 +93,11 @@ if __name__ == "__main__":
             "beam_value": "beam w/ value",
             "beam": "beam w/o value",
             "no_REPL": "no REPL",
-            "abs_non_modular": "SMC, non-modular abstract REPL (with spec in objectEnc)",
+            "abs_non_modular_withSpec": "SMC, non-modular abstract REPL (with spec in objectEnc)",
             "abs_modular": "SMC, modular abstract REPL",
             "full_repl": "SMC, full symbolic REPL (RL training) ",
-            "abs_modular_rl": "SMC, modular abstract REPL (RL training)"
+            "abs_modular_rl": "SMC, modular abstract REPL (RL training)",
+            "abs_non_modular": "SMC, non-modular abstract REPL"
             }
 
     ordering = dict(zip(ordering,range(len(ordering))))
