@@ -182,7 +182,7 @@ def launchExperiment(
         sys.exit(1)
 
     # building script:
-    command = f"python dummy.py&&singularity exec --nv container.img {command}"
+    #command = f"python dummy.py&&singularity exec --nv container.img {command}"
     script = """
 %s > jobs/%s 2>&1
 """ % (command, job_id)
