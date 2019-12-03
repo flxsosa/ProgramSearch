@@ -80,6 +80,7 @@ def sendCommand(
 
     preamble = f"""#!/bin/bash
 source ~/.bashrc
+export PATH="/home/mnye/miniconda3/bin:$PATH"
 cd ~/ProgramSearch
 {copyCheckpoint}
 git fetch
