@@ -86,7 +86,8 @@ if __name__ == "__main__":
                 for rss in solverToResult[solver]] 
 
     ordering = ["abs_non_modular", "abs_non_modular_withSpec", "abs_modular_rl", "abs_modular", "full_repl", 
-                "SMC_value", "forwardSample","beam_value","beam","no_REPL"]
+                "SMC_value", "forwardSample","beam_value","beam","no_REPL",
+                "AbsContNorm", 'AbsContTriplet.2', 'AbsContTriplet.05', 'AbsContTriplet1', 'AbsContTriplet5']
 
     name = {"SMC_value": "SMC",
             "forwardSample": "policy rollout",
@@ -97,7 +98,12 @@ if __name__ == "__main__":
             "abs_modular": "SMC, modular abstract REPL",
             "full_repl": "SMC, full symbolic REPL (RL training) ",
             "abs_modular_rl": "SMC, modular abstract REPL (RL training)",
-            "abs_non_modular": "SMC, non-modular abstract REPL"
+            "abs_non_modular": "SMC, non-modular abstract REPL",
+            "AbsContNorm": "SMC, modular abstract w/ norm vector loss",
+            'AbsContTriplet.2': "SMC, modular abstract w/ triplet 0.2 vector loss", 
+            'AbsContTriplet.05':"SMC, modular abstract w/ triplet 0.05 vector loss" ,
+            'AbsContTriplet1': "SMC, modular abstract w/ triplet 1. vector loss", 
+            'AbsContTriplet5': "SMC, modular abstract w/ triplet 5. vector loss",
             }
 
     ordering = dict(zip(ordering,range(len(ordering))))
