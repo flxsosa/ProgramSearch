@@ -1,0 +1,35 @@
+Bootstrap: docker
+
+From: ubuntu:16.04
+
+
+%runscript
+    PATH="/usr/local/conda/bin:$PATH"
+    export PATH
+    if [ $# = 0 ] ; then exec bash; else exec "$@"; fi
+
+%environment
+    PATH="/usr/local/conda/bin:$PATH"
+    export PATH
+
+
+%labels
+
+   AUTHOR ellisk@mit.edu
+
+
+%post
+
+    apt-get update && apt-get -y install python3 git wget opam m4 libcairo2-dev libzmq3-dev swig graphviz openscad build-essential cmake
+
+
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    chmod +x Miniconda3-latest-Linux-x86_64.sh
+    ./Miniconda3-latest-Linux-x86_64.sh -b  -p /usr/local/conda
+    rm ./Miniconda3-latest-Linux-x86_64.sh
+    export PATH="/usr/local/conda/bin:$PATH"
+
+    conda install -y  numpy dill pyzmq matplotlib scipy protobuf scikit-learn
+    conda install pytorch torchvision -c pytorch
+    pip install dill sexpdata pygame pycairo cairocffi psutil pypng graphviz frozendict pathos trimesh
+
