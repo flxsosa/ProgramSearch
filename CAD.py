@@ -1796,6 +1796,7 @@ def testCSG(m, getProgram, timeout, timestamp, solvers, solverSeed=0, n_test=30)
     
     twodimensional = len(specs[0].execute().shape) == 2
     for ti,spec in enumerate(specs):
+        instrumentSMC(str(ti))
         print("Trying to explain the program:")
         print(ProgramGraph.fromRoot(spec, oneParent=oneParent).prettyPrint())
         print()

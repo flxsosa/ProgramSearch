@@ -2,6 +2,7 @@ from CAD import *
 from tool_set import *
 import matplotlib.pyplot as plot
 
+from SMC import instrumentSMC
 
 import numpy as np
 import torch

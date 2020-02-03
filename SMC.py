@@ -7,6 +7,9 @@ import os
 import time
 
 INSTRUMENT = True
+def instrumentSMC(prefix):
+    global INSTRUMENT
+    INSTRUMENT = prefix
 
 class SMC(Solver):
     def __init__(self, model, _=None,
@@ -36,7 +39,7 @@ class SMC(Solver):
         allObjects = set()
 
         if INSTRUMENT:
-            os.system("mkdir  -p experimentOutputs/SMC")
+            os.system(f"mkdir  -p experimentOutputs/SMC/{INSTRUMENT}")
             
         class Particle():
             def __init__(self, trajectory, frequency, finished=False):
@@ -60,7 +63,7 @@ class SMC(Solver):
 
         while time.time() - startTime < timeout:
             population = [Particle(tuple([]), numberOfParticles)]
-            if INSTRUMENT: os.system(f"mkdir  -p experimentOutputs/SMC/{numberOfParticles}")
+            if INSTRUMENT: os.system(f"mkdir  -p experimentOutputs/SMC/{INSTRUMENT}/{numberOfParticles}")
             for generation in range(self.maximumLength):
                 if time.time() - startTime > timeout: break
                 
@@ -79,7 +82,7 @@ class SMC(Solver):
                         sampleFrequency[newKey] = sampleFrequency.get(newKey, 0) + 1
 
                 if INSTRUMENT:
-                    os.system(f"mkdir  -p experimentOutputs/SMC/{numberOfParticles}/generation{generation}")
+                    os.system(f"mkdir  -p experimentOutputs/SMC/{INSTRUMENT}/{numberOfParticles}/generation{generation}")
                 
                         
                 for o in newObjects: allObjects.add(o)
@@ -115,7 +118,7 @@ class SMC(Solver):
                     if INSTRUMENT:
                         childIndex += 1
                         trajectory = '\n'.join([str(ptt) for ptt in particle.trajectory])
-                        stringToFile(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}.txt",
+                        stringToFile(f"experimentOutputs/SMC/{INSTRUMENT}/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}.txt",
                                      f"""
 Hello Felix! I am a program.
                                      this is how many times I was originally sampled (how many parents gave birth to me): {particle.frequency}
@@ -131,7 +134,7 @@ and here is a trace of every command that gave rise to me:
                             # 2d
                             #pr.export(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}_canvas{ri}.png",
                             #          256)
-                            pr.scad(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}_canvas{ri}.png")
+                            pr.scad(f"experimentOutputs/SMC/{INSTRUMENT}/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}_canvas{ri}.png")
                     particle.frequency = frequency
                     if frequency > 0.3*numberOfParticles:
                         print(particle)
