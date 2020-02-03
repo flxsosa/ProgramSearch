@@ -110,7 +110,7 @@ module cylindrical(p1,p2,radius)
         elif fn.endswith("png"):
             with open(fn + ".scad","w") as handle:
                 handle.write(source)
-            os.system(f"openscad --camera=0,0,0,60,0,30,140 --autocenter -o {fn} {fn}.scad")
+            #os.system(f"openscad --camera=0,0,0,60,0,30,140 --autocenter -o {fn} {fn}.scad")
             #os.system(f"rm {fn}.scad")
             
         return source
