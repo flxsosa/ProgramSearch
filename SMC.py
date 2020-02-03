@@ -6,7 +6,7 @@ from pointerNetwork import *
 import os
 import time
 
-INSTRUMENT = False
+INSTRUMENT = True
 
 class SMC(Solver):
     def __init__(self, model, _=None,
@@ -128,8 +128,10 @@ and here is a trace of every command that gave rise to me:
                                      {trajectory}
 """)
                         for ri,pr in enumerate(particle.graph.objects()):
-                            pr.export(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}_canvas{ri}.png",
-                                      256)
+                            # 2d
+                            #pr.export(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}_canvas{ri}.png",
+                            #          256)
+                            pr.scad(f"experimentOutputs/SMC/{numberOfParticles}/generation{generation}/{childIndex}_beforeFrequency{particle.frequency}_afterFrequency{frequency}_canvas{ri}.png")
                     particle.frequency = frequency
                     if frequency > 0.3*numberOfParticles:
                         print(particle)
