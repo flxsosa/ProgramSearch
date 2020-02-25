@@ -55,6 +55,7 @@ if __name__ == "__main__":
     parser.add_argument("--outputFolder", default="", type=str)
     parser.add_argument("--specInOE", action='store_true')
     parser.add_argument("--alpha", type=float, default=0.2)
+    parser.add_argument("--test_data", type=str, default="", choices=['subTriangle','subCompound'])
     #^only applies to training the noexecution model now
 
     timestamp = datetime.now().strftime('%FT%T')
@@ -245,13 +246,21 @@ if __name__ == "__main__":
                               policyOracle=lambda spec: spec.toTrace(),
                               timeout=1,
                               exitIterations=-1)
+
     elif arguments.mode == "test":
         m = load_checkpoint(arguments.checkpoint)
         if arguments.td:
-            if arguments.tools:
-                dataGenerator = make2DTools()
+            if arguments.test_data == 'subTriangle':
+                from generalization2dSceneGen import randomSceneSubTriangle
+                dataGenerator = lambda: randomSceneSubTriangle(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
+            elif arguments.test_data == 'subCompound':
+                from generalization2dSceneGen import randomSceneSubCompound #TODO
+                dataGenerator = lambda: randomSceneSubCompound(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
             else:
-                dataGenerator = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
+                if arguments.tools:
+                    dataGenerator = make2DTools()
+                else:
+                    dataGenerator = lambda: randomScene(maxShapes=arguments.maxShapes, minShapes=arguments.maxShapes)
         else:
             if arguments.tools:
                 dataGenerator = make3DTools()

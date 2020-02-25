@@ -235,9 +235,7 @@ class NMObjectEncoder(Module):
             out.append( apply(o) )
         return torch.stack(out, dim=0)
 
-
-
-
+        
 def set_sampling_equivalent(a, b):
     """
     Evan-style sampling-based reward. 

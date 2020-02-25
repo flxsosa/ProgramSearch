@@ -172,6 +172,7 @@ def load_checkpoint(fn):
     print(f"Loading checkpoint {fn}. cuda? {torch.cuda.is_available()}")
     m = torch.load(fn, map_location=torch.device('cpu'))
     print(f"loaded {m}")
+    #import pdb; pdb.set_trace()
     if torch.cuda.is_available():
         print(f"moving to GPU...")
         m.cuda()

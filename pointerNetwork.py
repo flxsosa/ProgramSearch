@@ -809,6 +809,7 @@ class ProgramPointerNetwork(Module):
         elif loss_mode == 'triplet':
             #NB: will only work if trace has same number of objects cannonicallized the same way or something ...
             # BIG HACK, they happen to line up bc of previous code
+            assert False, "I don't think we want to do this"
 
             positivePredictions = distancePredictions[distanceTargets == 1.]
             negativePredictions = distancePredictions[distanceTargets == 0.]
@@ -829,7 +830,7 @@ class ProgramPointerNetwork(Module):
             posRewriteNorms = torch.norm(posVector - rewrittenPosVector, p=2, dim=1)
             negRewriteNorms = torch.norm(posVector - negVector , p=2, dim=1)
 
-            vector_loss = triplet_loss(posRewriteNorms, negRewriteNorms)
+            vector_loss = triplet_loss(posRewriteNorms, negRewriteNorms) # does this mean i never did training with different alphas? Oy vey
         elif vector_loss_type == 'norm':
             posVector = torch.cat(posVectors, dim=0)
             assert posVector.shape[0] == len(posVectors)

@@ -8,7 +8,7 @@ import numpy as np
 from CAD import changeTopLevel, Union,Ab_Circle, Ab_Rectangle, Difference,rewrite
 import sys
 
-def mutate(prog, p=0.2):
+def mutate(prog, p=0.2): #TODO modify for concrete programs
     """
     nb type(prog) and prog.type are different
     type(prog) gives the value of the root node
@@ -19,9 +19,15 @@ def mutate(prog, p=0.2):
     else:
         return type(prog)(*map(mutate, prog.children()))
 
-def getNegativeExample(prog):
-    """randomly permute a program to get a different one"""
-    prog = prog.abstract()
+def getNegativeExample(prog, abstract=True):
+    """
+    randomly permute an abstract program to get a different one
+    requres that input prog is abstract
+    """
+    if abstract:
+        prog = prog.abstract()
+    else:
+        assert False
     negProg = mutate(prog)
     return negProg
 
@@ -39,7 +45,6 @@ def trainAbstractContrastive(m,
                              vector_loss_type=None,
                              example_mode='posNegTraces',
                              train_abstraction=True, alpha=0.2):
-    assert train_abstraction
     #assert mode=='cross_entropy'
     print("cuda?", m.use_cuda)
     assert checkpoint is not None, "must provide a checkpoint path to export to"
@@ -56,15 +61,16 @@ def trainAbstractContrastive(m,
     iteration = 0
     B = 16
 
-    #ss = [getProgram() for _ in range(B)]
-    #ss = [(spec, spec.abstract().toTrace(), getNegativeExample(spec).toTrace() ) for spec in ss] 
 
     while trainTime is None or time.time() - startTime < trainTime:
         sys.stdout.flush()
 
         #possibly refactor
         ss = [getProgram() for _ in range(B)]
-        ss = [(spec, spec.abstract().toTrace(), getNegativeExample(spec).toTrace() ) for spec in ss] 
+        if train_abstraction:
+            ss = [(spec, spec.abstract().toTrace(), getNegativeExample(spec).toTrace() ) for spec in ss] 
+        else:
+            ss = [(spec, spec.toTrace(), getNegativeExample(spec, abstract=False).toTrace() ) for spec in ss] #TODO
 
         policy_loss, value_loss, vector_loss, policy_losses = m.gradientStepContrastiveBatched(optimizer, ss, 
                                                                                 loss_mode=loss_mode, 
@@ -88,6 +94,9 @@ def trainAbstractContrastive(m,
             movedLosses = []
             value_losses = []
             torch.save(m, checkpoint)
+
+
+
 
 if __name__=='__main__':
     p = Difference(Ab_Circle(), Union(Ab_Rectangle(),Ab_Circle()))
