@@ -6,7 +6,7 @@ from pointerNetwork import *
 import os
 import time
 
-INSTRUMENT = True
+INSTRUMENT = False
 def instrumentSMC(prefix):
     global INSTRUMENT
     INSTRUMENT = prefix
