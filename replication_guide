@@ -28,3 +28,7 @@ But in the above you need to include the path which was output by the reinforcem
  - SMC: sequential Monte Carlo, a.k.a. our preferred model
  - bm: beam search decoding using the policy
  - bmv: beam search decoding using the policy+value
+
+In order to create the IOU-over-time graphs use graphs.py and point it at the testResults.pickle final output by the above testing code invocations:
+
+python graphs.py  -e <PATH_WHERE_THE_IMAGE_OF_THE_GRAPH_WILL_BE_EXPORTED> -t <MAXIMUM_TIMEOUT_MEASURED_IN_SECONDS_SUCH_AS_120> -n <TITLE_OF_GRAPH> <LIST_OF_PATHS_TO_testResults.pickle_FILES>
